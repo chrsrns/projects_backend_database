@@ -5,5 +5,9 @@
 file = "../domain/src/schema.rs"
 custom_type_derives = ["diesel::query_builder::QueryId", "Clone"]
 
+[print_schema]
+file = "src/schema.rs"
+custom_type_derives = ["diesel::query_builder::QueryId", "Clone"]
+
 [migrations_directory]
 dir = "/run/media/flavolite/30524ad5-1cdc-4501-a036-1312a6bfad76/Development/projects_backend_database/infrastructure/migrations"
