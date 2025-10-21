@@ -7,5 +7,6 @@ fn rocket() -> _ {
         .mount("/api", routes![
             resume_handler::list_resumes_handler, 
             resume_handler::list_resume_handler,
+            resume_handler::create_resume_handler,
         ])
 }
