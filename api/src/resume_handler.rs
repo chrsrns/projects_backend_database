@@ -5,7 +5,7 @@ use rocket::{get, post};
 use rocket::response::status::{NotFound, Created};
 use rocket::serde::json::Json;
 
-#[get("/")]
+#[get("/resumes")]
 pub fn list_resumes_handler() -> String {
     let resumes: Vec<Resume> = read::list_resumes();
     let response = Response { body: ResponseBody::Resumes(resumes) };
