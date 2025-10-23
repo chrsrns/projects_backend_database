@@ -10,3 +10,8 @@ shared = { path = "../shared" }
 
 rocket = { version = "0.5.1", features = ["json"] }
 serde_json = "1.0.145"
+
+[dev-dependencies]
+chrono = { version = "0.4.42", features = ["serde"] }
+diesel = { version = "2.3.2", features = ["postgres"] }
+infrastructure = { path = "../infrastructure" }
