@@ -4,3 +4,4 @@ Cargo.lock
 .env
 *.snap.new
 migrations/.diesel_lock
+bruno
