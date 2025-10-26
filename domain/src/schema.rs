@@ -106,6 +106,17 @@ diesel::table! {
         mobile_number -> Nullable<Varchar>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        created_by -> Nullable<Int4>,
+    }
+}
+
+diesel::table! {
+    sessions (id) {
+        id -> Uuid,
+        user_id -> Int4,
+        expires_at -> Timestamp,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
     }
 }
 
@@ -118,6 +129,18 @@ diesel::table! {
         confidence_percentage -> Int4,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    users (id) {
+        id -> Int4,
+        #[max_length = 255]
+        email -> Varchar,
+        #[max_length = 255]
+        password_hash -> Varchar,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
     }
 }
 
@@ -154,6 +177,8 @@ diesel::joinable!(languages -> resumes (resume_id));
 diesel::joinable!(portfolio_key_points -> portfolio_projects (portfolio_project_id));
 diesel::joinable!(portfolio_projects -> resumes (resume_id));
 diesel::joinable!(portfolio_technologies -> portfolio_projects (portfolio_project_id));
+diesel::joinable!(resumes -> users (created_by));
+diesel::joinable!(sessions -> users (user_id));
 diesel::joinable!(skills -> resumes (resume_id));
 diesel::joinable!(work_experience_key_points -> work_experiences (work_experience_id));
 diesel::joinable!(work_experiences -> resumes (resume_id));
@@ -167,7 +192,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     portfolio_projects,
     portfolio_technologies,
     resumes,
+    sessions,
     skills,
+    users,
     work_experience_key_points,
     work_experiences,
 );

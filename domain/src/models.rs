@@ -19,6 +19,7 @@ pub struct Resume {
     pub mobile_number: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub created_by: Option<i32>,
 }
 
 #[derive(Insertable, Deserialize)]
@@ -31,6 +32,7 @@ pub struct NewResume {
     pub email: String,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
+    pub created_by: Option<i32>,
 }
 
 // ==================== Skills ====================
