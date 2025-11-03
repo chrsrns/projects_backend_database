@@ -35,6 +35,18 @@ pub struct NewResume {
     pub created_by: Option<i32>,
 }
 
+#[derive(AsChangeset, Deserialize)]
+#[serde(crate = "rocket::serde")]
+#[diesel(table_name = resumes)]
+pub struct UpdateResume {
+    pub name: Option<String>,
+    pub profile_image_url: Option<String>,
+    pub location: Option<String>,
+    pub email: Option<String>,
+    pub github_url: Option<String>,
+    pub mobile_number: Option<String>,
+}
+
 // ==================== Skills ====================
 
 #[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
