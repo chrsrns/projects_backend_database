@@ -1,4 +1,4 @@
-use domain::models::Resume;
+use domain::models::{Resume, User};
 use rocket::serde::Serialize;
 
 #[derive(Serialize)]
@@ -6,6 +6,7 @@ pub enum ResponseBody {
     Message(String),
     Resume(Resume),
     Resumes(Vec<Resume>),
+    User(User),
 }
 
 #[derive(Serialize)]
