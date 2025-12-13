@@ -27,6 +27,8 @@ impl TestFixture {
                 api::resume_handler::list_resumes_handler,
                 api::resume_handler::list_resume_handler,
                 api::resume_handler::create_resume_handler,
+                api::resume_handler::update_resume_handler,
+                api::resume_handler::delete_resume_handler,
             ]);
         
         let client = Client::tracked(rocket).expect("valid rocket instance");
