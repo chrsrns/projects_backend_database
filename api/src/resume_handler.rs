@@ -2,7 +2,7 @@ use shared::response_models::{Response, ResponseBody};
 use application::resume::{create, read, update, delete};
 use domain::models::{Resume, NewResume, UpdateResume};
 use rocket::{get, post, put, delete as rocket_delete};
-use rocket::response::status::{NotFound, Created, NoContent};
+use rocket::response::status::{NotFound, Created, NoContent, Conflict};
 use rocket::serde::json::Json;
 
 #[get("/resumes")]
@@ -22,7 +22,7 @@ pub fn list_resume_handler(resume_id: i32) -> Result<String, NotFound<String>> {
 }
 
 #[post("/new_resume", format = "application/json", data = "<resume>")]
-pub fn create_resume_handler(resume: Json<NewResume>) -> Created<String> {
+pub fn create_resume_handler(resume: Json<NewResume>) -> Result<Created<String>, Conflict<String>> {
     create::create_resume(resume)
 }
 
