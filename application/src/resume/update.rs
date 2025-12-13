@@ -1,15 +1,51 @@
 use diesel::prelude::*;
 use domain::models::{Resume, UpdateResume};
 use infrastructure::establish_connection;
-use rocket::response::status::NotFound;
+use rocket::http::Status;
+use rocket::response::status::Custom;
 use rocket::serde::json::Json;
 use shared::response_models::{Response, ResponseBody};
 
 pub fn update_resume(
+    user_id_value: i32,
     resume_id: i32,
     resume: Json<UpdateResume>,
-) -> Result<String, NotFound<String>> {
+) -> Result<String, Custom<String>> {
     use domain::schema::resumes;
+
+    let existing: Resume = match resumes::table
+        .find(resume_id)
+        .first(&mut establish_connection())
+    {
+        Ok(r) => r,
+        Err(diesel::result::Error::NotFound) => {
+            let response = Response {
+                body: ResponseBody::Message(format!(
+                    "Error updating resume with id {} - {}",
+                    resume_id,
+                    diesel::result::Error::NotFound
+                )),
+            };
+            return Err(Custom(
+                Status::NotFound,
+                serde_json::to_string(&response).unwrap(),
+            ));
+        }
+        Err(err) => panic!("Database error - {}", err),
+    };
+
+    match existing.created_by {
+        Some(owner) if owner == user_id_value => {}
+        Some(_) | None => {
+            let response = Response {
+                body: ResponseBody::Message("Forbidden".to_string()),
+            };
+            return Err(Custom(
+                Status::Forbidden,
+                serde_json::to_string(&response).unwrap(),
+            ));
+        }
+    }
 
     let resume = resume.into_inner();
 
@@ -31,7 +67,10 @@ pub fn update_resume(
                         resume_id, err
                     )),
                 };
-                Err(NotFound(serde_json::to_string(&response).unwrap()))
+                Err(Custom(
+                    Status::NotFound,
+                    serde_json::to_string(&response).unwrap(),
+                ))
             }
             _ => {
                 panic!("Database error - {}", err);

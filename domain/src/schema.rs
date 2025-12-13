@@ -107,6 +107,7 @@ diesel::table! {
         created_at -> Timestamp,
         updated_at -> Timestamp,
         created_by -> Nullable<Int4>,
+        is_public -> Bool,
     }
 }
 

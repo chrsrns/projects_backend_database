@@ -1,17 +1,30 @@
 use diesel::prelude::*;
-use domain::models::{NewResume, Resume};
+use domain::models::{NewResume, NewResumeRequest, Resume};
 use infrastructure::establish_connection;
 use rocket::response::status::{Conflict, Created};
 use rocket::serde::json::Json;
 use shared::response_models::{Response, ResponseBody};
 
-pub fn create_resume(resume: Json<NewResume>) -> Result<Created<String>, Conflict<String>> {
+pub fn create_resume(
+    user_id_value: i32,
+    resume: Json<NewResumeRequest>,
+) -> Result<Created<String>, Conflict<String>> {
     use domain::schema::resumes;
 
     let resume = resume.into_inner();
+    let new_resume = NewResume {
+        name: resume.name,
+        profile_image_url: resume.profile_image_url,
+        location: resume.location,
+        email: resume.email,
+        github_url: resume.github_url,
+        mobile_number: resume.mobile_number,
+        created_by: Some(user_id_value),
+        is_public: resume.is_public.unwrap_or(false),
+    };
 
     match diesel::insert_into(resumes::table)
-        .values(&resume)
+        .values(&new_resume)
         .get_result::<Resume>(&mut establish_connection())
     {
         Ok(resume) => {

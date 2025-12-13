@@ -1,9 +1,7 @@
-#[macro_use]
-extern crate rocket;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use infrastructure::establish_connection;
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 use serde_json::Value;
 use std::time::Duration;
@@ -12,6 +10,7 @@ use std::time::Duration;
 struct TestFixture {
     client: Client,
     created_resume_ids: Vec<i32>,
+    auth_token: String,
     lock_key: i64,
     lock_connection: PgConnection,
 }
@@ -24,22 +23,57 @@ impl TestFixture {
             .execute(&mut lock_connection)
             .expect("acquire advisory lock");
 
-        let rocket = rocket::build().mount(
-            "/api",
-            routes![
-                api::resume_handler::list_resumes_handler,
-                api::resume_handler::list_resume_handler,
-                api::resume_handler::create_resume_handler,
-                api::resume_handler::update_resume_handler,
-                api::resume_handler::delete_resume_handler,
-            ],
-        );
-
+        let rocket = api::build_rocket();
         let client = Client::tracked(rocket).expect("valid rocket instance");
+
+        // Create a dedicated user for this fixture and login to get a Bearer token.
+        // Note: responses borrow the client, so compute token in a scope that ends
+        // before we move the client into the fixture.
+        let auth_token = {
+            let unique_email = format!(
+                "resume.tests.{}@example.com",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis()
+            );
+
+            let register_payload = serde_json::json!({
+                "email": unique_email,
+                "password": "test-password"
+            });
+
+            let register_response = client
+                .post("/api/auth/register")
+                .header(ContentType::JSON)
+                .body(register_payload.to_string())
+                .dispatch();
+            assert_eq!(register_response.status(), Status::Created);
+
+            let login_payload = serde_json::json!({
+                "email": register_payload["email"].as_str().unwrap(),
+                "password": "test-password"
+            });
+
+            let login_response = client
+                .post("/api/auth/login")
+                .header(ContentType::JSON)
+                .body(login_payload.to_string())
+                .dispatch();
+            assert_eq!(login_response.status(), Status::Ok);
+
+            let login_body = login_response.into_string().expect("login body");
+            let login_json: Value = serde_json::from_str(&login_body).expect("valid json");
+            login_json["body"]["AuthToken"]["token"]
+                .as_str()
+                .expect("token")
+                .to_string()
+        };
 
         TestFixture {
             client,
             created_resume_ids: Vec::new(),
+            auth_token,
             lock_key,
             lock_connection,
         }
@@ -47,6 +81,10 @@ impl TestFixture {
 
     fn client(&self) -> &Client {
         &self.client
+    }
+
+    fn auth_header(&self) -> Header<'static> {
+        Header::new("Authorization", format!("Bearer {}", self.auth_token))
     }
 
     fn track_resume_id(&mut self, id: i32) {
@@ -94,13 +132,15 @@ fn test_create_and_retrieve_resume_persistence() {
         "location": "San Francisco, CA",
         "email": "john.doe@example.com",
         "github_url": "https://github.com/johndoe",
-        "mobile_number": "+1234567890"
+        "mobile_number": "+1234567890",
+        "is_public": true
     });
 
     // Step 1: Create a new resume via POST
     let create_response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(new_resume_json.to_string())
         .dispatch();
@@ -180,12 +220,14 @@ fn test_create_resume_appears_in_list() {
         "location": "New York, NY",
         "email": unique_email,
         "github_url": "https://github.com/janesmith",
-        "mobile_number": null
+        "mobile_number": null,
+        "is_public": true
     });
 
     let create_response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(new_resume_json.to_string())
         .dispatch();
@@ -294,12 +336,14 @@ fn test_update_and_retrieve_resume_persistence() {
         "location": "Old Location",
         "email": unique_email,
         "github_url": null,
-        "mobile_number": null
+        "mobile_number": null,
+        "is_public": true
     });
 
     let create_response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(new_resume_json.to_string())
         .dispatch();
@@ -322,6 +366,7 @@ fn test_update_and_retrieve_resume_persistence() {
     let update_response = fixture
         .client()
         .put(format!("/api/resume/{}", resume_id))
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(update_resume_json.to_string())
         .dispatch();
@@ -360,6 +405,7 @@ fn test_update_nonexistent_resume() {
     let response = fixture
         .client()
         .put(format!("/api/resume/{}", nonexistent_id))
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(update_resume_json.to_string())
         .dispatch();
@@ -392,12 +438,14 @@ fn test_delete_resume_then_not_found() {
         "location": "Delete Location",
         "email": unique_email,
         "github_url": null,
-        "mobile_number": null
+        "mobile_number": null,
+        "is_public": true
     });
 
     let create_response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(new_resume_json.to_string())
         .dispatch();
@@ -417,6 +465,7 @@ fn test_delete_resume_then_not_found() {
         let delete_response = fixture
             .client()
             .delete(format!("/api/resume/{}", resume_id))
+            .header(fixture.auth_header())
             .dispatch();
 
         assert_eq!(delete_response.status(), Status::NoContent);
@@ -440,6 +489,7 @@ fn test_delete_nonexistent_resume() {
     let response = fixture
         .client()
         .delete(format!("/api/resume/{}", nonexistent_id))
+        .header(fixture.auth_header())
         .dispatch();
 
     assert_eq!(response.status(), Status::NotFound);
@@ -463,6 +513,7 @@ fn test_create_resume_missing_required_fields_returns_422() {
     let response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(invalid_json_missing_email.to_string())
         .dispatch();
@@ -488,12 +539,14 @@ fn test_create_resume_duplicate_email_returns_409() {
         "location": "Dupe Location",
         "email": unique_email,
         "github_url": null,
-        "mobile_number": null
+        "mobile_number": null,
+        "is_public": true
     });
 
     let first_response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(new_resume_json.to_string())
         .dispatch();
@@ -511,6 +564,7 @@ fn test_create_resume_duplicate_email_returns_409() {
     let second_response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(new_resume_json.to_string())
         .dispatch();
@@ -548,7 +602,8 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
         "location": "Loc A",
         "email": email_a,
         "github_url": null,
-        "mobile_number": null
+        "mobile_number": null,
+        "is_public": true
     });
 
     let resume_b = serde_json::json!({
@@ -557,12 +612,14 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
         "location": "Loc B",
         "email": email_b,
         "github_url": null,
-        "mobile_number": null
+        "mobile_number": null,
+        "is_public": true
     });
 
     let create_a = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(resume_a.to_string())
         .dispatch();
@@ -575,6 +632,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     let create_b = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(resume_b.to_string())
         .dispatch();
@@ -640,12 +698,14 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
         "location": "Initial",
         "email": unique_email,
         "github_url": null,
-        "mobile_number": null
+        "mobile_number": null,
+        "is_public": true
     });
 
     let create_response = fixture
         .client()
         .post("/api/new_resume")
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(new_resume_json.to_string())
         .dispatch();
@@ -676,6 +736,7 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
     let update_response = fixture
         .client()
         .put(format!("/api/resume/{}", resume_id))
+        .header(fixture.auth_header())
         .header(ContentType::JSON)
         .body(update_payload.to_string())
         .dispatch();

@@ -8,6 +8,9 @@ pub struct AuthSession {
     pub user_id: i32,
 }
 
+#[derive(Debug, Clone)]
+pub struct MaybeAuthSession(pub Option<AuthSession>);
+
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for AuthSession {
     type Error = ();
@@ -39,6 +42,23 @@ impl<'r> FromRequest<'r> for AuthSession {
             }),
             Ok(None) => Outcome::Error((Status::Unauthorized, ())),
             Err(_) => Outcome::Error((Status::Unauthorized, ())),
+        }
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for MaybeAuthSession {
+    type Error = ();
+
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        if req.headers().get_one("Authorization").is_none() {
+            return Outcome::Success(MaybeAuthSession(None));
+        }
+
+        match AuthSession::from_request(req).await {
+            Outcome::Success(session) => Outcome::Success(MaybeAuthSession(Some(session))),
+            Outcome::Error(e) => Outcome::Error(e),
+            Outcome::Forward(s) => Outcome::Forward(s),
         }
     }
 }

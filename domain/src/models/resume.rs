@@ -20,6 +20,7 @@ pub struct Resume {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub created_by: Option<i32>,
+    pub is_public: bool,
 }
 
 #[derive(Insertable, Deserialize)]
@@ -33,6 +34,19 @@ pub struct NewResume {
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
     pub created_by: Option<i32>,
+    pub is_public: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct NewResumeRequest {
+    pub name: String,
+    pub profile_image_url: Option<String>,
+    pub location: Option<String>,
+    pub email: String,
+    pub github_url: Option<String>,
+    pub mobile_number: Option<String>,
+    pub is_public: Option<bool>,
 }
 
 #[derive(AsChangeset, Deserialize)]
@@ -45,6 +59,7 @@ pub struct UpdateResume {
     pub email: Option<String>,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
+    pub is_public: Option<bool>,
 }
 
 // ==================== Skills ====================
