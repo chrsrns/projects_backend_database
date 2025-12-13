@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
+pub mod auth;
 pub mod resume_handler;
 
 pub fn build_rocket() -> rocket::Rocket<rocket::Build> {
