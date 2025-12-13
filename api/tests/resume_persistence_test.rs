@@ -3,16 +3,25 @@ use rocket::local::blocking::Client;
 use rocket::http::{Status, ContentType};
 use serde_json::Value;
 use diesel::prelude::*;
+use diesel::pg::PgConnection;
 use infrastructure::establish_connection;
 
 /// Test fixture that automatically cleans up created resumes
 struct TestFixture {
     client: Client,
     created_resume_ids: Vec<i32>,
+    lock_key: i64,
+    lock_connection: PgConnection,
 }
 
 impl TestFixture {
     fn new() -> Self {
+        let lock_key: i64 = 9_225_337;
+        let mut lock_connection = establish_connection();
+        diesel::sql_query(format!("SELECT pg_advisory_lock({})", lock_key))
+            .execute(&mut lock_connection)
+            .expect("acquire advisory lock");
+
         let rocket = rocket::build()
             .mount("/api", routes![
                 api::resume_handler::list_resumes_handler,
@@ -25,6 +34,8 @@ impl TestFixture {
         TestFixture {
             client,
             created_resume_ids: Vec::new(),
+            lock_key,
+            lock_connection,
         }
     }
     
@@ -36,6 +47,10 @@ impl TestFixture {
         self.created_resume_ids.push(id);
         println!("Tracking resume ID {} for cleanup", id);
     }
+
+    fn untrack_resume_id(&mut self, id: i32) {
+        self.created_resume_ids.retain(|&existing| existing != id);
+    }
 }
 
 impl Drop for TestFixture {
@@ -44,11 +59,11 @@ impl Drop for TestFixture {
             println!("Cleaning up {} resume(s)...", self.created_resume_ids.len());
             
             use domain::schema::resumes::dsl::*;
-            let mut connection = establish_connection();
+            let connection = &mut self.lock_connection;
             
             for resume_id in &self.created_resume_ids {
                 match diesel::delete(resumes.find(resume_id))
-                    .execute(&mut connection)
+                    .execute(connection)
                 {
                     Ok(_) => println!("✓ Deleted resume ID {}", resume_id),
                     Err(e) => eprintln!("✗ Failed to delete resume ID {}: {}", resume_id, e),
@@ -57,6 +72,10 @@ impl Drop for TestFixture {
             
             println!("Cleanup complete!");
         }
+
+        diesel::sql_query(format!("SELECT pg_advisory_unlock({})", self.lock_key))
+            .execute(&mut self.lock_connection)
+            .expect("release advisory lock");
     }
 }
 
