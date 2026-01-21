@@ -758,3 +758,987 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
         "updated_at should change on update"
     );
 }
+
+#[test]
+fn test_skills_crud_flow() {
+    let mut fixture = TestFixture::new();
+
+    let unique_email = format!(
+        "skills.user.{}@example.com",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    let new_resume_json = serde_json::json!({
+        "name": "Skills User",
+        "profile_image_url": null,
+        "location": null,
+        "email": unique_email,
+        "github_url": null,
+        "mobile_number": null,
+        "is_public": false
+    });
+
+    let create_resume_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_resume_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_resume_response.status(), Status::Created);
+    let create_resume_body = create_resume_response
+        .into_string()
+        .expect("create resume body");
+    let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
+    let resume_id = create_resume_json["body"]["Resume"]["id"]
+        .as_i64()
+        .expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let new_skill_json = serde_json::json!({
+        "skill_name": "Rust",
+        "confidence_percentage": 80,
+        "display_order": 0
+    });
+
+    let create_skill_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/skills", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_skill_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_skill_response.status(), Status::Created);
+    let create_skill_body = create_skill_response
+        .into_string()
+        .expect("create skill body");
+    let create_skill_json: Value = serde_json::from_str(&create_skill_body).expect("valid json");
+    let skill_id = create_skill_json["body"]["Skill"]["id"]
+        .as_i64()
+        .expect("skill id") as i32;
+    assert_eq!(
+        create_skill_json["body"]["Skill"]["resume_id"]
+            .as_i64()
+            .expect("resume_id") as i32,
+        resume_id
+    );
+    assert_eq!(
+        create_skill_json["body"]["Skill"]["skill_name"]
+            .as_str()
+            .expect("skill_name"),
+        "Rust"
+    );
+    assert_eq!(
+        create_skill_json["body"]["Skill"]["confidence_percentage"]
+            .as_i64()
+            .expect("confidence_percentage") as i32,
+        80
+    );
+
+    let list_skills_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/skills", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_skills_response.status(), Status::Ok);
+    let list_skills_body = list_skills_response
+        .into_string()
+        .expect("list skills body");
+    let list_skills_json: Value = serde_json::from_str(&list_skills_body).expect("valid json");
+    let skills_array = list_skills_json["body"]["Skills"]
+        .as_array()
+        .expect("skills array");
+    assert!(
+        skills_array
+            .iter()
+            .any(|s| s["id"].as_i64() == Some(skill_id as i64))
+    );
+
+    let update_skill_json = serde_json::json!({
+        "confidence_percentage": 95
+    });
+
+    let update_skill_response = fixture
+        .client()
+        .put(format!("/api/skills/{}", skill_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(update_skill_json.to_string())
+        .dispatch();
+
+    assert_eq!(update_skill_response.status(), Status::Ok);
+    let update_skill_body = update_skill_response
+        .into_string()
+        .expect("update skill body");
+    let update_skill_json: Value = serde_json::from_str(&update_skill_body).expect("valid json");
+    assert_eq!(
+        update_skill_json["body"]["Skill"]["id"]
+            .as_i64()
+            .expect("id") as i32,
+        skill_id
+    );
+    assert_eq!(
+        update_skill_json["body"]["Skill"]["confidence_percentage"]
+            .as_i64()
+            .expect("confidence_percentage") as i32,
+        95
+    );
+
+    let delete_skill_response = fixture
+        .client()
+        .delete(format!("/api/skills/{}", skill_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(delete_skill_response.status(), Status::NoContent);
+
+    let list_after_delete_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/skills", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_after_delete_response.status(), Status::Ok);
+    let list_after_delete_body = list_after_delete_response
+        .into_string()
+        .expect("list skills after delete body");
+    let list_after_delete_json: Value =
+        serde_json::from_str(&list_after_delete_body).expect("valid json");
+    let skills_after_delete = list_after_delete_json["body"]["Skills"]
+        .as_array()
+        .expect("skills array");
+    assert!(
+        !skills_after_delete
+            .iter()
+            .any(|s| s["id"].as_i64() == Some(skill_id as i64))
+    );
+}
+
+#[test]
+fn test_languages_crud_flow() {
+    let mut fixture = TestFixture::new();
+
+    let unique_email = format!(
+        "languages.user.{}@example.com",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    let new_resume_json = serde_json::json!({
+        "name": "Languages User",
+        "profile_image_url": null,
+        "location": null,
+        "email": unique_email,
+        "github_url": null,
+        "mobile_number": null,
+        "is_public": false
+    });
+
+    let create_resume_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_resume_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_resume_response.status(), Status::Created);
+    let create_resume_body = create_resume_response
+        .into_string()
+        .expect("create resume body");
+    let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
+    let resume_id = create_resume_json["body"]["Resume"]["id"]
+        .as_i64()
+        .expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let new_language_json = serde_json::json!({
+        "language_name": "TypeScript",
+        "display_order": 0
+    });
+
+    let create_language_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/languages", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_language_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_language_response.status(), Status::Created);
+    let create_language_body = create_language_response
+        .into_string()
+        .expect("create language body");
+    let create_language_json: Value =
+        serde_json::from_str(&create_language_body).expect("valid json");
+    let language_id = create_language_json["body"]["Language"]["id"]
+        .as_i64()
+        .expect("language id") as i32;
+    assert_eq!(
+        create_language_json["body"]["Language"]["resume_id"]
+            .as_i64()
+            .expect("resume_id") as i32,
+        resume_id
+    );
+    assert_eq!(
+        create_language_json["body"]["Language"]["language_name"]
+            .as_str()
+            .expect("language_name"),
+        "TypeScript"
+    );
+
+    let list_languages_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/languages", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_languages_response.status(), Status::Ok);
+    let list_languages_body = list_languages_response
+        .into_string()
+        .expect("list languages body");
+    let list_languages_json: Value =
+        serde_json::from_str(&list_languages_body).expect("valid json");
+    let languages_array = list_languages_json["body"]["Languages"]
+        .as_array()
+        .expect("languages array");
+    assert!(
+        languages_array
+            .iter()
+            .any(|l| l["id"].as_i64() == Some(language_id as i64))
+    );
+
+    let update_language_json = serde_json::json!({
+        "language_name": "JavaScript"
+    });
+
+    let update_language_response = fixture
+        .client()
+        .put(format!("/api/languages/{}", language_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(update_language_json.to_string())
+        .dispatch();
+
+    assert_eq!(update_language_response.status(), Status::Ok);
+    let update_language_body = update_language_response
+        .into_string()
+        .expect("update language body");
+    let update_language_json: Value =
+        serde_json::from_str(&update_language_body).expect("valid json");
+    assert_eq!(
+        update_language_json["body"]["Language"]["id"]
+            .as_i64()
+            .expect("id") as i32,
+        language_id
+    );
+    assert_eq!(
+        update_language_json["body"]["Language"]["language_name"]
+            .as_str()
+            .expect("language_name"),
+        "JavaScript"
+    );
+
+    let delete_language_response = fixture
+        .client()
+        .delete(format!("/api/languages/{}", language_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(delete_language_response.status(), Status::NoContent);
+}
+
+#[test]
+fn test_frameworks_crud_flow() {
+    let mut fixture = TestFixture::new();
+
+    let unique_email = format!(
+        "frameworks.user.{}@example.com",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    let new_resume_json = serde_json::json!({
+        "name": "Frameworks User",
+        "profile_image_url": null,
+        "location": null,
+        "email": unique_email,
+        "github_url": null,
+        "mobile_number": null,
+        "is_public": false
+    });
+
+    let create_resume_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_resume_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_resume_response.status(), Status::Created);
+    let create_resume_body = create_resume_response
+        .into_string()
+        .expect("create resume body");
+    let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
+    let resume_id = create_resume_json["body"]["Resume"]["id"]
+        .as_i64()
+        .expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let new_language_json = serde_json::json!({
+        "language_name": "Rust",
+        "display_order": 0
+    });
+
+    let create_language_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/languages", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_language_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_language_response.status(), Status::Created);
+    let create_language_body = create_language_response
+        .into_string()
+        .expect("create language body");
+    let create_language_json: Value =
+        serde_json::from_str(&create_language_body).expect("valid json");
+    let language_id = create_language_json["body"]["Language"]["id"]
+        .as_i64()
+        .expect("language id") as i32;
+
+    let new_framework_json = serde_json::json!({
+        "framework_name": "Rocket",
+        "display_order": 0
+    });
+
+    let create_framework_response = fixture
+        .client()
+        .post(format!(
+            "/api/resume/{}/languages/{}/frameworks",
+            resume_id, language_id
+        ))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_framework_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_framework_response.status(), Status::Created);
+    let create_framework_body = create_framework_response
+        .into_string()
+        .expect("create framework body");
+    let create_framework_json: Value =
+        serde_json::from_str(&create_framework_body).expect("valid json");
+    let framework_id = create_framework_json["body"]["Framework"]["id"]
+        .as_i64()
+        .expect("framework id") as i32;
+    assert_eq!(
+        create_framework_json["body"]["Framework"]["language_id"]
+            .as_i64()
+            .expect("language_id") as i32,
+        language_id
+    );
+    assert_eq!(
+        create_framework_json["body"]["Framework"]["framework_name"]
+            .as_str()
+            .expect("framework_name"),
+        "Rocket"
+    );
+
+    let list_frameworks_response = fixture
+        .client()
+        .get(format!(
+            "/api/resume/{}/languages/{}/frameworks",
+            resume_id, language_id
+        ))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_frameworks_response.status(), Status::Ok);
+    let list_frameworks_body = list_frameworks_response
+        .into_string()
+        .expect("list frameworks body");
+    let list_frameworks_json: Value =
+        serde_json::from_str(&list_frameworks_body).expect("valid json");
+    let frameworks_array = list_frameworks_json["body"]["Frameworks"]
+        .as_array()
+        .expect("frameworks array");
+    assert!(
+        frameworks_array
+            .iter()
+            .any(|f| f["id"].as_i64() == Some(framework_id as i64))
+    );
+
+    let update_framework_json = serde_json::json!({
+        "framework_name": "Diesel",
+    });
+
+    let update_framework_response = fixture
+        .client()
+        .put(format!("/api/frameworks/{}", framework_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(update_framework_json.to_string())
+        .dispatch();
+
+    assert_eq!(update_framework_response.status(), Status::Ok);
+    let update_framework_body = update_framework_response
+        .into_string()
+        .expect("update framework body");
+    let update_framework_json: Value =
+        serde_json::from_str(&update_framework_body).expect("valid json");
+    assert_eq!(
+        update_framework_json["body"]["Framework"]["id"]
+            .as_i64()
+            .expect("id") as i32,
+        framework_id
+    );
+    assert_eq!(
+        update_framework_json["body"]["Framework"]["framework_name"]
+            .as_str()
+            .expect("framework_name"),
+        "Diesel"
+    );
+
+    let delete_framework_response = fixture
+        .client()
+        .delete(format!("/api/frameworks/{}", framework_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(delete_framework_response.status(), Status::NoContent);
+}
+
+#[test]
+fn test_education_and_key_points_crud_flow() {
+    let mut fixture = TestFixture::new();
+
+    let unique_email = format!(
+        "education.user.{}@example.com",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    let new_resume_json = serde_json::json!({
+        "name": "Education User",
+        "profile_image_url": null,
+        "location": null,
+        "email": unique_email,
+        "github_url": null,
+        "mobile_number": null,
+        "is_public": false
+    });
+
+    let create_resume_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_resume_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_resume_response.status(), Status::Created);
+    let create_resume_body = create_resume_response
+        .into_string()
+        .expect("create resume body");
+    let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
+    let resume_id = create_resume_json["body"]["Resume"]["id"]
+        .as_i64()
+        .expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let new_education_json = serde_json::json!({
+        "education_stage": "University",
+        "institution_name": "Example University",
+        "degree": "BSc Computer Science",
+        "start_date": "2020-01-01",
+        "end_date": "2024-01-01",
+        "description": "Some description",
+        "display_order": 0
+    });
+
+    let create_education_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/education", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_education_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_education_response.status(), Status::Created);
+    let create_education_body = create_education_response
+        .into_string()
+        .expect("create education body");
+    let create_education_json: Value =
+        serde_json::from_str(&create_education_body).expect("valid json");
+    let education_id = create_education_json["body"]["Education"]["id"]
+        .as_i64()
+        .expect("education id") as i32;
+
+    let list_education_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/education", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_education_response.status(), Status::Ok);
+    let list_education_body = list_education_response
+        .into_string()
+        .expect("list education body");
+    let list_education_json: Value =
+        serde_json::from_str(&list_education_body).expect("valid json");
+    let education_array = list_education_json["body"]["Educations"]
+        .as_array()
+        .expect("education array");
+    assert!(
+        education_array
+            .iter()
+            .any(|e| e["id"].as_i64() == Some(education_id as i64))
+    );
+
+    let update_education_payload = serde_json::json!({
+        "degree": "BSc Computer Science (Honours)"
+    });
+
+    let update_education_response = fixture
+        .client()
+        .put(format!("/api/education/{}", education_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(update_education_payload.to_string())
+        .dispatch();
+    assert_eq!(update_education_response.status(), Status::Ok);
+
+    let new_key_point_json = serde_json::json!({
+        "key_point": "Graduated with honours",
+        "display_order": 0
+    });
+
+    let create_key_point_response = fixture
+        .client()
+        .post(format!(
+            "/api/resume/{}/education/{}/key_points",
+            resume_id, education_id
+        ))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_key_point_json.to_string())
+        .dispatch();
+    assert_eq!(create_key_point_response.status(), Status::Created);
+    let create_key_point_body = create_key_point_response
+        .into_string()
+        .expect("create key point body");
+    let create_key_point_json: Value =
+        serde_json::from_str(&create_key_point_body).expect("valid json");
+    let key_point_id = create_key_point_json["body"]["EducationKeyPoint"]["id"]
+        .as_i64()
+        .expect("key point id") as i32;
+
+    let list_key_points_response = fixture
+        .client()
+        .get(format!(
+            "/api/resume/{}/education/{}/key_points",
+            resume_id, education_id
+        ))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_key_points_response.status(), Status::Ok);
+
+    let list_key_points_body = list_key_points_response
+        .into_string()
+        .expect("list education key points body");
+    let list_key_points_json: Value =
+        serde_json::from_str(&list_key_points_body).expect("valid json");
+    let key_points_array = list_key_points_json["body"]["EducationKeyPoints"]
+        .as_array()
+        .expect("education key points array");
+    assert!(
+        key_points_array
+            .iter()
+            .any(|kp| kp["id"].as_i64() == Some(key_point_id as i64))
+    );
+
+    let update_key_point_payload = serde_json::json!({
+        "key_point": "Graduated with first-class honours"
+    });
+    let update_key_point_response = fixture
+        .client()
+        .put(format!("/api/education_key_points/{}", key_point_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(update_key_point_payload.to_string())
+        .dispatch();
+    assert_eq!(update_key_point_response.status(), Status::Ok);
+
+    let delete_key_point_response = fixture
+        .client()
+        .delete(format!("/api/education_key_points/{}", key_point_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(delete_key_point_response.status(), Status::NoContent);
+
+    let delete_education_response = fixture
+        .client()
+        .delete(format!("/api/education/{}", education_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(delete_education_response.status(), Status::NoContent);
+}
+
+#[test]
+fn test_work_experiences_and_key_points_crud_flow() {
+    let mut fixture = TestFixture::new();
+
+    let unique_email = format!(
+        "work.user.{}@example.com",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    let new_resume_json = serde_json::json!({
+        "name": "Work User",
+        "profile_image_url": null,
+        "location": null,
+        "email": unique_email,
+        "github_url": null,
+        "mobile_number": null,
+        "is_public": false
+    });
+
+    let create_resume_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_resume_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_resume_response.status(), Status::Created);
+    let create_resume_body = create_resume_response
+        .into_string()
+        .expect("create resume body");
+    let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
+    let resume_id = create_resume_json["body"]["Resume"]["id"]
+        .as_i64()
+        .expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let new_work_json = serde_json::json!({
+        "job_title": "Software Engineer",
+        "company_name": "Example Corp",
+        "start_date": "2022-01-01",
+        "end_date": null,
+        "description": "Did things",
+        "display_order": 0
+    });
+
+    let create_work_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/work_experiences", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_work_json.to_string())
+        .dispatch();
+    assert_eq!(create_work_response.status(), Status::Created);
+
+    let create_work_body = create_work_response
+        .into_string()
+        .expect("create work body");
+    let create_work_json: Value = serde_json::from_str(&create_work_body).expect("valid json");
+    let work_id = create_work_json["body"]["WorkExperience"]["id"]
+        .as_i64()
+        .expect("work id") as i32;
+
+    let list_work_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/work_experiences", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_work_response.status(), Status::Ok);
+
+    let list_work_body = list_work_response.into_string().expect("list work body");
+    let list_work_json: Value = serde_json::from_str(&list_work_body).expect("valid json");
+    let work_array = list_work_json["body"]["WorkExperiences"]
+        .as_array()
+        .expect("work experiences array");
+    assert!(
+        work_array
+            .iter()
+            .any(|w| w["id"].as_i64() == Some(work_id as i64))
+    );
+
+    let new_work_kp_json = serde_json::json!({
+        "key_point": "Led a project",
+        "display_order": 0
+    });
+
+    let create_work_kp_response = fixture
+        .client()
+        .post(format!(
+            "/api/resume/{}/work_experiences/{}/key_points",
+            resume_id, work_id
+        ))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_work_kp_json.to_string())
+        .dispatch();
+    assert_eq!(create_work_kp_response.status(), Status::Created);
+
+    let create_work_kp_body = create_work_kp_response
+        .into_string()
+        .expect("create work key point body");
+    let create_work_kp_json: Value =
+        serde_json::from_str(&create_work_kp_body).expect("valid json");
+    let work_kp_id = create_work_kp_json["body"]["WorkExperienceKeyPoint"]["id"]
+        .as_i64()
+        .expect("work key point id") as i32;
+
+    let delete_work_kp_response = fixture
+        .client()
+        .delete(format!("/api/work_experience_key_points/{}", work_kp_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(delete_work_kp_response.status(), Status::NoContent);
+
+    let list_work_kps_response = fixture
+        .client()
+        .get(format!(
+            "/api/resume/{}/work_experiences/{}/key_points",
+            resume_id, work_id
+        ))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_work_kps_response.status(), Status::Ok);
+    let list_work_kps_body = list_work_kps_response
+        .into_string()
+        .expect("list work key points body");
+    let list_work_kps_json: Value = serde_json::from_str(&list_work_kps_body).expect("valid json");
+    let work_kps_array = list_work_kps_json["body"]["WorkExperienceKeyPoints"]
+        .as_array()
+        .expect("work key points array");
+    assert!(
+        !work_kps_array
+            .iter()
+            .any(|kp| kp["id"].as_i64() == Some(work_kp_id as i64))
+    );
+
+    let delete_work_response = fixture
+        .client()
+        .delete(format!("/api/work_experiences/{}", work_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(delete_work_response.status(), Status::NoContent);
+}
+
+#[test]
+fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
+    let mut fixture = TestFixture::new();
+
+    let unique_email = format!(
+        "portfolio.user.{}@example.com",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    let new_resume_json = serde_json::json!({
+        "name": "Portfolio User",
+        "profile_image_url": null,
+        "location": null,
+        "email": unique_email,
+        "github_url": null,
+        "mobile_number": null,
+        "is_public": false
+    });
+
+    let create_resume_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_resume_json.to_string())
+        .dispatch();
+
+    assert_eq!(create_resume_response.status(), Status::Created);
+    let create_resume_body = create_resume_response
+        .into_string()
+        .expect("create resume body");
+    let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
+    let resume_id = create_resume_json["body"]["Resume"]["id"]
+        .as_i64()
+        .expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let new_project_json = serde_json::json!({
+        "project_name": "Resume Builder",
+        "image_url": null,
+        "project_link": "https://example.com",
+        "source_code_link": null,
+        "description": "A project",
+        "display_order": 0
+    });
+
+    let create_project_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/portfolio_projects", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_project_json.to_string())
+        .dispatch();
+    assert_eq!(create_project_response.status(), Status::Created);
+
+    let create_project_body = create_project_response
+        .into_string()
+        .expect("create project body");
+    let create_project_json: Value =
+        serde_json::from_str(&create_project_body).expect("valid json");
+    let project_id = create_project_json["body"]["PortfolioProject"]["id"]
+        .as_i64()
+        .expect("project id") as i32;
+
+    let list_projects_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/portfolio_projects", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_projects_response.status(), Status::Ok);
+    let list_projects_body = list_projects_response
+        .into_string()
+        .expect("list projects body");
+    let list_projects_json: Value = serde_json::from_str(&list_projects_body).expect("valid json");
+    let projects_array = list_projects_json["body"]["PortfolioProjects"]
+        .as_array()
+        .expect("projects array");
+    assert!(
+        projects_array
+            .iter()
+            .any(|p| p["id"].as_i64() == Some(project_id as i64))
+    );
+
+    let new_project_kp_json = serde_json::json!({
+        "key_point": "Built with Svelte",
+        "display_order": 0
+    });
+
+    let create_project_kp_response = fixture
+        .client()
+        .post(format!(
+            "/api/resume/{}/portfolio_projects/{}/key_points",
+            resume_id, project_id
+        ))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_project_kp_json.to_string())
+        .dispatch();
+    assert_eq!(create_project_kp_response.status(), Status::Created);
+
+    let create_project_kp_body = create_project_kp_response
+        .into_string()
+        .expect("create project key point body");
+    let create_project_kp_json: Value =
+        serde_json::from_str(&create_project_kp_body).expect("valid json");
+    let project_kp_id = create_project_kp_json["body"]["PortfolioKeyPoint"]["id"]
+        .as_i64()
+        .expect("project key point id") as i32;
+
+    let list_project_kps_response = fixture
+        .client()
+        .get(format!(
+            "/api/resume/{}/portfolio_projects/{}/key_points",
+            resume_id, project_id
+        ))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_project_kps_response.status(), Status::Ok);
+    let list_project_kps_body = list_project_kps_response
+        .into_string()
+        .expect("list project key points body");
+    let list_project_kps_json: Value =
+        serde_json::from_str(&list_project_kps_body).expect("valid json");
+    let project_kps_array = list_project_kps_json["body"]["PortfolioKeyPoints"]
+        .as_array()
+        .expect("project key points array");
+    assert!(
+        project_kps_array
+            .iter()
+            .any(|kp| kp["id"].as_i64() == Some(project_kp_id as i64))
+    );
+
+    let new_tech_json = serde_json::json!({
+        "technology_name": "Rust",
+        "display_order": 0
+    });
+
+    let create_tech_response = fixture
+        .client()
+        .post(format!(
+            "/api/resume/{}/portfolio_projects/{}/technologies",
+            resume_id, project_id
+        ))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_tech_json.to_string())
+        .dispatch();
+    assert_eq!(create_tech_response.status(), Status::Created);
+
+    let create_tech_body = create_tech_response
+        .into_string()
+        .expect("create tech body");
+    let create_tech_json: Value = serde_json::from_str(&create_tech_body).expect("valid json");
+    let tech_id = create_tech_json["body"]["PortfolioTechnology"]["id"]
+        .as_i64()
+        .expect("tech id") as i32;
+
+    let list_techs_response = fixture
+        .client()
+        .get(format!(
+            "/api/resume/{}/portfolio_projects/{}/technologies",
+            resume_id, project_id
+        ))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_techs_response.status(), Status::Ok);
+    let list_techs_body = list_techs_response.into_string().expect("list techs body");
+    let list_techs_json: Value = serde_json::from_str(&list_techs_body).expect("valid json");
+    let techs_array = list_techs_json["body"]["PortfolioTechnologies"]
+        .as_array()
+        .expect("technologies array");
+    assert!(
+        techs_array
+            .iter()
+            .any(|t| t["id"].as_i64() == Some(tech_id as i64))
+    );
+
+    let delete_tech_response = fixture
+        .client()
+        .delete(format!("/api/portfolio_technologies/{}", tech_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(delete_tech_response.status(), Status::NoContent);
+
+    let delete_project_kp_response = fixture
+        .client()
+        .delete(format!("/api/portfolio_key_points/{}", project_kp_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(delete_project_kp_response.status(), Status::NoContent);
+
+    let delete_project_response = fixture
+        .client()
+        .delete(format!("/api/portfolio_projects/{}", project_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(delete_project_response.status(), Status::NoContent);
+}
