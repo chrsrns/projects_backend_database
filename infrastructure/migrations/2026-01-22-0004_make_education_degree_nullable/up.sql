@@ -1,0 +1,2 @@
+ALTER TABLE education
+ALTER COLUMN degree DROP NOT NULL;
