@@ -9,7 +9,7 @@ diesel::table! {
         #[max_length = 255]
         institution_name -> Varchar,
         #[max_length = 255]
-        degree -> Varchar,
+        degree -> Nullable<Varchar>,
         start_date -> Date,
         end_date -> Nullable<Date>,
         description -> Nullable<Text>,
