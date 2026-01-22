@@ -1260,7 +1260,6 @@ fn test_education_and_key_points_crud_flow() {
     let new_education_json = serde_json::json!({
         "education_stage": "University",
         "institution_name": "Example University",
-        "degree": "BSc Computer Science",
         "start_date": "2020-01-01",
         "end_date": "2024-01-01",
         "description": "Some description",
@@ -1284,6 +1283,11 @@ fn test_education_and_key_points_crud_flow() {
     let education_id = create_education_json["body"]["Education"]["id"]
         .as_i64()
         .expect("education id") as i32;
+
+    assert!(
+        create_education_json["body"]["Education"]["degree"].is_null(),
+        "degree should be null when omitted on create"
+    );
 
     let list_education_response = fixture
         .client()
@@ -1317,6 +1321,28 @@ fn test_education_and_key_points_crud_flow() {
         .body(update_education_payload.to_string())
         .dispatch();
     assert_eq!(update_education_response.status(), Status::Ok);
+
+    let clear_degree_payload = serde_json::json!({
+        "degree": null
+    });
+
+    let clear_degree_response = fixture
+        .client()
+        .put(format!("/api/education/{}", education_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(clear_degree_payload.to_string())
+        .dispatch();
+    assert_eq!(clear_degree_response.status(), Status::Ok);
+
+    let clear_degree_body = clear_degree_response
+        .into_string()
+        .expect("clear degree body");
+    let clear_degree_json: Value = serde_json::from_str(&clear_degree_body).expect("valid json");
+    assert!(
+        clear_degree_json["body"]["Education"]["degree"].is_null(),
+        "degree should be null after clearing via update"
+    );
 
     let new_key_point_json = serde_json::json!({
         "key_point": "Graduated with honours",
