@@ -9,6 +9,17 @@ use rocket::response::status::{Created, Custom};
 use rocket::serde::json::Json;
 use shared::response_models::{Response, ResponseBody};
 
+fn normalize_optional_text(value: Option<String>) -> Option<String> {
+    value.and_then(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
 pub fn create_work_experience(
     user_id_value: i32,
     resume_id_value: i32,
@@ -51,13 +62,15 @@ pub fn create_work_experience(
     }
 
     let payload = payload.into_inner();
+    let company_name = normalize_optional_text(payload.company_name);
+    let description = normalize_optional_text(payload.description);
     let new_item = NewWorkExperience {
         resume_id: resume_id_value,
         job_title: payload.job_title,
-        company_name: payload.company_name,
+        company_name,
         start_date: payload.start_date,
         end_date: payload.end_date,
-        description: payload.description,
+        description,
         display_order: payload.display_order,
     };
 

@@ -9,6 +9,19 @@ use rocket::response::status::Custom;
 use rocket::serde::json::Json;
 use shared::response_models::{Response, ResponseBody};
 
+fn normalize_optional_string_change(value: Option<Option<String>>) -> Option<Option<String>> {
+    value.map(|inner| {
+        inner.and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+    })
+}
+
 pub fn update_work_experience(
     user_id_value: i32,
     work_id_value: i32,
@@ -68,6 +81,14 @@ pub fn update_work_experience(
     }
 
     let payload = payload.into_inner();
+    let payload = UpdateWorkExperience {
+        job_title: payload.job_title.map(|v| v.trim().to_string()),
+        company_name: normalize_optional_string_change(payload.company_name),
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        description: normalize_optional_string_change(payload.description),
+        display_order: payload.display_order,
+    };
     match diesel::update(work_experiences::table.find(work_id_value))
         .set(&payload)
         .get_result::<WorkExperience>(&mut establish_connection())
