@@ -162,7 +162,7 @@ diesel::table! {
         #[max_length = 255]
         job_title -> Varchar,
         #[max_length = 255]
-        company_name -> Varchar,
+        company_name -> Nullable<Varchar>,
         start_date -> Date,
         end_date -> Nullable<Date>,
         description -> Nullable<Text>,

@@ -5,8 +5,47 @@ use crate::schema::{
 };
 use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
+use rocket::serde::de::{Deserializer, Error as DeError};
+use rocket::serde::json::Value as JsonValue;
 use rocket::serde::{Deserialize, Serialize};
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
+
+fn deserialize_optional_nullable_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = JsonValue::deserialize(deserializer)?;
+    match value {
+        JsonValue::Null => Ok(Some(None)),
+        JsonValue::String(v) => Ok(Some(Some(v))),
+        other => Err(DeError::custom(format!(
+            "expected string or null, got {}",
+            other
+        ))),
+    }
+}
+
+fn deserialize_optional_nullable_date<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<NaiveDate>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = JsonValue::deserialize(deserializer)?;
+    match value {
+        JsonValue::Null => Ok(Some(None)),
+        JsonValue::String(v) => NaiveDate::parse_from_str(&v, "%Y-%m-%d")
+            .map(Some)
+            .map(Some)
+            .map_err(|e| DeError::custom(format!("invalid date '{}': {}", v, e))),
+        other => Err(DeError::custom(format!(
+            "expected date string or null, got {}",
+            other
+        ))),
+    }
+}
 
 #[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Resume {
@@ -268,7 +307,7 @@ pub struct WorkExperience {
     pub id: i32,
     pub resume_id: i32,
     pub job_title: String,
-    pub company_name: String,
+    pub company_name: Option<String>,
     pub start_date: NaiveDate,
     pub end_date: Option<NaiveDate>,
     pub description: Option<String>,
@@ -282,7 +321,7 @@ pub struct WorkExperience {
 pub struct NewWorkExperience {
     pub resume_id: i32,
     pub job_title: String,
-    pub company_name: String,
+    pub company_name: Option<String>,
     pub start_date: NaiveDate,
     pub end_date: Option<NaiveDate>,
     pub description: Option<String>,
@@ -293,7 +332,7 @@ pub struct NewWorkExperience {
 #[serde(crate = "rocket::serde")]
 pub struct NewWorkExperienceRequest {
     pub job_title: String,
-    pub company_name: String,
+    pub company_name: Option<String>,
     pub start_date: NaiveDate,
     pub end_date: Option<NaiveDate>,
     pub description: Option<String>,
@@ -305,9 +344,12 @@ pub struct NewWorkExperienceRequest {
 #[diesel(table_name = work_experiences)]
 pub struct UpdateWorkExperience {
     pub job_title: Option<String>,
-    pub company_name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub company_name: Option<Option<String>>,
     pub start_date: Option<NaiveDate>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_date")]
     pub end_date: Option<Option<NaiveDate>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,
 }
