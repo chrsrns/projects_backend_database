@@ -1462,7 +1462,6 @@ fn test_work_experiences_and_key_points_crud_flow() {
 
     let new_work_json = serde_json::json!({
         "job_title": "Software Engineer",
-        "company_name": "Example Corp",
         "start_date": "2022-01-01",
         "end_date": null,
         "description": "Did things",
@@ -1486,6 +1485,41 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .as_i64()
         .expect("work id") as i32;
 
+    assert!(
+        create_work_json["body"]["WorkExperience"]["company_name"].is_null(),
+        "company_name should be null when omitted on create"
+    );
+
+    let new_work_with_company_json = serde_json::json!({
+        "job_title": "Senior Engineer",
+        "company_name": "Example Corp",
+        "start_date": "2023-01-01",
+        "end_date": null,
+        "description": "More things",
+        "display_order": 10
+    });
+
+    let create_work_with_company_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/work_experiences", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(new_work_with_company_json.to_string())
+        .dispatch();
+    assert_eq!(create_work_with_company_response.status(), Status::Created);
+    let create_work_with_company_body = create_work_with_company_response
+        .into_string()
+        .expect("create work with company body");
+    let create_work_with_company_json: Value =
+        serde_json::from_str(&create_work_with_company_body).expect("valid json");
+    let work_with_company_id = create_work_with_company_json["body"]["WorkExperience"]["id"]
+        .as_i64()
+        .expect("work with company id") as i32;
+    assert_eq!(
+        create_work_with_company_json["body"]["WorkExperience"]["company_name"], "Example Corp",
+        "company_name should be returned when set on create"
+    );
+
     let list_work_response = fixture
         .client()
         .get(format!("/api/resume/{}/work_experiences", resume_id))
@@ -1502,6 +1536,71 @@ fn test_work_experiences_and_key_points_crud_flow() {
         work_array
             .iter()
             .any(|w| w["id"].as_i64() == Some(work_id as i64))
+    );
+
+    let update_company_whitespace = serde_json::json!({
+        "company_name": "   "
+    });
+    let update_company_whitespace_response = fixture
+        .client()
+        .put(format!("/api/work_experiences/{}", work_with_company_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(update_company_whitespace.to_string())
+        .dispatch();
+    assert_eq!(update_company_whitespace_response.status(), Status::Ok);
+    let update_company_whitespace_body = update_company_whitespace_response
+        .into_string()
+        .expect("update company whitespace body");
+    let update_company_whitespace_json: Value =
+        serde_json::from_str(&update_company_whitespace_body).expect("valid json");
+    assert!(
+        update_company_whitespace_json["body"]["WorkExperience"]["company_name"].is_null(),
+        "company_name should normalize to null when whitespace"
+    );
+
+    let update_company_null = serde_json::json!({
+        "company_name": null
+    });
+    let update_company_null_response = fixture
+        .client()
+        .put(format!("/api/work_experiences/{}", work_with_company_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(update_company_null.to_string())
+        .dispatch();
+    assert_eq!(update_company_null_response.status(), Status::Ok);
+    let update_company_null_body = update_company_null_response
+        .into_string()
+        .expect("update company null body");
+    let update_company_null_json: Value =
+        serde_json::from_str(&update_company_null_body).expect("valid json");
+    assert!(
+        update_company_null_json["body"]["WorkExperience"]["company_name"].is_null(),
+        "company_name should be null when explicitly set to null"
+    );
+
+    let list_work_after_clear_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/work_experiences", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list_work_after_clear_response.status(), Status::Ok);
+    let list_work_after_clear_body = list_work_after_clear_response
+        .into_string()
+        .expect("list work after clear body");
+    let list_work_after_clear_json: Value =
+        serde_json::from_str(&list_work_after_clear_body).expect("valid json");
+    let work_after_clear_array = list_work_after_clear_json["body"]["WorkExperiences"]
+        .as_array()
+        .expect("work experiences array after clear");
+    let cleared_item = work_after_clear_array
+        .iter()
+        .find(|w| w["id"].as_i64() == Some(work_with_company_id as i64))
+        .expect("updated work experience should appear in list");
+    assert!(
+        cleared_item["company_name"].is_null(),
+        "company_name should be null in list after clearing"
     );
 
     let new_work_kp_json = serde_json::json!({
