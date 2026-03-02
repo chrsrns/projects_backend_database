@@ -1,14 +1,10 @@
 use diesel::prelude::*;
 use domain::models::{Language, Resume};
 use infrastructure::establish_connection;
-use rocket::http::Status;
-use rocket::response::status::{Custom, NoContent};
-use shared::response_models::Response;
 
-pub fn delete_language(
-    user_id_value: i32,
-    language_id_value: i32,
-) -> Result<NoContent, Custom<String>> {
+use crate::error::ApplicationError;
+
+pub fn delete_language(user_id_value: i32, language_id_value: i32) -> Result<(), ApplicationError> {
     use domain::schema::languages;
     use domain::schema::resumes;
 
@@ -18,15 +14,17 @@ pub fn delete_language(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Language with id {} not found", language_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Language with id {} not found",
+                language_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -35,27 +33,20 @@ pub fn delete_language(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Resume not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
@@ -64,17 +55,17 @@ pub fn delete_language(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response::<String> {
-                    body: format!("Language with id {} not found", language_id_value),
-                };
-                Err(Custom(
-                    Status::NotFound,
-                    serde_json::to_string(&response).unwrap(),
-                ))
+                Err(ApplicationError::NotFound(format!(
+                    "Language with id {} not found",
+                    language_id_value
+                )))
             } else {
-                Ok(NoContent)
+                Ok(())
             }
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }

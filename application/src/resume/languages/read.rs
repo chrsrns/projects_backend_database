@@ -1,13 +1,13 @@
 use diesel::prelude::*;
 use domain::models::{Language, Resume};
 use infrastructure::establish_connection;
-use rocket::response::status::NotFound;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn list_languages(
     resume_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<Language>, ApplicationError> {
     use domain::schema::languages::dsl as languages_dsl;
     use domain::schema::resumes::dsl as resumes_dsl;
 
@@ -25,12 +25,17 @@ pub fn list_languages(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<Language> = match languages_dsl::languages
@@ -38,12 +43,15 @@ pub fn list_languages(
         .load::<Language>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|l| (l.display_order.unwrap_or(0), l.id));
 
-    let response = Response::<Vec<Language>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }
