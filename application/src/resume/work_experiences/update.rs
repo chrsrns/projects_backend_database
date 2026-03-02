@@ -98,7 +98,7 @@ pub fn update_work_experience_key_point(
     user_id_value: i32,
     kp_id_value: i32,
     payload: UpdateWorkExperienceKeyPoint,
-) -> Result<WorkExperienceKeyPoint, ApplicationError> {
+) -> Result<(WorkExperienceKeyPoint, i32), ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
@@ -167,7 +167,7 @@ pub fn update_work_experience_key_point(
         .set(&payload)
         .get_result::<WorkExperienceKeyPoint>(&mut establish_connection())
     {
-        Ok(updated) => Ok(updated),
+        Ok(updated) => Ok((updated, work.resume_id)),
         Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
             "Work experience key point with id {} not found",
             kp_id_value

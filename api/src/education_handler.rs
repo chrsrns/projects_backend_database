@@ -4,12 +4,14 @@ use domain::models::{
     Education, EducationKeyPoint, NewEducationKeyPointRequest, NewEducationRequest,
     UpdateEducation, UpdateEducationKeyPoint,
 };
+use rocket::State;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
     get,
@@ -88,14 +90,18 @@ pub fn list_educations_handler(
 )]
 pub fn create_education_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewEducationRequest>,
 ) -> Result<Custom<Json<Response<Education>>>, Custom<Json<Response<String>>>> {
     match education::create_education(auth.user_id, resume_id, payload.into_inner()) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
+        Ok(item) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(Custom(
+                rocket::http::Status::Created,
+                Json(Response { body: item }),
+            ))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -150,11 +156,15 @@ pub fn create_education_handler(
 )]
 pub fn update_education_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     education_id: i32,
     payload: Json<UpdateEducation>,
 ) -> Result<Json<Response<Education>>, Custom<Json<Response<String>>>> {
     match education::update_education(auth.user_id, education_id, payload.into_inner()) {
-        Ok(item) => Ok(Json(Response { body: item })),
+        Ok(item) => {
+            hub.publish_resume_changed(item.resume_id, ResumeChangedAction::Updated);
+            Ok(Json(Response { body: item }))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -204,10 +214,14 @@ pub fn update_education_handler(
 #[rocket_delete("/education/<education_id>")]
 pub fn delete_education_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     education_id: i32,
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match education::delete_education(auth.user_id, education_id) {
-        Ok(()) => Ok(NoContent),
+        Ok(resume_id) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(NoContent)
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -319,6 +333,7 @@ pub fn list_education_key_points_handler(
 )]
 pub fn create_education_key_point_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume_id: i32,
     education_id: i32,
     payload: Json<NewEducationKeyPointRequest>,
@@ -329,10 +344,13 @@ pub fn create_education_key_point_handler(
         education_id,
         payload.into_inner(),
     ) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
+        Ok(item) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(Custom(
+                rocket::http::Status::Created,
+                Json(Response { body: item }),
+            ))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -387,11 +405,15 @@ pub fn create_education_key_point_handler(
 )]
 pub fn update_education_key_point_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     key_point_id: i32,
     payload: Json<UpdateEducationKeyPoint>,
 ) -> Result<Json<Response<EducationKeyPoint>>, Custom<Json<Response<String>>>> {
     match education::update_education_key_point(auth.user_id, key_point_id, payload.into_inner()) {
-        Ok(item) => Ok(Json(Response { body: item })),
+        Ok((item, resume_id)) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(Json(Response { body: item }))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -441,10 +463,14 @@ pub fn update_education_key_point_handler(
 #[rocket_delete("/education_key_points/<key_point_id>")]
 pub fn delete_education_key_point_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     key_point_id: i32,
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match education::delete_education_key_point(auth.user_id, key_point_id) {
-        Ok(()) => Ok(NoContent),
+        Ok(resume_id) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(NoContent)
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),

@@ -77,7 +77,7 @@ pub fn update_portfolio_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
     payload: UpdatePortfolioKeyPoint,
-) -> Result<PortfolioKeyPoint, ApplicationError> {
+) -> Result<(PortfolioKeyPoint, i32), ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects;
     use domain::schema::resumes;
@@ -146,7 +146,7 @@ pub fn update_portfolio_key_point(
         .set(&payload)
         .get_result::<PortfolioKeyPoint>(&mut establish_connection())
     {
-        Ok(updated) => Ok(updated),
+        Ok(updated) => Ok((updated, project.resume_id)),
         Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
             "Portfolio key point with id {} not found",
             key_point_id_value
@@ -162,7 +162,7 @@ pub fn update_portfolio_technology(
     user_id_value: i32,
     tech_id_value: i32,
     payload: UpdatePortfolioTechnology,
-) -> Result<PortfolioTechnology, ApplicationError> {
+) -> Result<(PortfolioTechnology, i32), ApplicationError> {
     use domain::schema::portfolio_projects;
     use domain::schema::portfolio_technologies;
     use domain::schema::resumes;
@@ -231,7 +231,7 @@ pub fn update_portfolio_technology(
         .set(&payload)
         .get_result::<PortfolioTechnology>(&mut establish_connection())
     {
-        Ok(updated) => Ok(updated),
+        Ok(updated) => Ok((updated, project.resume_id)),
         Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
             "Portfolio technology with id {} not found",
             tech_id_value

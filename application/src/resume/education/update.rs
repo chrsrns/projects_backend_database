@@ -76,7 +76,7 @@ pub fn update_education_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
     payload: UpdateEducationKeyPoint,
-) -> Result<EducationKeyPoint, ApplicationError> {
+) -> Result<(EducationKeyPoint, i32), ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
     use domain::schema::resumes;
@@ -145,7 +145,7 @@ pub fn update_education_key_point(
         .set(&payload)
         .get_result::<EducationKeyPoint>(&mut establish_connection())
     {
-        Ok(updated) => Ok(updated),
+        Ok(updated) => Ok((updated, edu.resume_id)),
         Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
             "Education key point with id {} not found",
             key_point_id_value

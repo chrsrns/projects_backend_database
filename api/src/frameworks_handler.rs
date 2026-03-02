@@ -1,12 +1,14 @@
 use application::error::ApplicationError;
 use application::resume::frameworks;
 use domain::models::{Framework, NewFrameworkRequest, UpdateFramework};
+use rocket::State;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
     get,
@@ -88,15 +90,19 @@ pub fn list_frameworks_handler(
 )]
 pub fn create_framework_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume_id: i32,
     language_id: i32,
     payload: Json<NewFrameworkRequest>,
 ) -> Result<Custom<Json<Response<Framework>>>, Custom<Json<Response<String>>>> {
     match frameworks::create_framework(auth.user_id, resume_id, language_id, payload.into_inner()) {
-        Ok(framework) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: framework }),
-        )),
+        Ok(framework) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(Custom(
+                rocket::http::Status::Created,
+                Json(Response { body: framework }),
+            ))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -151,11 +157,15 @@ pub fn create_framework_handler(
 )]
 pub fn update_framework_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     framework_id: i32,
     payload: Json<UpdateFramework>,
 ) -> Result<Json<Response<Framework>>, Custom<Json<Response<String>>>> {
     match frameworks::update_framework(auth.user_id, framework_id, payload.into_inner()) {
-        Ok(framework) => Ok(Json(Response { body: framework })),
+        Ok((framework, resume_id)) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(Json(Response { body: framework }))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -205,10 +215,14 @@ pub fn update_framework_handler(
 #[rocket_delete("/frameworks/<framework_id>")]
 pub fn delete_framework_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     framework_id: i32,
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match frameworks::delete_framework(auth.user_id, framework_id) {
-        Ok(()) => Ok(NoContent),
+        Ok(resume_id) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(NoContent)
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),

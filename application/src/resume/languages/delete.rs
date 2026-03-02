@@ -4,7 +4,10 @@ use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
 
-pub fn delete_language(user_id_value: i32, language_id_value: i32) -> Result<(), ApplicationError> {
+pub fn delete_language(
+    user_id_value: i32,
+    language_id_value: i32,
+) -> Result<i32, ApplicationError> {
     use domain::schema::languages;
     use domain::schema::resumes;
 
@@ -60,7 +63,7 @@ pub fn delete_language(user_id_value: i32, language_id_value: i32) -> Result<(),
                     language_id_value
                 )))
             } else {
-                Ok(())
+                Ok(existing.resume_id)
             }
         }
         Err(err) => Err(ApplicationError::Internal(format!(

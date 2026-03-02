@@ -8,7 +8,7 @@ pub fn update_framework(
     user_id_value: i32,
     framework_id_value: i32,
     payload: UpdateFramework,
-) -> Result<Framework, ApplicationError> {
+) -> Result<(Framework, i32), ApplicationError> {
     use domain::schema::frameworks;
     use domain::schema::languages;
     use domain::schema::resumes;
@@ -75,7 +75,7 @@ pub fn update_framework(
         .set(&payload)
         .get_result::<Framework>(&mut establish_connection())
     {
-        Ok(updated) => Ok(updated),
+        Ok(updated) => Ok((updated, language.resume_id)),
         Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
             "Framework with id {} not found",
             framework_id_value

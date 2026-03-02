@@ -7,7 +7,7 @@ use crate::error::ApplicationError;
 pub fn delete_education(
     user_id_value: i32,
     education_id_value: i32,
-) -> Result<(), ApplicationError> {
+) -> Result<i32, ApplicationError> {
     use domain::schema::education;
     use domain::schema::resumes;
 
@@ -63,7 +63,7 @@ pub fn delete_education(
                     education_id_value
                 )))
             } else {
-                Ok(())
+                Ok(existing.resume_id)
             }
         }
         Err(err) => Err(ApplicationError::Internal(format!(
@@ -76,7 +76,7 @@ pub fn delete_education(
 pub fn delete_education_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
-) -> Result<(), ApplicationError> {
+) -> Result<i32, ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
     use domain::schema::resumes;
@@ -151,7 +151,7 @@ pub fn delete_education_key_point(
                     key_point_id_value
                 )))
             } else {
-                Ok(())
+                Ok(edu.resume_id)
             }
         }
         Err(err) => Err(ApplicationError::Internal(format!(

@@ -7,7 +7,7 @@ use crate::error::ApplicationError;
 pub fn delete_framework(
     user_id_value: i32,
     framework_id_value: i32,
-) -> Result<(), ApplicationError> {
+) -> Result<i32, ApplicationError> {
     use domain::schema::frameworks;
     use domain::schema::languages;
     use domain::schema::resumes;
@@ -23,7 +23,12 @@ pub fn delete_framework(
                 framework_id_value
             )));
         }
-        Err(err) => return Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let language: Language = match languages::table
@@ -34,7 +39,12 @@ pub fn delete_framework(
         Err(diesel::result::Error::NotFound) => {
             return Err(ApplicationError::NotFound("Language not found".to_string()));
         }
-        Err(err) => return Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -45,7 +55,12 @@ pub fn delete_framework(
         Err(diesel::result::Error::NotFound) => {
             return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => return Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
@@ -65,9 +80,12 @@ pub fn delete_framework(
                     framework_id_value
                 )))
             } else {
-                Ok(())
+                Ok(language.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }

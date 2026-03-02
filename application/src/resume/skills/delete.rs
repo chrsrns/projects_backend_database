@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
 
-pub fn delete_skill(user_id_value: i32, skill_id_value: i32) -> Result<(), ApplicationError> {
+pub fn delete_skill(user_id_value: i32, skill_id_value: i32) -> Result<i32, ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::skills;
 
@@ -19,7 +19,12 @@ pub fn delete_skill(user_id_value: i32, skill_id_value: i32) -> Result<(), Appli
                 skill_id_value
             )));
         }
-        Err(err) => return Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -30,7 +35,12 @@ pub fn delete_skill(user_id_value: i32, skill_id_value: i32) -> Result<(), Appli
         Err(diesel::result::Error::NotFound) => {
             return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => return Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
@@ -48,9 +58,12 @@ pub fn delete_skill(user_id_value: i32, skill_id_value: i32) -> Result<(), Appli
                     skill_id_value
                 )))
             } else {
-                Ok(())
+                Ok(existing.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }

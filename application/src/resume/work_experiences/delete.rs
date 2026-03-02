@@ -7,7 +7,7 @@ use crate::error::ApplicationError;
 pub fn delete_work_experience(
     user_id_value: i32,
     work_id_value: i32,
-) -> Result<(), ApplicationError> {
+) -> Result<i32, ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::work_experiences;
 
@@ -63,7 +63,7 @@ pub fn delete_work_experience(
                     work_id_value
                 )))
             } else {
-                Ok(())
+                Ok(existing.resume_id)
             }
         }
         Err(err) => Err(ApplicationError::Internal(format!(
@@ -76,7 +76,7 @@ pub fn delete_work_experience(
 pub fn delete_work_experience_key_point(
     user_id_value: i32,
     kp_id_value: i32,
-) -> Result<(), ApplicationError> {
+) -> Result<i32, ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
@@ -151,7 +151,7 @@ pub fn delete_work_experience_key_point(
                     kp_id_value
                 )))
             } else {
-                Ok(())
+                Ok(work.resume_id)
             }
         }
         Err(err) => Err(ApplicationError::Internal(format!(

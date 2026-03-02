@@ -1,12 +1,14 @@
 use application::error::ApplicationError;
 use application::resume::languages;
 use domain::models::{Language, NewLanguageRequest, UpdateLanguage};
+use rocket::State;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
     get,
@@ -85,14 +87,18 @@ pub fn list_languages_handler(
 )]
 pub fn create_language_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewLanguageRequest>,
 ) -> Result<Custom<Json<Response<Language>>>, Custom<Json<Response<String>>>> {
     match languages::create_language(auth.user_id, resume_id, payload.into_inner()) {
-        Ok(language) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: language }),
-        )),
+        Ok(language) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(Custom(
+                rocket::http::Status::Created,
+                Json(Response { body: language }),
+            ))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -147,11 +153,15 @@ pub fn create_language_handler(
 )]
 pub fn update_language_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     language_id: i32,
     payload: Json<UpdateLanguage>,
 ) -> Result<Json<Response<Language>>, Custom<Json<Response<String>>>> {
     match languages::update_language(auth.user_id, language_id, payload.into_inner()) {
-        Ok(language) => Ok(Json(Response { body: language })),
+        Ok(language) => {
+            hub.publish_resume_changed(language.resume_id, ResumeChangedAction::Updated);
+            Ok(Json(Response { body: language }))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -201,10 +211,14 @@ pub fn update_language_handler(
 #[rocket_delete("/languages/<language_id>")]
 pub fn delete_language_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     language_id: i32,
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match languages::delete_language(auth.user_id, language_id) {
-        Ok(()) => Ok(NoContent),
+        Ok(resume_id) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(NoContent)
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),

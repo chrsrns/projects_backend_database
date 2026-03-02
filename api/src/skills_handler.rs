@@ -1,12 +1,14 @@
 use application::error::ApplicationError;
 use application::resume::skills;
 use domain::models::{NewSkillRequest, Skill, UpdateSkill};
+use rocket::State;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
     get,
@@ -85,14 +87,18 @@ pub fn list_skills_handler(
 )]
 pub fn create_skill_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewSkillRequest>,
 ) -> Result<Custom<Json<Response<Skill>>>, Custom<Json<Response<String>>>> {
     match skills::create_skill(auth.user_id, resume_id, payload.into_inner()) {
-        Ok(skill) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: skill }),
-        )),
+        Ok(skill) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(Custom(
+                rocket::http::Status::Created,
+                Json(Response { body: skill }),
+            ))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -143,11 +149,15 @@ pub fn create_skill_handler(
 #[put("/skills/<skill_id>", format = "application/json", data = "<payload>")]
 pub fn update_skill_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     skill_id: i32,
     payload: Json<UpdateSkill>,
 ) -> Result<Json<Response<Skill>>, Custom<Json<Response<String>>>> {
     match skills::update_skill(auth.user_id, skill_id, payload.into_inner()) {
-        Ok(skill) => Ok(Json(Response { body: skill })),
+        Ok(skill) => {
+            hub.publish_resume_changed(skill.resume_id, ResumeChangedAction::Updated);
+            Ok(Json(Response { body: skill }))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -197,10 +207,14 @@ pub fn update_skill_handler(
 #[rocket_delete("/skills/<skill_id>")]
 pub fn delete_skill_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     skill_id: i32,
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match skills::delete_skill(auth.user_id, skill_id) {
-        Ok(()) => Ok(NoContent),
+        Ok(resume_id) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            Ok(NoContent)
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
