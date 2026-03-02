@@ -9,6 +9,7 @@ use rocket::serde::de::{Deserializer, Error as DeError};
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::{Deserialize, Serialize};
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
+use utoipa::ToSchema;
 
 fn deserialize_optional_nullable_string<'de, D>(
     deserializer: D,
@@ -47,7 +48,7 @@ where
     }
 }
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Resume {
     pub id: i32,
     pub name: String,
@@ -62,7 +63,7 @@ pub struct Resume {
     pub is_public: bool,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = resumes)]
 pub struct NewResume {
@@ -76,7 +77,7 @@ pub struct NewResume {
     pub is_public: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewResumeRequest {
     pub name: String,
@@ -88,7 +89,7 @@ pub struct NewResumeRequest {
     pub is_public: Option<bool>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = resumes)]
 pub struct UpdateResume {
@@ -103,7 +104,7 @@ pub struct UpdateResume {
 
 // ==================== Skills ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Skill {
     pub id: i32,
     pub resume_id: i32,
@@ -113,7 +114,7 @@ pub struct Skill {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = skills)]
 pub struct NewSkill {
@@ -123,7 +124,7 @@ pub struct NewSkill {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewSkillRequest {
     pub skill_name: String,
@@ -131,7 +132,7 @@ pub struct NewSkillRequest {
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = skills)]
 pub struct UpdateSkill {
@@ -142,7 +143,7 @@ pub struct UpdateSkill {
 
 // ==================== Languages ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Language {
     pub id: i32,
     pub resume_id: i32,
@@ -151,7 +152,7 @@ pub struct Language {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = languages)]
 pub struct NewLanguage {
@@ -160,14 +161,14 @@ pub struct NewLanguage {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewLanguageRequest {
     pub language_name: String,
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = languages)]
 pub struct UpdateLanguage {
@@ -177,7 +178,7 @@ pub struct UpdateLanguage {
 
 // ==================== Frameworks ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Framework {
     pub id: i32,
     pub language_id: i32,
@@ -186,7 +187,7 @@ pub struct Framework {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = frameworks)]
 pub struct NewFramework {
@@ -195,14 +196,14 @@ pub struct NewFramework {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewFrameworkRequest {
     pub framework_name: String,
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = frameworks)]
 pub struct UpdateFramework {
@@ -212,7 +213,7 @@ pub struct UpdateFramework {
 
 // ==================== Education ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Education {
     pub id: i32,
     pub resume_id: i32,
@@ -226,7 +227,7 @@ pub struct Education {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = education)]
 pub struct NewEducation {
@@ -240,7 +241,7 @@ pub struct NewEducation {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewEducationRequest {
     pub education_stage: String,
@@ -252,22 +253,25 @@ pub struct NewEducationRequest {
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = education)]
 pub struct UpdateEducation {
     pub education_stage: Option<String>,
     pub institution_name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub degree: Option<Option<String>>,
     pub start_date: Option<NaiveDate>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_date")]
     pub end_date: Option<Option<NaiveDate>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,
 }
 
 // ==================== Education Key Points ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct EducationKeyPoint {
     pub id: i32,
     pub education_id: i32,
@@ -276,7 +280,7 @@ pub struct EducationKeyPoint {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = education_key_points)]
 pub struct NewEducationKeyPoint {
@@ -285,14 +289,14 @@ pub struct NewEducationKeyPoint {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewEducationKeyPointRequest {
     pub key_point: String,
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = education_key_points)]
 pub struct UpdateEducationKeyPoint {
@@ -302,7 +306,7 @@ pub struct UpdateEducationKeyPoint {
 
 // ==================== Work Experiences ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct WorkExperience {
     pub id: i32,
     pub resume_id: i32,
@@ -315,7 +319,7 @@ pub struct WorkExperience {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = work_experiences)]
 pub struct NewWorkExperience {
@@ -328,7 +332,7 @@ pub struct NewWorkExperience {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewWorkExperienceRequest {
     pub job_title: String,
@@ -339,7 +343,7 @@ pub struct NewWorkExperienceRequest {
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = work_experiences)]
 pub struct UpdateWorkExperience {
@@ -356,7 +360,7 @@ pub struct UpdateWorkExperience {
 
 // ==================== Work Experience Key Points ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct WorkExperienceKeyPoint {
     pub id: i32,
     pub work_experience_id: i32,
@@ -365,7 +369,7 @@ pub struct WorkExperienceKeyPoint {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = work_experience_key_points)]
 pub struct NewWorkExperienceKeyPoint {
@@ -374,14 +378,14 @@ pub struct NewWorkExperienceKeyPoint {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewWorkExperienceKeyPointRequest {
     pub key_point: String,
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = work_experience_key_points)]
 pub struct UpdateWorkExperienceKeyPoint {
@@ -391,7 +395,7 @@ pub struct UpdateWorkExperienceKeyPoint {
 
 // ==================== Portfolio Projects ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct PortfolioProject {
     pub id: i32,
     pub resume_id: i32,
@@ -404,7 +408,7 @@ pub struct PortfolioProject {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = portfolio_projects)]
 pub struct NewPortfolioProject {
@@ -417,7 +421,7 @@ pub struct NewPortfolioProject {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewPortfolioProjectRequest {
     pub project_name: String,
@@ -428,7 +432,7 @@ pub struct NewPortfolioProjectRequest {
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = portfolio_projects)]
 pub struct UpdatePortfolioProject {
@@ -442,7 +446,7 @@ pub struct UpdatePortfolioProject {
 
 // ==================== Portfolio Key Points ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct PortfolioKeyPoint {
     pub id: i32,
     pub portfolio_project_id: i32,
@@ -451,7 +455,7 @@ pub struct PortfolioKeyPoint {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = portfolio_key_points)]
 pub struct NewPortfolioKeyPoint {
@@ -460,14 +464,14 @@ pub struct NewPortfolioKeyPoint {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewPortfolioKeyPointRequest {
     pub key_point: String,
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = portfolio_key_points)]
 pub struct UpdatePortfolioKeyPoint {
@@ -477,7 +481,7 @@ pub struct UpdatePortfolioKeyPoint {
 
 // ==================== Portfolio Technologies ====================
 
-#[derive(Queryable, Serialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct PortfolioTechnology {
     pub id: i32,
     pub portfolio_project_id: i32,
@@ -486,7 +490,7 @@ pub struct PortfolioTechnology {
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Insertable, Deserialize)]
+#[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = portfolio_technologies)]
 pub struct NewPortfolioTechnology {
@@ -495,14 +499,14 @@ pub struct NewPortfolioTechnology {
     pub display_order: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct NewPortfolioTechnologyRequest {
     pub technology_name: String,
     pub display_order: Option<i32>,
 }
 
-#[derive(AsChangeset, Deserialize)]
+#[derive(AsChangeset, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = portfolio_technologies)]
 pub struct UpdatePortfolioTechnology {

@@ -4,8 +4,9 @@ use domain::models::{
     PortfolioTechnology, Resume, Skill, User, WorkExperience, WorkExperienceKeyPoint,
 };
 use rocket::serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub enum ResponseBody {
     Message(String),
     Resume(Resume),
@@ -34,14 +35,14 @@ pub enum ResponseBody {
     AuthToken(AuthTokenResponse),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct AuthTokenResponse {
     pub token: String,
     pub expires_at: NaiveDateTime,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct Response {
     pub body: ResponseBody,
