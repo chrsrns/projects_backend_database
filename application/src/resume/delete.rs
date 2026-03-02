@@ -1,11 +1,10 @@
 use diesel::prelude::*;
 use domain::models::Resume;
 use infrastructure::establish_connection;
-use rocket::http::Status;
-use rocket::response::status::{Custom, NoContent};
-use shared::response_models::Response;
 
-pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<NoContent, Custom<String>> {
+use crate::error::ApplicationError;
+
+pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), ApplicationError> {
     use domain::schema::resumes;
 
     let existing: Resume = match resumes::table
@@ -14,46 +13,32 @@ pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<NoContent, Cu
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => return Err(ApplicationError::Internal(format!("Database error - {}", err))),
     };
 
     match existing.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
     match diesel::delete(resumes::table.find(resume_id)).execute(&mut establish_connection()) {
         Ok(count) => {
             if count == 0 {
-                let response = Response::<String> {
-                    body: format!("Resume with id {} not found", resume_id),
-                };
-                Err(Custom(
-                    Status::NotFound,
-                    serde_json::to_string(&response).unwrap(),
-                ))
+                Err(ApplicationError::NotFound(format!(
+                    "Resume with id {} not found",
+                    resume_id
+                )))
             } else {
-                Ok(NoContent)
+                Ok(())
             }
         }
-        Err(err) => {
-            panic!("Database error - {}", err);
-        }
+        Err(err) => Err(ApplicationError::Internal(format!("Database error - {}", err))),
     }
 }

@@ -1,17 +1,15 @@
 use diesel::prelude::*;
 use domain::models::{NewResume, NewResumeRequest, Resume};
 use infrastructure::establish_connection;
-use rocket::response::status::{Conflict, Created};
-use rocket::serde::json::Json;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn create_resume(
     user_id_value: i32,
-    resume: Json<NewResumeRequest>,
-) -> Result<Created<String>, Conflict<String>> {
+    resume: NewResumeRequest,
+) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes;
 
-    let resume = resume.into_inner();
     let new_resume = NewResume {
         name: resume.name,
         profile_image_url: resume.profile_image_url,
@@ -27,21 +25,18 @@ pub fn create_resume(
         .values(&new_resume)
         .get_result::<Resume>(&mut establish_connection())
     {
-        Ok(resume) => {
-            let response = Response::<Resume> { body: resume };
-            Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
-        }
+        Ok(resume) => Ok(resume),
         Err(err) => match err {
             diesel::result::Error::DatabaseError(
                 diesel::result::DatabaseErrorKind::UniqueViolation,
                 _,
-            ) => {
-                let response = Response::<String> {
-                    body: "Resume with this email already exists".to_string(),
-                };
-                Err(Conflict(serde_json::to_string(&response).unwrap()))
-            }
-            _ => panic!("Database error - {}", err),
+            ) => Err(ApplicationError::Conflict(
+                "Resume with this email already exists".to_string(),
+            )),
+            _ => Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            ))),
         },
     }
 }

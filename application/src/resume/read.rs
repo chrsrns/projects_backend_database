@@ -1,10 +1,10 @@
 use diesel::prelude::*;
 use domain::models::Resume;
 use infrastructure::establish_connection;
-use rocket::response::status::NotFound;
-use shared::response_models::Response;
 
-pub fn list_resume(resume_id: i32, user_id_value: Option<i32>) -> Result<Resume, NotFound<String>> {
+use crate::error::ApplicationError;
+
+pub fn list_resume(resume_id: i32, user_id_value: Option<i32>) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::resumes::dsl::*;
 
@@ -18,20 +18,19 @@ pub fn list_resume(resume_id: i32, user_id_value: Option<i32>) -> Result<Resume,
     match query.first::<Resume>(&mut establish_connection()) {
         Ok(resume) => Ok(resume),
         Err(err) => match err {
-            diesel::result::Error::NotFound => {
-                let response = Response::<String> {
-                    body: format!("Error selecting resume with id {} - {}", resume_id, err),
-                };
-                return Err(NotFound(serde_json::to_string(&response).unwrap()));
-            }
-            _ => {
-                panic!("Database error - {}", err);
-            }
+            diesel::result::Error::NotFound => Err(ApplicationError::NotFound(format!(
+                "Error selecting resume with id {} - {}",
+                resume_id, err
+            ))),
+            _ => Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            ))),
         },
     }
 }
 
-pub fn list_resumes(user_id_value: Option<i32>) -> Vec<Resume> {
+pub fn list_resumes(user_id_value: Option<i32>) -> Result<Vec<Resume>, ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::resumes::dsl::*;
 
@@ -47,12 +46,11 @@ pub fn list_resumes(user_id_value: Option<i32>) -> Vec<Resume> {
     {
         Ok(mut items) => {
             items.sort();
-            items
+            Ok(items)
         }
-        Err(err) => match err {
-            _ => {
-                panic!("Database error - {}", err);
-            }
-        },
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
