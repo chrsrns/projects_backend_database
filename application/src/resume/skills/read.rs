@@ -1,13 +1,13 @@
 use diesel::prelude::*;
 use domain::models::{Resume, Skill};
 use infrastructure::establish_connection;
-use rocket::response::status::NotFound;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn list_skills(
     resume_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<Skill>, ApplicationError> {
     use domain::schema::resumes::dsl as resumes_dsl;
     use domain::schema::skills::dsl as skills_dsl;
 
@@ -25,12 +25,17 @@ pub fn list_skills(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<Skill> = match skills_dsl::skills
@@ -38,12 +43,15 @@ pub fn list_skills(
         .load::<Skill>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|s| (s.display_order.unwrap_or(0), s.id));
 
-    let response = Response::<Vec<Skill>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }
