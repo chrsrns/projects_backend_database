@@ -1,6 +1,6 @@
 use application::auth::{login, logout, me, register};
 use application::error::ApplicationError;
-use domain::models::{AuthLoginRequest, AuthRegisterRequest};
+use domain::models::{AuthLoginRequest, AuthRegisterRequest, User};
 use rocket::response::status::{Custom, Unauthorized};
 use rocket::serde::json::Json;
 use rocket::{get, post};
@@ -9,7 +9,7 @@ use shared::response_models::{AuthTokenResponse, Response};
 #[post("/auth/register", format = "application/json", data = "<payload>")]
 pub fn register_handler(
     payload: Json<AuthRegisterRequest>,
-) -> Result<Custom<Json<Response<domain::models::User>>>, Custom<Json<Response<String>>>> {
+) -> Result<Custom<Json<Response<User>>>, Custom<Json<Response<String>>>> {
     match register::register(payload.into_inner()) {
         Ok(user) => Ok(Custom(
             rocket::http::Status::Created,
@@ -61,7 +61,7 @@ pub fn login_handler(
 #[get("/auth/me")]
 pub fn me_handler(
     auth: crate::auth::AuthSession,
-) -> Result<Json<Response<domain::models::User>>, Unauthorized<Json<Response<String>>>> {
+) -> Result<Json<Response<User>>, Unauthorized<Json<Response<String>>>> {
     match me::me(auth.user_id) {
         Ok(user) => Ok(Json(Response { body: user })),
         Err(_) => Err(Unauthorized(Json(Response {

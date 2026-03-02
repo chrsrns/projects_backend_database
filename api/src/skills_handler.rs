@@ -1,6 +1,6 @@
 use application::error::ApplicationError;
 use application::resume::skills;
-use domain::models::{NewSkillRequest, UpdateSkill};
+use domain::models::{NewSkillRequest, Skill, UpdateSkill};
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
@@ -12,7 +12,7 @@ use crate::auth::{AuthSession, MaybeAuthSession};
 pub fn list_skills_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<domain::models::Skill>>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Vec<Skill>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match skills::list_skills(resume_id, user_id_value) {
@@ -57,7 +57,7 @@ pub fn create_skill_handler(
     auth: AuthSession,
     resume_id: i32,
     payload: Json<NewSkillRequest>,
-) -> Result<Custom<Json<Response<domain::models::Skill>>>, Custom<Json<Response<String>>>> {
+) -> Result<Custom<Json<Response<Skill>>>, Custom<Json<Response<String>>>> {
     match skills::create_skill(auth.user_id, resume_id, payload.into_inner()) {
         Ok(skill) => Ok(Custom(
             rocket::http::Status::Created,
@@ -99,7 +99,7 @@ pub fn update_skill_handler(
     auth: AuthSession,
     skill_id: i32,
     payload: Json<UpdateSkill>,
-) -> Result<Json<Response<domain::models::Skill>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Skill>>, Custom<Json<Response<String>>>> {
     match skills::update_skill(auth.user_id, skill_id, payload.into_inner()) {
         Ok(skill) => Ok(Json(Response { body: skill })),
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

@@ -1,7 +1,8 @@
 use application::error::ApplicationError;
 use application::resume::education;
 use domain::models::{
-    NewEducationKeyPointRequest, NewEducationRequest, UpdateEducation, UpdateEducationKeyPoint,
+    Education, EducationKeyPoint, NewEducationKeyPointRequest, NewEducationRequest,
+    UpdateEducation, UpdateEducationKeyPoint,
 };
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
@@ -14,7 +15,7 @@ use crate::auth::{AuthSession, MaybeAuthSession};
 pub fn list_educations_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<domain::models::Education>>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Vec<Education>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match education::list_educations(resume_id, user_id_value) {
@@ -59,7 +60,7 @@ pub fn create_education_handler(
     auth: AuthSession,
     resume_id: i32,
     payload: Json<NewEducationRequest>,
-) -> Result<Custom<Json<Response<domain::models::Education>>>, Custom<Json<Response<String>>>> {
+) -> Result<Custom<Json<Response<Education>>>, Custom<Json<Response<String>>>> {
     match education::create_education(auth.user_id, resume_id, payload.into_inner()) {
         Ok(item) => Ok(Custom(
             rocket::http::Status::Created,
@@ -105,7 +106,7 @@ pub fn update_education_handler(
     auth: AuthSession,
     education_id: i32,
     payload: Json<UpdateEducation>,
-) -> Result<Json<Response<domain::models::Education>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Education>>, Custom<Json<Response<String>>>> {
     match education::update_education(auth.user_id, education_id, payload.into_inner()) {
         Ok(item) => Ok(Json(Response { body: item })),
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -182,8 +183,7 @@ pub fn list_education_key_points_handler(
     resume_id: i32,
     education_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<domain::models::EducationKeyPoint>>>, Custom<Json<Response<String>>>>
-{
+) -> Result<Json<Response<Vec<EducationKeyPoint>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match education::list_education_key_points(resume_id, education_id, user_id_value) {
@@ -229,8 +229,7 @@ pub fn create_education_key_point_handler(
     resume_id: i32,
     education_id: i32,
     payload: Json<NewEducationKeyPointRequest>,
-) -> Result<Custom<Json<Response<domain::models::EducationKeyPoint>>>, Custom<Json<Response<String>>>>
-{
+) -> Result<Custom<Json<Response<EducationKeyPoint>>>, Custom<Json<Response<String>>>> {
     match education::create_education_key_point(
         auth.user_id,
         resume_id,
@@ -281,7 +280,7 @@ pub fn update_education_key_point_handler(
     auth: AuthSession,
     key_point_id: i32,
     payload: Json<UpdateEducationKeyPoint>,
-) -> Result<Json<Response<domain::models::EducationKeyPoint>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<EducationKeyPoint>>, Custom<Json<Response<String>>>> {
     match education::update_education_key_point(auth.user_id, key_point_id, payload.into_inner()) {
         Ok(item) => Ok(Json(Response { body: item })),
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

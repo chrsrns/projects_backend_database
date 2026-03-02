@@ -2,7 +2,7 @@ use application::error::ApplicationError;
 use application::resume::work_experiences;
 use domain::models::{
     NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, UpdateWorkExperience,
-    UpdateWorkExperienceKeyPoint,
+    UpdateWorkExperienceKeyPoint, WorkExperience, WorkExperienceKeyPoint,
 };
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
@@ -15,7 +15,7 @@ use crate::auth::{AuthSession, MaybeAuthSession};
 pub fn list_work_experiences_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<domain::models::WorkExperience>>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Vec<WorkExperience>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match work_experiences::list_work_experiences(resume_id, user_id_value) {
@@ -60,8 +60,7 @@ pub fn create_work_experience_handler(
     auth: AuthSession,
     resume_id: i32,
     payload: Json<NewWorkExperienceRequest>,
-) -> Result<Custom<Json<Response<domain::models::WorkExperience>>>, Custom<Json<Response<String>>>>
-{
+) -> Result<Custom<Json<Response<WorkExperience>>>, Custom<Json<Response<String>>>> {
     match work_experiences::create_work_experience(auth.user_id, resume_id, payload.into_inner()) {
         Ok(item) => Ok(Custom(
             rocket::http::Status::Created,
@@ -107,7 +106,7 @@ pub fn update_work_experience_handler(
     auth: AuthSession,
     work_id: i32,
     payload: Json<UpdateWorkExperience>,
-) -> Result<Json<Response<domain::models::WorkExperience>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<WorkExperience>>, Custom<Json<Response<String>>>> {
     match work_experiences::update_work_experience(auth.user_id, work_id, payload.into_inner()) {
         Ok(item) => Ok(Json(Response { body: item })),
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -184,10 +183,7 @@ pub fn list_work_experience_key_points_handler(
     resume_id: i32,
     work_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<
-    Json<Response<Vec<domain::models::WorkExperienceKeyPoint>>>,
-    Custom<Json<Response<String>>>,
-> {
+) -> Result<Json<Response<Vec<WorkExperienceKeyPoint>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match work_experiences::list_work_experience_key_points(resume_id, work_id, user_id_value) {
@@ -233,10 +229,7 @@ pub fn create_work_experience_key_point_handler(
     resume_id: i32,
     work_id: i32,
     payload: Json<NewWorkExperienceKeyPointRequest>,
-) -> Result<
-    Custom<Json<Response<domain::models::WorkExperienceKeyPoint>>>,
-    Custom<Json<Response<String>>>,
-> {
+) -> Result<Custom<Json<Response<WorkExperienceKeyPoint>>>, Custom<Json<Response<String>>>> {
     match work_experiences::create_work_experience_key_point(
         auth.user_id,
         resume_id,
@@ -287,8 +280,7 @@ pub fn update_work_experience_key_point_handler(
     auth: AuthSession,
     key_point_id: i32,
     payload: Json<UpdateWorkExperienceKeyPoint>,
-) -> Result<Json<Response<domain::models::WorkExperienceKeyPoint>>, Custom<Json<Response<String>>>>
-{
+) -> Result<Json<Response<WorkExperienceKeyPoint>>, Custom<Json<Response<String>>>> {
     match work_experiences::update_work_experience_key_point(
         auth.user_id,
         key_point_id,

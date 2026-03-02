@@ -1,6 +1,7 @@
 use application::resume::frameworks;
 use application::error::ApplicationError;
-use domain::models::{NewFrameworkRequest, UpdateFramework};
+use application::resume::frameworks;
+use domain::models::{Framework, NewFrameworkRequest, UpdateFramework};
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
@@ -13,7 +14,7 @@ pub fn list_frameworks_handler(
     resume_id: i32,
     language_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<domain::models::Framework>>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Vec<Framework>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match frameworks::list_frameworks(resume_id, language_id, user_id_value) {
@@ -59,7 +60,7 @@ pub fn create_framework_handler(
     resume_id: i32,
     language_id: i32,
     payload: Json<NewFrameworkRequest>,
-) -> Result<Custom<Json<Response<domain::models::Framework>>>, Custom<Json<Response<String>>>> {
+) -> Result<Custom<Json<Response<Framework>>>, Custom<Json<Response<String>>>> {
     match frameworks::create_framework(auth.user_id, resume_id, language_id, payload.into_inner()) {
         Ok(framework) => Ok(Custom(
             rocket::http::Status::Created,
@@ -105,7 +106,7 @@ pub fn update_framework_handler(
     auth: AuthSession,
     framework_id: i32,
     payload: Json<UpdateFramework>,
-) -> Result<Json<Response<domain::models::Framework>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Framework>>, Custom<Json<Response<String>>>> {
     match frameworks::update_framework(auth.user_id, framework_id, payload.into_inner()) {
         Ok(framework) => Ok(Json(Response { body: framework })),
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

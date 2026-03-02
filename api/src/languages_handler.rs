@@ -1,6 +1,6 @@
 use application::error::ApplicationError;
 use application::resume::languages;
-use domain::models::{NewLanguageRequest, UpdateLanguage};
+use domain::models::{Language, NewLanguageRequest, UpdateLanguage};
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
@@ -12,7 +12,7 @@ use crate::auth::{AuthSession, MaybeAuthSession};
 pub fn list_languages_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<domain::models::Language>>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Vec<Language>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match languages::list_languages(resume_id, user_id_value) {
@@ -57,7 +57,7 @@ pub fn create_language_handler(
     auth: AuthSession,
     resume_id: i32,
     payload: Json<NewLanguageRequest>,
-) -> Result<Custom<Json<Response<domain::models::Language>>>, Custom<Json<Response<String>>>> {
+) -> Result<Custom<Json<Response<Language>>>, Custom<Json<Response<String>>>> {
     match languages::create_language(auth.user_id, resume_id, payload.into_inner()) {
         Ok(language) => Ok(Custom(
             rocket::http::Status::Created,
@@ -103,7 +103,7 @@ pub fn update_language_handler(
     auth: AuthSession,
     language_id: i32,
     payload: Json<UpdateLanguage>,
-) -> Result<Json<Response<domain::models::Language>>, Custom<Json<Response<String>>>> {
+) -> Result<Json<Response<Language>>, Custom<Json<Response<String>>>> {
     match languages::update_language(auth.user_id, language_id, payload.into_inner()) {
         Ok(language) => Ok(Json(Response { body: language })),
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
