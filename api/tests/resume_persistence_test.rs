@@ -64,7 +64,7 @@ impl TestFixture {
 
             let login_body = login_response.into_string().expect("login body");
             let login_json: Value = serde_json::from_str(&login_body).expect("valid json");
-            login_json["body"]["AuthToken"]["token"]
+            login_json["body"]["token"]
                 .as_str()
                 .expect("token")
                 .to_string()
@@ -152,7 +152,7 @@ fn test_create_and_retrieve_resume_persistence() {
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
 
     // Extract the created resume from response
-    let created_resume = &create_json["body"]["Resume"];
+    let created_resume = &create_json["body"];
     let resume_id = created_resume["id"]
         .as_i64()
         .expect("Resume ID should exist") as i32;
@@ -174,7 +174,7 @@ fn test_create_and_retrieve_resume_persistence() {
     let get_body = get_response.into_string().expect("Response body");
     let get_json: Value = serde_json::from_str(&get_body).expect("Valid JSON");
 
-    let retrieved_resume = &get_json["body"]["Resume"];
+    let retrieved_resume = &get_json["body"];
 
     // Step 3: Verify all fields match
     assert_eq!(retrieved_resume["id"], resume_id);
@@ -236,7 +236,7 @@ fn test_create_resume_appears_in_list() {
 
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
-    let created_resume = &create_json["body"]["Resume"];
+    let created_resume = &create_json["body"];
     let created_id = created_resume["id"]
         .as_i64()
         .expect("Resume ID should exist") as i32;
@@ -255,9 +255,7 @@ fn test_create_resume_appears_in_list() {
     let list_body = list_response.into_string().expect("Response body");
     let list_json: Value = serde_json::from_str(&list_body).expect("Valid JSON");
 
-    let resumes_array = list_json["body"]["Resumes"]
-        .as_array()
-        .expect("Should be array");
+    let resumes_array = list_json["body"].as_array().expect("Should be array");
 
     println!("Total resumes in list: {}", resumes_array.len());
 
@@ -307,9 +305,7 @@ fn test_retrieve_nonexistent_resume() {
     let json: Value = serde_json::from_str(&body).expect("Valid JSON");
 
     // Verify error message contains information about the missing ID
-    let message = json["body"]["Message"]
-        .as_str()
-        .expect("Should have message");
+    let message = json["body"].as_str().expect("Should have message");
     assert!(
         message.contains(&nonexistent_id.to_string()),
         "Error message should mention the resume ID"
@@ -352,7 +348,7 @@ fn test_update_and_retrieve_resume_persistence() {
 
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
-    let created_resume = &create_json["body"]["Resume"];
+    let created_resume = &create_json["body"];
     let resume_id = created_resume["id"]
         .as_i64()
         .expect("Resume ID should exist") as i32;
@@ -375,7 +371,7 @@ fn test_update_and_retrieve_resume_persistence() {
 
     let update_body = update_response.into_string().expect("Response body");
     let update_json: Value = serde_json::from_str(&update_body).expect("Valid JSON");
-    let updated_resume = &update_json["body"]["Resume"];
+    let updated_resume = &update_json["body"];
     assert_eq!(updated_resume["id"], resume_id);
     assert_eq!(updated_resume["location"], "New Location");
 
@@ -388,7 +384,7 @@ fn test_update_and_retrieve_resume_persistence() {
 
     let get_body = get_response.into_string().expect("Response body");
     let get_json: Value = serde_json::from_str(&get_body).expect("Valid JSON");
-    let retrieved_resume = &get_json["body"]["Resume"];
+    let retrieved_resume = &get_json["body"];
     assert_eq!(retrieved_resume["id"], resume_id);
     assert_eq!(retrieved_resume["location"], "New Location");
 }
@@ -414,9 +410,7 @@ fn test_update_nonexistent_resume() {
 
     let body = response.into_string().expect("Response body");
     let json: Value = serde_json::from_str(&body).expect("Valid JSON");
-    let message = json["body"]["Message"]
-        .as_str()
-        .expect("Should have message");
+    let message = json["body"].as_str().expect("Should have message");
     assert!(message.contains(&nonexistent_id.to_string()));
 }
 
@@ -454,7 +448,7 @@ fn test_delete_resume_then_not_found() {
 
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
-    let created_resume = &create_json["body"]["Resume"];
+    let created_resume = &create_json["body"];
     let resume_id = created_resume["id"]
         .as_i64()
         .expect("Resume ID should exist") as i32;
@@ -496,9 +490,7 @@ fn test_delete_nonexistent_resume() {
 
     let body = response.into_string().expect("Response body");
     let json: Value = serde_json::from_str(&body).expect("Valid JSON");
-    let message = json["body"]["Message"]
-        .as_str()
-        .expect("Should have message");
+    let message = json["body"].as_str().expect("Should have message");
     assert!(message.contains(&nonexistent_id.to_string()));
 }
 
@@ -555,7 +547,7 @@ fn test_create_resume_duplicate_email_returns_409() {
 
     let first_body = first_response.into_string().expect("Response body");
     let first_json: Value = serde_json::from_str(&first_body).expect("Valid JSON");
-    let created_resume = &first_json["body"]["Resume"];
+    let created_resume = &first_json["body"];
     let resume_id = created_resume["id"]
         .as_i64()
         .expect("Resume ID should exist") as i32;
@@ -573,7 +565,7 @@ fn test_create_resume_duplicate_email_returns_409() {
 
     let second_body = second_response.into_string().expect("Response body");
     let second_json: Value = serde_json::from_str(&second_body).expect("Valid JSON");
-    assert!(second_json["body"]["Message"].is_string());
+    assert!(second_json["body"].is_string());
 }
 
 #[test]
@@ -626,7 +618,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     assert_eq!(create_a.status(), Status::Created);
     let create_a_body = create_a.into_string().expect("Response body");
     let create_a_json: Value = serde_json::from_str(&create_a_body).expect("Valid JSON");
-    let id_a = create_a_json["body"]["Resume"]["id"].as_i64().expect("id") as i32;
+    let id_a = create_a_json["body"]["id"].as_i64().expect("id") as i32;
     fixture.track_resume_id(id_a);
 
     let create_b = fixture
@@ -639,7 +631,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     assert_eq!(create_b.status(), Status::Created);
     let create_b_body = create_b.into_string().expect("Response body");
     let create_b_json: Value = serde_json::from_str(&create_b_body).expect("Valid JSON");
-    let id_b = create_b_json["body"]["Resume"]["id"].as_i64().expect("id") as i32;
+    let id_b = create_b_json["body"]["id"].as_i64().expect("id") as i32;
     fixture.track_resume_id(id_b);
 
     let list_response = fixture.client().get("/api/resumes").dispatch();
@@ -647,9 +639,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     let list_body = list_response.into_string().expect("Response body");
     let list_json: Value = serde_json::from_str(&list_body).expect("Valid JSON");
 
-    let resumes_array = list_json["body"]["Resumes"]
-        .as_array()
-        .expect("Should be array");
+    let resumes_array = list_json["body"].as_array().expect("Should be array");
 
     let our_ids: Vec<i32> = resumes_array
         .iter()
@@ -713,7 +703,7 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
     assert_eq!(create_response.status(), Status::Created);
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
-    let created = &create_json["body"]["Resume"];
+    let created = &create_json["body"];
 
     let resume_id = created["id"].as_i64().expect("id") as i32;
     fixture.track_resume_id(resume_id);
@@ -744,7 +734,7 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
     assert_eq!(update_response.status(), Status::Ok);
     let update_body = update_response.into_string().expect("Response body");
     let update_json: Value = serde_json::from_str(&update_body).expect("Valid JSON");
-    let updated = &update_json["body"]["Resume"];
+    let updated = &update_json["body"];
 
     let created_at_after = updated["created_at"].as_str().expect("created_at string");
     let updated_at_after = updated["updated_at"].as_str().expect("updated_at string");
@@ -794,7 +784,7 @@ fn test_skills_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["Resume"]["id"]
+    let resume_id = create_resume_json["body"]["id"]
         .as_i64()
         .expect("resume id") as i32;
     fixture.track_resume_id(resume_id);
@@ -818,23 +808,21 @@ fn test_skills_crud_flow() {
         .into_string()
         .expect("create skill body");
     let create_skill_json: Value = serde_json::from_str(&create_skill_body).expect("valid json");
-    let skill_id = create_skill_json["body"]["Skill"]["id"]
-        .as_i64()
-        .expect("skill id") as i32;
+    let skill_id = create_skill_json["body"]["id"].as_i64().expect("skill id") as i32;
     assert_eq!(
-        create_skill_json["body"]["Skill"]["resume_id"]
+        create_skill_json["body"]["resume_id"]
             .as_i64()
             .expect("resume_id") as i32,
         resume_id
     );
     assert_eq!(
-        create_skill_json["body"]["Skill"]["skill_name"]
+        create_skill_json["body"]["skill_name"]
             .as_str()
             .expect("skill_name"),
         "Rust"
     );
     assert_eq!(
-        create_skill_json["body"]["Skill"]["confidence_percentage"]
+        create_skill_json["body"]["confidence_percentage"]
             .as_i64()
             .expect("confidence_percentage") as i32,
         80
@@ -850,9 +838,7 @@ fn test_skills_crud_flow() {
         .into_string()
         .expect("list skills body");
     let list_skills_json: Value = serde_json::from_str(&list_skills_body).expect("valid json");
-    let skills_array = list_skills_json["body"]["Skills"]
-        .as_array()
-        .expect("skills array");
+    let skills_array = list_skills_json["body"].as_array().expect("skills array");
     assert!(
         skills_array
             .iter()
@@ -877,13 +863,11 @@ fn test_skills_crud_flow() {
         .expect("update skill body");
     let update_skill_json: Value = serde_json::from_str(&update_skill_body).expect("valid json");
     assert_eq!(
-        update_skill_json["body"]["Skill"]["id"]
-            .as_i64()
-            .expect("id") as i32,
+        update_skill_json["body"]["id"].as_i64().expect("id") as i32,
         skill_id
     );
     assert_eq!(
-        update_skill_json["body"]["Skill"]["confidence_percentage"]
+        update_skill_json["body"]["confidence_percentage"]
             .as_i64()
             .expect("confidence_percentage") as i32,
         95
@@ -908,7 +892,7 @@ fn test_skills_crud_flow() {
         .expect("list skills after delete body");
     let list_after_delete_json: Value =
         serde_json::from_str(&list_after_delete_body).expect("valid json");
-    let skills_after_delete = list_after_delete_json["body"]["Skills"]
+    let skills_after_delete = list_after_delete_json["body"]
         .as_array()
         .expect("skills array");
     assert!(
@@ -953,7 +937,7 @@ fn test_languages_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["Resume"]["id"]
+    let resume_id = create_resume_json["body"]["id"]
         .as_i64()
         .expect("resume id") as i32;
     fixture.track_resume_id(resume_id);
@@ -977,17 +961,17 @@ fn test_languages_crud_flow() {
         .expect("create language body");
     let create_language_json: Value =
         serde_json::from_str(&create_language_body).expect("valid json");
-    let language_id = create_language_json["body"]["Language"]["id"]
+    let language_id = create_language_json["body"]["id"]
         .as_i64()
         .expect("language id") as i32;
     assert_eq!(
-        create_language_json["body"]["Language"]["resume_id"]
+        create_language_json["body"]["resume_id"]
             .as_i64()
             .expect("resume_id") as i32,
         resume_id
     );
     assert_eq!(
-        create_language_json["body"]["Language"]["language_name"]
+        create_language_json["body"]["language_name"]
             .as_str()
             .expect("language_name"),
         "TypeScript"
@@ -1004,7 +988,7 @@ fn test_languages_crud_flow() {
         .expect("list languages body");
     let list_languages_json: Value =
         serde_json::from_str(&list_languages_body).expect("valid json");
-    let languages_array = list_languages_json["body"]["Languages"]
+    let languages_array = list_languages_json["body"]
         .as_array()
         .expect("languages array");
     assert!(
@@ -1032,13 +1016,11 @@ fn test_languages_crud_flow() {
     let update_language_json: Value =
         serde_json::from_str(&update_language_body).expect("valid json");
     assert_eq!(
-        update_language_json["body"]["Language"]["id"]
-            .as_i64()
-            .expect("id") as i32,
+        update_language_json["body"]["id"].as_i64().expect("id") as i32,
         language_id
     );
     assert_eq!(
-        update_language_json["body"]["Language"]["language_name"]
+        update_language_json["body"]["language_name"]
             .as_str()
             .expect("language_name"),
         "JavaScript"
@@ -1088,7 +1070,7 @@ fn test_frameworks_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["Resume"]["id"]
+    let resume_id = create_resume_json["body"]["id"]
         .as_i64()
         .expect("resume id") as i32;
     fixture.track_resume_id(resume_id);
@@ -1112,7 +1094,7 @@ fn test_frameworks_crud_flow() {
         .expect("create language body");
     let create_language_json: Value =
         serde_json::from_str(&create_language_body).expect("valid json");
-    let language_id = create_language_json["body"]["Language"]["id"]
+    let language_id = create_language_json["body"]["id"]
         .as_i64()
         .expect("language id") as i32;
 
@@ -1138,17 +1120,17 @@ fn test_frameworks_crud_flow() {
         .expect("create framework body");
     let create_framework_json: Value =
         serde_json::from_str(&create_framework_body).expect("valid json");
-    let framework_id = create_framework_json["body"]["Framework"]["id"]
+    let framework_id = create_framework_json["body"]["id"]
         .as_i64()
         .expect("framework id") as i32;
     assert_eq!(
-        create_framework_json["body"]["Framework"]["language_id"]
+        create_framework_json["body"]["language_id"]
             .as_i64()
             .expect("language_id") as i32,
         language_id
     );
     assert_eq!(
-        create_framework_json["body"]["Framework"]["framework_name"]
+        create_framework_json["body"]["framework_name"]
             .as_str()
             .expect("framework_name"),
         "Rocket"
@@ -1168,7 +1150,7 @@ fn test_frameworks_crud_flow() {
         .expect("list frameworks body");
     let list_frameworks_json: Value =
         serde_json::from_str(&list_frameworks_body).expect("valid json");
-    let frameworks_array = list_frameworks_json["body"]["Frameworks"]
+    let frameworks_array = list_frameworks_json["body"]
         .as_array()
         .expect("frameworks array");
     assert!(
@@ -1196,13 +1178,11 @@ fn test_frameworks_crud_flow() {
     let update_framework_json: Value =
         serde_json::from_str(&update_framework_body).expect("valid json");
     assert_eq!(
-        update_framework_json["body"]["Framework"]["id"]
-            .as_i64()
-            .expect("id") as i32,
+        update_framework_json["body"]["id"].as_i64().expect("id") as i32,
         framework_id
     );
     assert_eq!(
-        update_framework_json["body"]["Framework"]["framework_name"]
+        update_framework_json["body"]["framework_name"]
             .as_str()
             .expect("framework_name"),
         "Diesel"
@@ -1252,7 +1232,7 @@ fn test_education_and_key_points_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["Resume"]["id"]
+    let resume_id = create_resume_json["body"]["id"]
         .as_i64()
         .expect("resume id") as i32;
     fixture.track_resume_id(resume_id);
@@ -1280,12 +1260,12 @@ fn test_education_and_key_points_crud_flow() {
         .expect("create education body");
     let create_education_json: Value =
         serde_json::from_str(&create_education_body).expect("valid json");
-    let education_id = create_education_json["body"]["Education"]["id"]
+    let education_id = create_education_json["body"]["id"]
         .as_i64()
         .expect("education id") as i32;
 
     assert!(
-        create_education_json["body"]["Education"]["degree"].is_null(),
+        create_education_json["body"]["degree"].is_null(),
         "degree should be null when omitted on create"
     );
 
@@ -1300,7 +1280,7 @@ fn test_education_and_key_points_crud_flow() {
         .expect("list education body");
     let list_education_json: Value =
         serde_json::from_str(&list_education_body).expect("valid json");
-    let education_array = list_education_json["body"]["Educations"]
+    let education_array = list_education_json["body"]
         .as_array()
         .expect("education array");
     assert!(
@@ -1340,7 +1320,7 @@ fn test_education_and_key_points_crud_flow() {
         .expect("clear degree body");
     let clear_degree_json: Value = serde_json::from_str(&clear_degree_body).expect("valid json");
     assert!(
-        clear_degree_json["body"]["Education"]["degree"].is_null(),
+        clear_degree_json["body"]["degree"].is_null(),
         "degree should be null after clearing via update"
     );
 
@@ -1365,7 +1345,7 @@ fn test_education_and_key_points_crud_flow() {
         .expect("create key point body");
     let create_key_point_json: Value =
         serde_json::from_str(&create_key_point_body).expect("valid json");
-    let key_point_id = create_key_point_json["body"]["EducationKeyPoint"]["id"]
+    let key_point_id = create_key_point_json["body"]["id"]
         .as_i64()
         .expect("key point id") as i32;
 
@@ -1384,7 +1364,7 @@ fn test_education_and_key_points_crud_flow() {
         .expect("list education key points body");
     let list_key_points_json: Value =
         serde_json::from_str(&list_key_points_body).expect("valid json");
-    let key_points_array = list_key_points_json["body"]["EducationKeyPoints"]
+    let key_points_array = list_key_points_json["body"]
         .as_array()
         .expect("education key points array");
     assert!(
@@ -1455,7 +1435,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["Resume"]["id"]
+    let resume_id = create_resume_json["body"]["id"]
         .as_i64()
         .expect("resume id") as i32;
     fixture.track_resume_id(resume_id);
@@ -1481,12 +1461,10 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .into_string()
         .expect("create work body");
     let create_work_json: Value = serde_json::from_str(&create_work_body).expect("valid json");
-    let work_id = create_work_json["body"]["WorkExperience"]["id"]
-        .as_i64()
-        .expect("work id") as i32;
+    let work_id = create_work_json["body"]["id"].as_i64().expect("work id") as i32;
 
     assert!(
-        create_work_json["body"]["WorkExperience"]["company_name"].is_null(),
+        create_work_json["body"]["company_name"].is_null(),
         "company_name should be null when omitted on create"
     );
 
@@ -1512,11 +1490,11 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .expect("create work with company body");
     let create_work_with_company_json: Value =
         serde_json::from_str(&create_work_with_company_body).expect("valid json");
-    let work_with_company_id = create_work_with_company_json["body"]["WorkExperience"]["id"]
+    let work_with_company_id = create_work_with_company_json["body"]["id"]
         .as_i64()
         .expect("work with company id") as i32;
     assert_eq!(
-        create_work_with_company_json["body"]["WorkExperience"]["company_name"], "Example Corp",
+        create_work_with_company_json["body"]["company_name"], "Example Corp",
         "company_name should be returned when set on create"
     );
 
@@ -1529,7 +1507,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
 
     let list_work_body = list_work_response.into_string().expect("list work body");
     let list_work_json: Value = serde_json::from_str(&list_work_body).expect("valid json");
-    let work_array = list_work_json["body"]["WorkExperiences"]
+    let work_array = list_work_json["body"]
         .as_array()
         .expect("work experiences array");
     assert!(
@@ -1555,7 +1533,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
     let update_company_whitespace_json: Value =
         serde_json::from_str(&update_company_whitespace_body).expect("valid json");
     assert!(
-        update_company_whitespace_json["body"]["WorkExperience"]["company_name"].is_null(),
+        update_company_whitespace_json["body"]["company_name"].is_null(),
         "company_name should normalize to null when whitespace"
     );
 
@@ -1576,7 +1554,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
     let update_company_null_json: Value =
         serde_json::from_str(&update_company_null_body).expect("valid json");
     assert!(
-        update_company_null_json["body"]["WorkExperience"]["company_name"].is_null(),
+        update_company_null_json["body"]["company_name"].is_null(),
         "company_name should be null when explicitly set to null"
     );
 
@@ -1591,7 +1569,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .expect("list work after clear body");
     let list_work_after_clear_json: Value =
         serde_json::from_str(&list_work_after_clear_body).expect("valid json");
-    let work_after_clear_array = list_work_after_clear_json["body"]["WorkExperiences"]
+    let work_after_clear_array = list_work_after_clear_json["body"]
         .as_array()
         .expect("work experiences array after clear");
     let cleared_item = work_after_clear_array
@@ -1625,7 +1603,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .expect("create work key point body");
     let create_work_kp_json: Value =
         serde_json::from_str(&create_work_kp_body).expect("valid json");
-    let work_kp_id = create_work_kp_json["body"]["WorkExperienceKeyPoint"]["id"]
+    let work_kp_id = create_work_kp_json["body"]["id"]
         .as_i64()
         .expect("work key point id") as i32;
 
@@ -1649,7 +1627,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .into_string()
         .expect("list work key points body");
     let list_work_kps_json: Value = serde_json::from_str(&list_work_kps_body).expect("valid json");
-    let work_kps_array = list_work_kps_json["body"]["WorkExperienceKeyPoints"]
+    let work_kps_array = list_work_kps_json["body"]
         .as_array()
         .expect("work key points array");
     assert!(
@@ -1701,7 +1679,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["Resume"]["id"]
+    let resume_id = create_resume_json["body"]["id"]
         .as_i64()
         .expect("resume id") as i32;
     fixture.track_resume_id(resume_id);
@@ -1729,7 +1707,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .expect("create project body");
     let create_project_json: Value =
         serde_json::from_str(&create_project_body).expect("valid json");
-    let project_id = create_project_json["body"]["PortfolioProject"]["id"]
+    let project_id = create_project_json["body"]["id"]
         .as_i64()
         .expect("project id") as i32;
 
@@ -1743,7 +1721,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .into_string()
         .expect("list projects body");
     let list_projects_json: Value = serde_json::from_str(&list_projects_body).expect("valid json");
-    let projects_array = list_projects_json["body"]["PortfolioProjects"]
+    let projects_array = list_projects_json["body"]
         .as_array()
         .expect("projects array");
     assert!(
@@ -1774,7 +1752,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .expect("create project key point body");
     let create_project_kp_json: Value =
         serde_json::from_str(&create_project_kp_body).expect("valid json");
-    let project_kp_id = create_project_kp_json["body"]["PortfolioKeyPoint"]["id"]
+    let project_kp_id = create_project_kp_json["body"]["id"]
         .as_i64()
         .expect("project key point id") as i32;
 
@@ -1792,7 +1770,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .expect("list project key points body");
     let list_project_kps_json: Value =
         serde_json::from_str(&list_project_kps_body).expect("valid json");
-    let project_kps_array = list_project_kps_json["body"]["PortfolioKeyPoints"]
+    let project_kps_array = list_project_kps_json["body"]
         .as_array()
         .expect("project key points array");
     assert!(
@@ -1822,9 +1800,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .into_string()
         .expect("create tech body");
     let create_tech_json: Value = serde_json::from_str(&create_tech_body).expect("valid json");
-    let tech_id = create_tech_json["body"]["PortfolioTechnology"]["id"]
-        .as_i64()
-        .expect("tech id") as i32;
+    let tech_id = create_tech_json["body"]["id"].as_i64().expect("tech id") as i32;
 
     let list_techs_response = fixture
         .client()
@@ -1837,7 +1813,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
     assert_eq!(list_techs_response.status(), Status::Ok);
     let list_techs_body = list_techs_response.into_string().expect("list techs body");
     let list_techs_json: Value = serde_json::from_str(&list_techs_body).expect("valid json");
-    let techs_array = list_techs_json["body"]["PortfolioTechnologies"]
+    let techs_array = list_techs_json["body"]
         .as_array()
         .expect("technologies array");
     assert!(

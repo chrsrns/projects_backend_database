@@ -101,7 +101,7 @@ fn test_register_login_me_logout_flow() {
 
     let register_body = register_response.into_string().expect("register body");
     let register_json: Value = serde_json::from_str(&register_body).expect("valid json");
-    let created_user = &register_json["body"]["User"];
+    let created_user = &register_json["body"];
     let user_id = created_user["id"].as_i64().expect("user id") as i32;
     fixture.track_user_id(user_id);
 
@@ -121,7 +121,7 @@ fn test_register_login_me_logout_flow() {
     let login_body = login_response.into_string().expect("login body");
     let login_json: Value = serde_json::from_str(&login_body).expect("valid json");
 
-    let token = login_json["body"]["AuthToken"]["token"]
+    let token = login_json["body"]["token"]
         .as_str()
         .expect("token")
         .to_string();
@@ -137,10 +137,7 @@ fn test_register_login_me_logout_flow() {
     assert_eq!(me_response.status(), Status::Ok);
     let me_body = me_response.into_string().expect("me body");
     let me_json: Value = serde_json::from_str(&me_body).expect("valid json");
-    assert_eq!(
-        me_json["body"]["User"]["id"].as_i64().unwrap() as i32,
-        user_id
-    );
+    assert_eq!(me_json["body"]["id"].as_i64().unwrap() as i32, user_id);
 
     let logout_response = fixture
         .client()
