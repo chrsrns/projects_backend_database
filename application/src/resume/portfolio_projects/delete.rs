@@ -1,14 +1,13 @@
 use diesel::prelude::*;
 use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume};
 use infrastructure::establish_connection;
-use rocket::http::Status;
-use rocket::response::status::{Custom, NoContent};
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn delete_portfolio_project(
     user_id_value: i32,
     project_id_value: i32,
-) -> Result<NoContent, Custom<String>> {
+) -> Result<(), ApplicationError> {
     use domain::schema::portfolio_projects;
     use domain::schema::resumes;
 
@@ -18,15 +17,17 @@ pub fn delete_portfolio_project(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Portfolio project with id {} not found", project_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Portfolio project with id {} not found",
+                project_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -35,27 +36,20 @@ pub fn delete_portfolio_project(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Resume not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
@@ -64,25 +58,25 @@ pub fn delete_portfolio_project(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response::<String> {
-                    body: format!("Portfolio project with id {} not found", project_id_value),
-                };
-                Err(Custom(
-                    Status::NotFound,
-                    serde_json::to_string(&response).unwrap(),
-                ))
+                Err(ApplicationError::NotFound(format!(
+                    "Portfolio project with id {} not found",
+                    project_id_value
+                )))
             } else {
-                Ok(NoContent)
+                Ok(())
             }
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
 
 pub fn delete_portfolio_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
-) -> Result<NoContent, Custom<String>> {
+) -> Result<(), ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects;
     use domain::schema::resumes;
@@ -93,18 +87,17 @@ pub fn delete_portfolio_key_point(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!(
-                    "Portfolio key point with id {} not found",
-                    key_point_id_value
-                ),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Portfolio key point with id {} not found",
+                key_point_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let project: PortfolioProject = match portfolio_projects::table
@@ -113,15 +106,16 @@ pub fn delete_portfolio_key_point(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Portfolio project not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
+            return Err(ApplicationError::NotFound(
+                "Portfolio project not found".to_string(),
             ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -130,27 +124,20 @@ pub fn delete_portfolio_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Resume not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
@@ -159,28 +146,25 @@ pub fn delete_portfolio_key_point(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response::<String> {
-                    body: format!(
-                        "Portfolio key point with id {} not found",
-                        key_point_id_value
-                    ),
-                };
-                Err(Custom(
-                    Status::NotFound,
-                    serde_json::to_string(&response).unwrap(),
-                ))
+                Err(ApplicationError::NotFound(format!(
+                    "Portfolio key point with id {} not found",
+                    key_point_id_value
+                )))
             } else {
-                Ok(NoContent)
+                Ok(())
             }
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
 
 pub fn delete_portfolio_technology(
     user_id_value: i32,
     tech_id_value: i32,
-) -> Result<NoContent, Custom<String>> {
+) -> Result<(), ApplicationError> {
     use domain::schema::portfolio_projects;
     use domain::schema::portfolio_technologies;
     use domain::schema::resumes;
@@ -191,15 +175,17 @@ pub fn delete_portfolio_technology(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Portfolio technology with id {} not found", tech_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Portfolio technology with id {} not found",
+                tech_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let project: PortfolioProject = match portfolio_projects::table
@@ -208,15 +194,16 @@ pub fn delete_portfolio_technology(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Portfolio project not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
+            return Err(ApplicationError::NotFound(
+                "Portfolio project not found".to_string(),
             ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -225,27 +212,20 @@ pub fn delete_portfolio_technology(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Resume not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
@@ -254,17 +234,17 @@ pub fn delete_portfolio_technology(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response::<String> {
-                    body: format!("Portfolio technology with id {} not found", tech_id_value),
-                };
-                Err(Custom(
-                    Status::NotFound,
-                    serde_json::to_string(&response).unwrap(),
-                ))
+                Err(ApplicationError::NotFound(format!(
+                    "Portfolio technology with id {} not found",
+                    tech_id_value
+                )))
             } else {
-                Ok(NoContent)
+                Ok(())
             }
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }

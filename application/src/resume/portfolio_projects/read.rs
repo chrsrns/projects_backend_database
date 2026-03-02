@@ -1,13 +1,13 @@
 use diesel::prelude::*;
 use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume};
 use infrastructure::establish_connection;
-use rocket::response::status::NotFound;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn list_portfolio_projects(
     resume_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<PortfolioProject>, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::resumes::dsl as resumes_dsl;
 
@@ -25,12 +25,17 @@ pub fn list_portfolio_projects(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<PortfolioProject> = match projects_dsl::portfolio_projects
@@ -38,21 +43,24 @@ pub fn list_portfolio_projects(
         .load::<PortfolioProject>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|p| (p.display_order.unwrap_or(0), p.id));
 
-    let response = Response::<Vec<PortfolioProject>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }
 
 pub fn list_portfolio_key_points(
     resume_id_value: i32,
     project_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<PortfolioKeyPoint>, ApplicationError> {
     use domain::schema::portfolio_key_points::dsl as kps_dsl;
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::resumes::dsl as resumes_dsl;
@@ -71,12 +79,17 @@ pub fn list_portfolio_key_points(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let _project: PortfolioProject = match projects_dsl::portfolio_projects
@@ -86,12 +99,16 @@ pub fn list_portfolio_key_points(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Portfolio project not found".to_string(),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(
+                "Portfolio project not found".to_string(),
+            ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<PortfolioKeyPoint> = match kps_dsl::portfolio_key_points
@@ -99,21 +116,24 @@ pub fn list_portfolio_key_points(
         .load::<PortfolioKeyPoint>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));
 
-    let response = Response::<Vec<PortfolioKeyPoint>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }
 
 pub fn list_portfolio_technologies(
     resume_id_value: i32,
     project_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<PortfolioTechnology>, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::portfolio_technologies::dsl as tech_dsl;
     use domain::schema::resumes::dsl as resumes_dsl;
@@ -132,12 +152,17 @@ pub fn list_portfolio_technologies(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let _project: PortfolioProject = match projects_dsl::portfolio_projects
@@ -147,12 +172,16 @@ pub fn list_portfolio_technologies(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Portfolio project not found".to_string(),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(
+                "Portfolio project not found".to_string(),
+            ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<PortfolioTechnology> = match tech_dsl::portfolio_technologies
@@ -160,12 +189,15 @@ pub fn list_portfolio_technologies(
         .load::<PortfolioTechnology>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|t| (t.display_order.unwrap_or(0), t.id));
 
-    let response = Response::<Vec<PortfolioTechnology>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }

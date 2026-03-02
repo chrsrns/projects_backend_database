@@ -5,16 +5,14 @@ use domain::models::{
     PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume,
 };
 use infrastructure::establish_connection;
-use rocket::http::Status;
-use rocket::response::status::{Created, Custom};
-use rocket::serde::json::Json;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn create_portfolio_project(
     user_id_value: i32,
     resume_id_value: i32,
-    payload: Json<NewPortfolioProjectRequest>,
-) -> Result<Created<String>, Custom<String>> {
+    payload: NewPortfolioProjectRequest,
+) -> Result<PortfolioProject, ApplicationError> {
     use domain::schema::portfolio_projects;
     use domain::schema::resumes;
 
@@ -24,31 +22,26 @@ pub fn create_portfolio_project(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
-    let payload = payload.into_inner();
     let new_item = NewPortfolioProject {
         resume_id: resume_id_value,
         project_name: payload.project_name,
@@ -63,11 +56,11 @@ pub fn create_portfolio_project(
         .values(&new_item)
         .get_result::<PortfolioProject>(&mut establish_connection())
     {
-        Ok(item) => {
-            let response = Response::<PortfolioProject> { body: item };
-            Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
-        }
-        Err(err) => panic!("Database error - {}", err),
+        Ok(item) => Ok(item),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
 
@@ -75,8 +68,8 @@ pub fn create_portfolio_key_point(
     user_id_value: i32,
     resume_id_value: i32,
     project_id_value: i32,
-    payload: Json<NewPortfolioKeyPointRequest>,
-) -> Result<Created<String>, Custom<String>> {
+    payload: NewPortfolioKeyPointRequest,
+) -> Result<PortfolioKeyPoint, ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::resumes;
@@ -87,27 +80,23 @@ pub fn create_portfolio_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
@@ -118,18 +107,18 @@ pub fn create_portfolio_key_point(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Portfolio project not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
+            return Err(ApplicationError::NotFound(
+                "Portfolio project not found".to_string(),
             ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
-    let payload = payload.into_inner();
     let new_item = NewPortfolioKeyPoint {
         portfolio_project_id: project_id_value,
         key_point: payload.key_point,
@@ -140,11 +129,11 @@ pub fn create_portfolio_key_point(
         .values(&new_item)
         .get_result::<PortfolioKeyPoint>(&mut establish_connection())
     {
-        Ok(item) => {
-            let response = Response::<PortfolioKeyPoint> { body: item };
-            Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
-        }
-        Err(err) => panic!("Database error - {}", err),
+        Ok(item) => Ok(item),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
 
@@ -152,8 +141,8 @@ pub fn create_portfolio_technology(
     user_id_value: i32,
     resume_id_value: i32,
     project_id_value: i32,
-    payload: Json<NewPortfolioTechnologyRequest>,
-) -> Result<Created<String>, Custom<String>> {
+    payload: NewPortfolioTechnologyRequest,
+) -> Result<PortfolioTechnology, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::portfolio_technologies;
     use domain::schema::resumes;
@@ -164,27 +153,23 @@ pub fn create_portfolio_technology(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
@@ -195,18 +180,18 @@ pub fn create_portfolio_technology(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Portfolio project not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
+            return Err(ApplicationError::NotFound(
+                "Portfolio project not found".to_string(),
             ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
-    let payload = payload.into_inner();
     let new_item = NewPortfolioTechnology {
         portfolio_project_id: project_id_value,
         technology_name: payload.technology_name,
@@ -217,10 +202,10 @@ pub fn create_portfolio_technology(
         .values(&new_item)
         .get_result::<PortfolioTechnology>(&mut establish_connection())
     {
-        Ok(item) => {
-            let response = Response::<PortfolioTechnology> { body: item };
-            Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
-        }
-        Err(err) => panic!("Database error - {}", err),
+        Ok(item) => Ok(item),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
