@@ -1,12 +1,14 @@
 use application::error::ApplicationError;
 use application::resume::{create, delete, read, update};
 use domain::models::{NewResumeRequest, Resume, UpdateResume};
+use rocket::State;
 use rocket::response::status::{Conflict, Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
     get,
@@ -102,13 +104,17 @@ pub fn list_resume_handler(
 #[post("/new_resume", format = "application/json", data = "<resume>")]
 pub fn create_resume_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume: Json<NewResumeRequest>,
 ) -> Result<Custom<Json<Response<Resume>>>, Conflict<Json<Response<String>>>> {
     match create::create_resume(auth.user_id, resume.into_inner()) {
-        Ok(resume) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: resume }),
-        )),
+        Ok(resume) => {
+            hub.publish_resume_changed(resume.id, ResumeChangedAction::Created);
+            Ok(Custom(
+                rocket::http::Status::Created,
+                Json(Response { body: resume }),
+            ))
+        }
         Err(ApplicationError::Conflict(msg)) => Err(Conflict(Json(Response { body: msg }))),
         Err(err) => Err(Conflict(Json(Response {
             body: format!("{:?}", err),
@@ -135,11 +141,15 @@ pub fn create_resume_handler(
 #[put("/resume/<resume_id>", format = "application/json", data = "<resume>")]
 pub fn update_resume_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume_id: i32,
     resume: Json<UpdateResume>,
 ) -> Result<Json<Response<Resume>>, Custom<Json<Response<String>>>> {
     match update::update_resume(auth.user_id, resume_id, resume.into_inner()) {
-        Ok(updated) => Ok(Json(Response { body: updated })),
+        Ok(updated) => {
+            hub.publish_resume_changed(updated.id, ResumeChangedAction::Updated);
+            Ok(Json(Response { body: updated }))
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),
@@ -189,10 +199,14 @@ pub fn update_resume_handler(
 #[rocket_delete("/resume/<resume_id>")]
 pub fn delete_resume_handler(
     auth: AuthSession,
+    hub: &State<Hub>,
     resume_id: i32,
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match delete::delete_resume(auth.user_id, resume_id) {
-        Ok(()) => Ok(NoContent),
+        Ok(()) => {
+            hub.publish_resume_changed(resume_id, ResumeChangedAction::Deleted);
+            Ok(NoContent)
+        }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
             rocket::http::Status::NotFound,
             Json(Response { body: msg }),

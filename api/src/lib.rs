@@ -10,12 +10,19 @@ pub mod frameworks_handler;
 pub mod languages_handler;
 pub mod openapi;
 pub mod portfolio_projects_handler;
+pub mod realtime;
 pub mod resume_handler;
 pub mod skills_handler;
 pub mod work_experiences_handler;
+pub mod ws_handler;
 
 pub fn build_rocket() -> rocket::Rocket<rocket::Build> {
+    build_rocket_with_hub(realtime::Hub::new())
+}
+
+pub fn build_rocket_with_hub(hub: realtime::Hub) -> rocket::Rocket<rocket::Build> {
     rocket::build()
+        .manage(hub)
         .mount(
             "/api",
             routes![
@@ -23,6 +30,7 @@ pub fn build_rocket() -> rocket::Rocket<rocket::Build> {
                 auth_handler::login_handler,
                 auth_handler::me_handler,
                 auth_handler::logout_handler,
+                ws_handler::ws_handler,
                 resume_handler::list_resumes_handler,
                 resume_handler::list_resume_handler,
                 resume_handler::create_resume_handler,
