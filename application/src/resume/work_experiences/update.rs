@@ -4,10 +4,8 @@ use domain::models::{
     WorkExperienceKeyPoint,
 };
 use infrastructure::establish_connection;
-use rocket::http::Status;
-use rocket::response::status::Custom;
-use rocket::serde::json::Json;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 fn normalize_optional_string_change(value: Option<Option<String>>) -> Option<Option<String>> {
     value.map(|inner| {
@@ -25,8 +23,8 @@ fn normalize_optional_string_change(value: Option<Option<String>>) -> Option<Opt
 pub fn update_work_experience(
     user_id_value: i32,
     work_id_value: i32,
-    payload: Json<UpdateWorkExperience>,
-) -> Result<String, Custom<String>> {
+    payload: UpdateWorkExperience,
+) -> Result<WorkExperience, ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::work_experiences;
 
@@ -36,15 +34,17 @@ pub fn update_work_experience(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Work experience with id {} not found", work_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Work experience with id {} not found",
+                work_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -53,31 +53,23 @@ pub fn update_work_experience(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Resume not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
-    let payload = payload.into_inner();
     let payload = UpdateWorkExperience {
         job_title: payload.job_title.map(|v| v.trim().to_string()),
         company_name: normalize_optional_string_change(payload.company_name),
@@ -90,28 +82,23 @@ pub fn update_work_experience(
         .set(&payload)
         .get_result::<WorkExperience>(&mut establish_connection())
     {
-        Ok(updated) => {
-            let response = Response::<WorkExperience> { body: updated };
-            Ok(serde_json::to_string(&response).unwrap())
-        }
-        Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Work experience with id {} not found", work_id_value),
-            };
-            Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ))
-        }
-        Err(err) => panic!("Database error - {}", err),
+        Ok(updated) => Ok(updated),
+        Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
+            "Work experience with id {} not found",
+            work_id_value
+        ))),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
 
 pub fn update_work_experience_key_point(
     user_id_value: i32,
     kp_id_value: i32,
-    payload: Json<UpdateWorkExperienceKeyPoint>,
-) -> Result<String, Custom<String>> {
+    payload: UpdateWorkExperienceKeyPoint,
+) -> Result<WorkExperienceKeyPoint, ApplicationError> {
     use domain::schema::resumes;
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
@@ -122,18 +109,17 @@ pub fn update_work_experience_key_point(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!(
-                    "Work experience key point with id {} not found",
-                    kp_id_value
-                ),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Work experience key point with id {} not found",
+                kp_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let work: WorkExperience = match work_experiences::table
@@ -142,15 +128,16 @@ pub fn update_work_experience_key_point(
     {
         Ok(w) => w,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Work experience not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
+            return Err(ApplicationError::NotFound(
+                "Work experience not found".to_string(),
             ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let resume: Resume = match resumes::table
@@ -159,51 +146,35 @@ pub fn update_work_experience_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Resume not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound("Resume not found".to_string()));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
-    let payload = payload.into_inner();
     match diesel::update(work_experience_key_points::table.find(kp_id_value))
         .set(&payload)
         .get_result::<WorkExperienceKeyPoint>(&mut establish_connection())
     {
-        Ok(updated) => {
-            let response = Response::<WorkExperienceKeyPoint> { body: updated };
-            Ok(serde_json::to_string(&response).unwrap())
-        }
-        Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!(
-                    "Work experience key point with id {} not found",
-                    kp_id_value
-                ),
-            };
-            Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ))
-        }
-        Err(err) => panic!("Database error - {}", err),
+        Ok(updated) => Ok(updated),
+        Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
+            "Work experience key point with id {} not found",
+            kp_id_value
+        ))),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }

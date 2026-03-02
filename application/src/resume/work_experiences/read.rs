@@ -1,13 +1,13 @@
 use diesel::prelude::*;
 use domain::models::{Resume, WorkExperience, WorkExperienceKeyPoint};
 use infrastructure::establish_connection;
-use rocket::response::status::NotFound;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn list_work_experiences(
     resume_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<WorkExperience>, ApplicationError> {
     use domain::schema::resumes::dsl as resumes_dsl;
     use domain::schema::work_experiences::dsl as work_dsl;
 
@@ -25,12 +25,17 @@ pub fn list_work_experiences(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<WorkExperience> = match work_dsl::work_experiences
@@ -38,21 +43,24 @@ pub fn list_work_experiences(
         .load::<WorkExperience>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|w| (w.display_order.unwrap_or(0), w.id));
 
-    let response = Response::<Vec<WorkExperience>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }
 
 pub fn list_work_experience_key_points(
     resume_id_value: i32,
     work_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<WorkExperienceKeyPoint>, ApplicationError> {
     use domain::schema::resumes::dsl as resumes_dsl;
     use domain::schema::work_experience_key_points::dsl as kps_dsl;
     use domain::schema::work_experiences::dsl as work_dsl;
@@ -71,12 +79,17 @@ pub fn list_work_experience_key_points(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let _work: WorkExperience = match work_dsl::work_experiences
@@ -86,12 +99,16 @@ pub fn list_work_experience_key_points(
     {
         Ok(w) => w,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Work experience not found".to_string(),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(
+                "Work experience not found".to_string(),
+            ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<WorkExperienceKeyPoint> = match kps_dsl::work_experience_key_points
@@ -99,12 +116,15 @@ pub fn list_work_experience_key_points(
         .load::<WorkExperienceKeyPoint>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));
 
-    let response = Response::<Vec<WorkExperienceKeyPoint>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }
