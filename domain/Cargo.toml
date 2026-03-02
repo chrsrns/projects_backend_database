@@ -9,3 +9,5 @@ diesel = { version = "2.3.2", features = ["chrono", "postgres", "uuid"] }
 rocket = { version = "0.5.1", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
+
+utoipa = { version = "5", features = ["chrono", "uuid"] }
