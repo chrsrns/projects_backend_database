@@ -1,27 +1,18 @@
+use crate::error::ApplicationError;
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use diesel::prelude::*;
 use domain::models::{AuthRegisterRequest, NewUser, User};
 use infrastructure::establish_connection;
 use rand_core::OsRng;
-use rocket::response::status::{Conflict, Created};
-use rocket::serde::json::Json;
-use shared::response_models::Response;
 
-pub fn register(payload: Json<AuthRegisterRequest>) -> Result<Created<String>, Conflict<String>> {
+pub fn register(payload: AuthRegisterRequest) -> Result<User, ApplicationError> {
     use domain::schema::users;
-
-    let payload = payload.into_inner();
 
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let password_hash = argon2
         .hash_password(payload.password.as_bytes(), &salt)
-        .map_err(|_| {
-            let response = Response::<String> {
-                body: "Password hashing failed".to_string(),
-            };
-            Conflict(serde_json::to_string(&response).unwrap())
-        })?
+        .map_err(|_| ApplicationError::Internal("Password hashing failed".to_string()))?
         .to_string();
 
     let new_user = NewUser {
@@ -33,21 +24,18 @@ pub fn register(payload: Json<AuthRegisterRequest>) -> Result<Created<String>, C
         .values(&new_user)
         .get_result::<User>(&mut establish_connection())
     {
-        Ok(user) => {
-            let response = Response::<User> { body: user };
-            Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
-        }
+        Ok(user) => Ok(user),
         Err(err) => match err {
             diesel::result::Error::DatabaseError(
                 diesel::result::DatabaseErrorKind::UniqueViolation,
                 _,
-            ) => {
-                let response = Response::<String> {
-                    body: "User with this email already exists".to_string(),
-                };
-                Err(Conflict(serde_json::to_string(&response).unwrap()))
-            }
-            _ => panic!("Database error - {}", err),
+            ) => Err(ApplicationError::Conflict(
+                "User with this email already exists".to_string(),
+            )),
+            _ => Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            ))),
         },
     }
 }

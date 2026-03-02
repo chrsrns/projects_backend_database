@@ -1,9 +1,9 @@
 use diesel::prelude::*;
 use domain::models::User;
 use infrastructure::establish_connection;
-use rocket::response::status::Unauthorized;
-use shared::response_models::Response;
 use uuid::Uuid;
+
+use crate::error::ApplicationError;
 
 pub fn resolve_session_user_id(session_id: Uuid) -> Result<Option<i32>, diesel::result::Error> {
     use domain::schema::sessions::dsl::*;
@@ -16,7 +16,7 @@ pub fn resolve_session_user_id(session_id: Uuid) -> Result<Option<i32>, diesel::
         .optional()
 }
 
-pub fn me(user_id_value: i32) -> Result<String, Unauthorized<String>> {
+pub fn me(user_id_value: i32) -> Result<User, ApplicationError> {
     use domain::schema::users::dsl::*;
 
     let user: User = match users
@@ -24,15 +24,8 @@ pub fn me(user_id_value: i32) -> Result<String, Unauthorized<String>> {
         .first::<User>(&mut establish_connection())
     {
         Ok(u) => u,
-        Err(_) => {
-            let response = Response::<String> {
-                body: "Unauthorized".to_string(),
-            };
-            return Err(Unauthorized(serde_json::to_string(&response).unwrap()));
-        }
+        Err(_) => return Err(ApplicationError::Unauthorized),
     };
 
-    let response = Response::<User> { body: user };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(user)
 }

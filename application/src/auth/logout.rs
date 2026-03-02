@@ -1,10 +1,10 @@
 use diesel::prelude::*;
 use infrastructure::establish_connection;
-use rocket::response::status::Unauthorized;
-use shared::response_models::Response;
 use uuid::Uuid;
 
-pub fn logout(session_id_value: Uuid) -> Result<String, Unauthorized<String>> {
+use crate::error::ApplicationError;
+
+pub fn logout(session_id_value: Uuid) -> Result<(), ApplicationError> {
     use domain::schema::sessions::dsl::*;
 
     match diesel::delete(sessions.filter(id.eq(session_id_value)))
@@ -12,22 +12,14 @@ pub fn logout(session_id_value: Uuid) -> Result<String, Unauthorized<String>> {
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response::<String> {
-                    body: "Unauthorized".to_string(),
-                };
-                Err(Unauthorized(serde_json::to_string(&response).unwrap()))
+                Err(ApplicationError::Unauthorized)
             } else {
-                let response = Response::<String> {
-                    body: "Logged out".to_string(),
-                };
-                Ok(serde_json::to_string(&response).unwrap())
+                Ok(())
             }
         }
-        Err(_) => {
-            let response = Response::<String> {
-                body: "Unauthorized".to_string(),
-            };
-            Err(Unauthorized(serde_json::to_string(&response).unwrap()))
-        }
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
