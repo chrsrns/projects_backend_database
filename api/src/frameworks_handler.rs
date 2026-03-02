@@ -1,8 +1,10 @@
 use application::resume::frameworks;
+use application::error::ApplicationError;
 use domain::models::{NewFrameworkRequest, UpdateFramework};
-use rocket::response::status::{Created, NoContent, NotFound};
+use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
+use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
 
@@ -11,9 +13,40 @@ pub fn list_frameworks_handler(
     resume_id: i32,
     language_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<String, NotFound<String>> {
+) -> Result<Json<Response<Vec<domain::models::Framework>>>, Custom<Json<Response<String>>>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    frameworks::list_frameworks(resume_id, language_id, user_id_value)
+
+    match frameworks::list_frameworks(resume_id, language_id, user_id_value) {
+        Ok(items) => Ok(Json(Response { body: items })),
+        Err(ApplicationError::NotFound(msg)) => Err(Custom(
+            rocket::http::Status::NotFound,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Forbidden) => Err(Custom(
+            rocket::http::Status::Forbidden,
+            Json(Response {
+                body: "Forbidden".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Unauthorized) => Err(Custom(
+            rocket::http::Status::Unauthorized,
+            Json(Response {
+                body: "Unauthorized".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Conflict(msg)) => Err(Custom(
+            rocket::http::Status::Conflict,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
+            rocket::http::Status::BadRequest,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Internal(msg)) => Err(Custom(
+            rocket::http::Status::InternalServerError,
+            Json(Response { body: msg }),
+        )),
+    }
 }
 
 #[post(
@@ -26,8 +59,41 @@ pub fn create_framework_handler(
     resume_id: i32,
     language_id: i32,
     payload: Json<NewFrameworkRequest>,
-) -> Result<Created<String>, rocket::response::status::Custom<String>> {
-    frameworks::create_framework(auth.user_id, resume_id, language_id, payload)
+) -> Result<Custom<Json<Response<domain::models::Framework>>>, Custom<Json<Response<String>>>> {
+    match frameworks::create_framework(auth.user_id, resume_id, language_id, payload.into_inner()) {
+        Ok(framework) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: framework }),
+        )),
+        Err(ApplicationError::NotFound(msg)) => Err(Custom(
+            rocket::http::Status::NotFound,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Forbidden) => Err(Custom(
+            rocket::http::Status::Forbidden,
+            Json(Response {
+                body: "Forbidden".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Unauthorized) => Err(Custom(
+            rocket::http::Status::Unauthorized,
+            Json(Response {
+                body: "Unauthorized".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Conflict(msg)) => Err(Custom(
+            rocket::http::Status::Conflict,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
+            rocket::http::Status::BadRequest,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Internal(msg)) => Err(Custom(
+            rocket::http::Status::InternalServerError,
+            Json(Response { body: msg }),
+        )),
+    }
 }
 
 #[put(
@@ -39,14 +105,74 @@ pub fn update_framework_handler(
     auth: AuthSession,
     framework_id: i32,
     payload: Json<UpdateFramework>,
-) -> Result<String, rocket::response::status::Custom<String>> {
-    frameworks::update_framework(auth.user_id, framework_id, payload)
+) -> Result<Json<Response<domain::models::Framework>>, Custom<Json<Response<String>>>> {
+    match frameworks::update_framework(auth.user_id, framework_id, payload.into_inner()) {
+        Ok(framework) => Ok(Json(Response { body: framework })),
+        Err(ApplicationError::NotFound(msg)) => Err(Custom(
+            rocket::http::Status::NotFound,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Forbidden) => Err(Custom(
+            rocket::http::Status::Forbidden,
+            Json(Response {
+                body: "Forbidden".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Unauthorized) => Err(Custom(
+            rocket::http::Status::Unauthorized,
+            Json(Response {
+                body: "Unauthorized".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Conflict(msg)) => Err(Custom(
+            rocket::http::Status::Conflict,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
+            rocket::http::Status::BadRequest,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Internal(msg)) => Err(Custom(
+            rocket::http::Status::InternalServerError,
+            Json(Response { body: msg }),
+        )),
+    }
 }
 
 #[rocket_delete("/frameworks/<framework_id>")]
 pub fn delete_framework_handler(
     auth: AuthSession,
     framework_id: i32,
-) -> Result<NoContent, rocket::response::status::Custom<String>> {
-    frameworks::delete_framework(auth.user_id, framework_id)
+) -> Result<NoContent, Custom<Json<Response<String>>>> {
+    match frameworks::delete_framework(auth.user_id, framework_id) {
+        Ok(()) => Ok(NoContent),
+        Err(ApplicationError::NotFound(msg)) => Err(Custom(
+            rocket::http::Status::NotFound,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Forbidden) => Err(Custom(
+            rocket::http::Status::Forbidden,
+            Json(Response {
+                body: "Forbidden".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Unauthorized) => Err(Custom(
+            rocket::http::Status::Unauthorized,
+            Json(Response {
+                body: "Unauthorized".to_string(),
+            }),
+        )),
+        Err(ApplicationError::Conflict(msg)) => Err(Custom(
+            rocket::http::Status::Conflict,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
+            rocket::http::Status::BadRequest,
+            Json(Response { body: msg }),
+        )),
+        Err(ApplicationError::Internal(msg)) => Err(Custom(
+            rocket::http::Status::InternalServerError,
+            Json(Response { body: msg }),
+        )),
+    }
 }
