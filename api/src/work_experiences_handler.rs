@@ -11,6 +11,20 @@ use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/work_experiences",
+    tag = "WorkExperiences",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<WorkExperience>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/work_experiences")]
 pub fn list_work_experiences_handler(
     resume_id: i32,
@@ -51,6 +65,22 @@ pub fn list_work_experiences_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/work_experiences",
+    tag = "WorkExperiences",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    request_body(content = NewWorkExperienceRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<WorkExperience>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/work_experiences",
     format = "application/json",
@@ -97,6 +127,22 @@ pub fn create_work_experience_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/work_experiences/{work_id}",
+    tag = "WorkExperiences",
+    security(("bearerAuth" = [])),
+    params(
+        ("work_id" = i32, Path, description = "Work experience id")
+    ),
+    request_body(content = UpdateWorkExperience, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<WorkExperience>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put(
     "/work_experiences/<work_id>",
     format = "application/json",
@@ -140,6 +186,21 @@ pub fn update_work_experience_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/work_experiences/{work_id}",
+    tag = "WorkExperiences",
+    security(("bearerAuth" = [])),
+    params(
+        ("work_id" = i32, Path, description = "Work experience id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/work_experiences/<work_id>")]
 pub fn delete_work_experience_handler(
     auth: AuthSession,
@@ -178,6 +239,21 @@ pub fn delete_work_experience_handler(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/work_experiences/{work_id}/key_points",
+    tag = "WorkExperienceKeyPoints",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("work_id" = i32, Path, description = "Work experience id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<WorkExperienceKeyPoint>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/work_experiences/<work_id>/key_points")]
 pub fn list_work_experience_key_points_handler(
     resume_id: i32,
@@ -219,6 +295,23 @@ pub fn list_work_experience_key_points_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/work_experiences/{work_id}/key_points",
+    tag = "WorkExperienceKeyPoints",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("work_id" = i32, Path, description = "Work experience id")
+    ),
+    request_body(content = NewWorkExperienceKeyPointRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<WorkExperienceKeyPoint>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/work_experiences/<work_id>/key_points",
     format = "application/json",
@@ -271,6 +364,22 @@ pub fn create_work_experience_key_point_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/work_experience_key_points/{key_point_id}",
+    tag = "WorkExperienceKeyPoints",
+    security(("bearerAuth" = [])),
+    params(
+        ("key_point_id" = i32, Path, description = "Key point id")
+    ),
+    request_body(content = UpdateWorkExperienceKeyPoint, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<WorkExperienceKeyPoint>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put(
     "/work_experience_key_points/<key_point_id>",
     format = "application/json",
@@ -318,6 +427,21 @@ pub fn update_work_experience_key_point_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/work_experience_key_points/{key_point_id}",
+    tag = "WorkExperienceKeyPoints",
+    security(("bearerAuth" = [])),
+    params(
+        ("key_point_id" = i32, Path, description = "Key point id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/work_experience_key_points/<key_point_id>")]
 pub fn delete_work_experience_key_point_handler(
     auth: AuthSession,

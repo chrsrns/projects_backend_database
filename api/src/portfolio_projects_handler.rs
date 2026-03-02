@@ -12,6 +12,20 @@ use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/portfolio_projects",
+    tag = "PortfolioProjects",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<PortfolioProject>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/portfolio_projects")]
 pub fn list_portfolio_projects_handler(
     resume_id: i32,
@@ -52,6 +66,22 @@ pub fn list_portfolio_projects_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/portfolio_projects",
+    tag = "PortfolioProjects",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    request_body(content = NewPortfolioProjectRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<PortfolioProject>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/portfolio_projects",
     format = "application/json",
@@ -102,6 +132,22 @@ pub fn create_portfolio_project_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/portfolio_projects/{project_id}",
+    tag = "PortfolioProjects",
+    security(("bearerAuth" = [])),
+    params(
+        ("project_id" = i32, Path, description = "Portfolio project id")
+    ),
+    request_body(content = UpdatePortfolioProject, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<PortfolioProject>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put(
     "/portfolio_projects/<project_id>",
     format = "application/json",
@@ -149,6 +195,21 @@ pub fn update_portfolio_project_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/portfolio_projects/{project_id}",
+    tag = "PortfolioProjects",
+    security(("bearerAuth" = [])),
+    params(
+        ("project_id" = i32, Path, description = "Portfolio project id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/portfolio_projects/<project_id>")]
 pub fn delete_portfolio_project_handler(
     auth: AuthSession,
@@ -187,6 +248,21 @@ pub fn delete_portfolio_project_handler(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/portfolio_projects/{project_id}/key_points",
+    tag = "PortfolioKeyPoints",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("project_id" = i32, Path, description = "Portfolio project id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<PortfolioKeyPoint>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/portfolio_projects/<project_id>/key_points")]
 pub fn list_portfolio_key_points_handler(
     resume_id: i32,
@@ -228,6 +304,23 @@ pub fn list_portfolio_key_points_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/portfolio_projects/{project_id}/key_points",
+    tag = "PortfolioKeyPoints",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("project_id" = i32, Path, description = "Portfolio project id")
+    ),
+    request_body(content = NewPortfolioKeyPointRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<PortfolioKeyPoint>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/portfolio_projects/<project_id>/key_points",
     format = "application/json",
@@ -280,6 +373,22 @@ pub fn create_portfolio_key_point_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/portfolio_key_points/{key_point_id}",
+    tag = "PortfolioKeyPoints",
+    security(("bearerAuth" = [])),
+    params(
+        ("key_point_id" = i32, Path, description = "Key point id")
+    ),
+    request_body(content = UpdatePortfolioKeyPoint, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<PortfolioKeyPoint>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put(
     "/portfolio_key_points/<key_point_id>",
     format = "application/json",
@@ -327,6 +436,21 @@ pub fn update_portfolio_key_point_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/portfolio_key_points/{key_point_id}",
+    tag = "PortfolioKeyPoints",
+    security(("bearerAuth" = [])),
+    params(
+        ("key_point_id" = i32, Path, description = "Key point id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/portfolio_key_points/<key_point_id>")]
 pub fn delete_portfolio_key_point_handler(
     auth: AuthSession,
@@ -365,6 +489,21 @@ pub fn delete_portfolio_key_point_handler(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/portfolio_projects/{project_id}/technologies",
+    tag = "PortfolioTechnologies",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("project_id" = i32, Path, description = "Portfolio project id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<PortfolioTechnology>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/portfolio_projects/<project_id>/technologies")]
 pub fn list_portfolio_technologies_handler(
     resume_id: i32,
@@ -406,6 +545,23 @@ pub fn list_portfolio_technologies_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/portfolio_projects/{project_id}/technologies",
+    tag = "PortfolioTechnologies",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("project_id" = i32, Path, description = "Portfolio project id")
+    ),
+    request_body(content = NewPortfolioTechnologyRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<PortfolioTechnology>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/portfolio_projects/<project_id>/technologies",
     format = "application/json",
@@ -458,6 +614,22 @@ pub fn create_portfolio_technology_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/portfolio_technologies/{technology_id}",
+    tag = "PortfolioTechnologies",
+    security(("bearerAuth" = [])),
+    params(
+        ("technology_id" = i32, Path, description = "Technology id")
+    ),
+    request_body(content = UpdatePortfolioTechnology, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<PortfolioTechnology>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put(
     "/portfolio_technologies/<technology_id>",
     format = "application/json",
@@ -505,6 +677,21 @@ pub fn update_portfolio_technology_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/portfolio_technologies/{technology_id}",
+    tag = "PortfolioTechnologies",
+    security(("bearerAuth" = [])),
+    params(
+        ("technology_id" = i32, Path, description = "Technology id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/portfolio_technologies/<technology_id>")]
 pub fn delete_portfolio_technology_handler(
     auth: AuthSession,

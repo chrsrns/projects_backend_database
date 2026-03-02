@@ -8,6 +8,20 @@ use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/skills",
+    tag = "Skills",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<Skill>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/skills")]
 pub fn list_skills_handler(
     resume_id: i32,
@@ -48,6 +62,22 @@ pub fn list_skills_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/skills",
+    tag = "Skills",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    request_body(content = NewSkillRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<Skill>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/skills",
     format = "application/json",
@@ -94,6 +124,22 @@ pub fn create_skill_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/skills/{skill_id}",
+    tag = "Skills",
+    security(("bearerAuth" = [])),
+    params(
+        ("skill_id" = i32, Path, description = "Skill id")
+    ),
+    request_body(content = UpdateSkill, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<Skill>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put("/skills/<skill_id>", format = "application/json", data = "<payload>")]
 pub fn update_skill_handler(
     auth: AuthSession,
@@ -133,6 +179,21 @@ pub fn update_skill_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/skills/{skill_id}",
+    tag = "Skills",
+    security(("bearerAuth" = [])),
+    params(
+        ("skill_id" = i32, Path, description = "Skill id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/skills/<skill_id>")]
 pub fn delete_skill_handler(
     auth: AuthSession,

@@ -6,6 +6,16 @@ use rocket::serde::json::Json;
 use rocket::{get, post};
 use shared::response_models::{AuthTokenResponse, Response};
 
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    tag = "Auth",
+    request_body(content = AuthRegisterRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<User>, content_type = "application/json"),
+        (status = 409, description = "Conflict", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post("/auth/register", format = "application/json", data = "<payload>")]
 pub fn register_handler(
     payload: Json<AuthRegisterRequest>,
@@ -46,6 +56,16 @@ pub fn register_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "Auth",
+    request_body(content = AuthLoginRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<AuthTokenResponse>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post("/auth/login", format = "application/json", data = "<payload>")]
 pub fn login_handler(
     payload: Json<AuthLoginRequest>,
@@ -58,6 +78,16 @@ pub fn login_handler(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/me",
+    tag = "Auth",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "OK", body = Response<User>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/auth/me")]
 pub fn me_handler(
     auth: crate::auth::AuthSession,
@@ -70,6 +100,16 @@ pub fn me_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/logout",
+    tag = "Auth",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "OK", body = Response<String>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post("/auth/logout")]
 pub fn logout_handler(
     auth: crate::auth::AuthSession,

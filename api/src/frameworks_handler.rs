@@ -8,6 +8,21 @@ use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/languages/{language_id}/frameworks",
+    tag = "Frameworks",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("language_id" = i32, Path, description = "Language id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<Framework>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/languages/<language_id>/frameworks")]
 pub fn list_frameworks_handler(
     resume_id: i32,
@@ -49,6 +64,23 @@ pub fn list_frameworks_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/languages/{language_id}/frameworks",
+    tag = "Frameworks",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id"),
+        ("language_id" = i32, Path, description = "Language id")
+    ),
+    request_body(content = NewFrameworkRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<Framework>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/languages/<language_id>/frameworks",
     format = "application/json",
@@ -96,6 +128,22 @@ pub fn create_framework_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/frameworks/{framework_id}",
+    tag = "Frameworks",
+    security(("bearerAuth" = [])),
+    params(
+        ("framework_id" = i32, Path, description = "Framework id")
+    ),
+    request_body(content = UpdateFramework, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<Framework>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put(
     "/frameworks/<framework_id>",
     format = "application/json",
@@ -139,6 +187,21 @@ pub fn update_framework_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/frameworks/{framework_id}",
+    tag = "Frameworks",
+    security(("bearerAuth" = [])),
+    params(
+        ("framework_id" = i32, Path, description = "Framework id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/frameworks/<framework_id>")]
 pub fn delete_framework_handler(
     auth: AuthSession,

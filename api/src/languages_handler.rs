@@ -8,6 +8,20 @@ use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
 
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/languages",
+    tag = "Languages",
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<Language>>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[get("/resume/<resume_id>/languages")]
 pub fn list_languages_handler(
     resume_id: i32,
@@ -48,6 +62,22 @@ pub fn list_languages_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/{resume_id}/languages",
+    tag = "Languages",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume id")
+    ),
+    request_body(content = NewLanguageRequest, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Created", body = Response<Language>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[post(
     "/resume/<resume_id>/languages",
     format = "application/json",
@@ -94,6 +124,22 @@ pub fn create_language_handler(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/languages/{language_id}",
+    tag = "Languages",
+    security(("bearerAuth" = [])),
+    params(
+        ("language_id" = i32, Path, description = "Language id")
+    ),
+    request_body(content = UpdateLanguage, content_type = "application/json"),
+    responses(
+        (status = 200, description = "OK", body = Response<Language>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[put(
     "/languages/<language_id>",
     format = "application/json",
@@ -137,6 +183,21 @@ pub fn update_language_handler(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/languages/{language_id}",
+    tag = "Languages",
+    security(("bearerAuth" = [])),
+    params(
+        ("language_id" = i32, Path, description = "Language id")
+    ),
+    responses(
+        (status = 204, description = "No Content"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
 #[rocket_delete("/languages/<language_id>")]
 pub fn delete_language_handler(
     auth: AuthSession,
