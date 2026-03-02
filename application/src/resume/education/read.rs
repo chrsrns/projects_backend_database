@@ -1,13 +1,13 @@
 use diesel::prelude::*;
 use domain::models::{Education, EducationKeyPoint, Resume};
 use infrastructure::establish_connection;
-use rocket::response::status::NotFound;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn list_educations(
     resume_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<Education>, ApplicationError> {
     use domain::schema::education::dsl as education_dsl;
     use domain::schema::resumes::dsl as resumes_dsl;
 
@@ -25,12 +25,17 @@ pub fn list_educations(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<Education> = match education_dsl::education
@@ -38,21 +43,24 @@ pub fn list_educations(
         .load::<Education>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|e| (e.display_order.unwrap_or(0), e.id));
 
-    let response = Response::<Vec<Education>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }
 
 pub fn list_education_key_points(
     resume_id_value: i32,
     education_id_value: i32,
     user_id_value: Option<i32>,
-) -> Result<String, NotFound<String>> {
+) -> Result<Vec<EducationKeyPoint>, ApplicationError> {
     use domain::schema::education::dsl as education_dsl;
     use domain::schema::education_key_points::dsl as key_points_dsl;
     use domain::schema::resumes::dsl as resumes_dsl;
@@ -71,12 +79,17 @@ pub fn list_education_key_points(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let _education: Education = match education_dsl::education
@@ -86,12 +99,16 @@ pub fn list_education_key_points(
     {
         Ok(e) => e,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Education not found".to_string(),
-            };
-            return Err(NotFound(serde_json::to_string(&response).unwrap()));
+            return Err(ApplicationError::NotFound(
+                "Education not found".to_string(),
+            ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     let mut items: Vec<EducationKeyPoint> = match key_points_dsl::education_key_points
@@ -99,12 +116,15 @@ pub fn list_education_key_points(
         .load::<EducationKeyPoint>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));
 
-    let response = Response::<Vec<EducationKeyPoint>> { body: items };
-
-    Ok(serde_json::to_string(&response).unwrap())
+    Ok(items)
 }

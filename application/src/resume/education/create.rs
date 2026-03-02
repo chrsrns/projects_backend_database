@@ -4,16 +4,14 @@ use domain::models::{
     NewEducationRequest, Resume,
 };
 use infrastructure::establish_connection;
-use rocket::http::Status;
-use rocket::response::status::{Created, Custom};
-use rocket::serde::json::Json;
-use shared::response_models::Response;
+
+use crate::error::ApplicationError;
 
 pub fn create_education(
     user_id_value: i32,
     resume_id_value: i32,
-    payload: Json<NewEducationRequest>,
-) -> Result<Created<String>, Custom<String>> {
+    payload: NewEducationRequest,
+) -> Result<Education, ApplicationError> {
     use domain::schema::education;
     use domain::schema::resumes;
 
@@ -23,31 +21,26 @@ pub fn create_education(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
-    let payload = payload.into_inner();
     let new_education = NewEducation {
         resume_id: resume_id_value,
         education_stage: payload.education_stage,
@@ -63,11 +56,11 @@ pub fn create_education(
         .values(&new_education)
         .get_result::<Education>(&mut establish_connection())
     {
-        Ok(item) => {
-            let response = Response::<Education> { body: item };
-            Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
-        }
-        Err(err) => panic!("Database error - {}", err),
+        Ok(item) => Ok(item),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
 
@@ -75,8 +68,8 @@ pub fn create_education_key_point(
     user_id_value: i32,
     resume_id_value: i32,
     education_id_value: i32,
-    payload: Json<NewEducationKeyPointRequest>,
-) -> Result<Created<String>, Custom<String>> {
+    payload: NewEducationKeyPointRequest,
+) -> Result<EducationKeyPoint, ApplicationError> {
     use domain::schema::education::dsl as education_dsl;
     use domain::schema::education_key_points;
     use domain::schema::resumes;
@@ -87,27 +80,23 @@ pub fn create_education_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: format!("Resume with id {} not found", resume_id_value),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::NotFound(format!(
+                "Resume with id {} not found",
+                resume_id_value
+            )));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response::<String> {
-                body: "Forbidden".to_string(),
-            };
-            return Err(Custom(
-                Status::Forbidden,
-                serde_json::to_string(&response).unwrap(),
-            ));
+            return Err(ApplicationError::Forbidden);
         }
     }
 
@@ -118,18 +107,18 @@ pub fn create_education_key_point(
     {
         Ok(e) => e,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response::<String> {
-                body: "Education not found".to_string(),
-            };
-            return Err(Custom(
-                Status::NotFound,
-                serde_json::to_string(&response).unwrap(),
+            return Err(ApplicationError::NotFound(
+                "Education not found".to_string(),
             ));
         }
-        Err(err) => panic!("Database error - {}", err),
+        Err(err) => {
+            return Err(ApplicationError::Internal(format!(
+                "Database error - {}",
+                err
+            )));
+        }
     };
 
-    let payload = payload.into_inner();
     let new_kp = NewEducationKeyPoint {
         education_id: education_id_value,
         key_point: payload.key_point,
@@ -140,10 +129,10 @@ pub fn create_education_key_point(
         .values(&new_kp)
         .get_result::<EducationKeyPoint>(&mut establish_connection())
     {
-        Ok(item) => {
-            let response = Response::<EducationKeyPoint> { body: item };
-            Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
-        }
-        Err(err) => panic!("Database error - {}", err),
+        Ok(item) => Ok(item),
+        Err(err) => Err(ApplicationError::Internal(format!(
+            "Database error - {}",
+            err
+        ))),
     }
 }
