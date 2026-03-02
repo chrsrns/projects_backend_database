@@ -3,7 +3,7 @@ use domain::models::{Framework, Language, Resume};
 use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn delete_framework(
     user_id_value: i32,
@@ -19,11 +19,8 @@ pub fn delete_framework(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Framework with id {} not found",
-                    framework_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Framework with id {} not found", framework_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -39,8 +36,8 @@ pub fn delete_framework(
     {
         Ok(l) => l,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Language not found".to_string()),
+            let response = Response::<String> {
+                body: "Language not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -56,8 +53,8 @@ pub fn delete_framework(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Resume not found".to_string()),
+            let response = Response::<String> {
+                body: "Resume not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -70,8 +67,8 @@ pub fn delete_framework(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -85,11 +82,8 @@ pub fn delete_framework(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
-                        "Framework with id {} not found",
-                        framework_id_value
-                    )),
+                let response = Response::<String> {
+                    body: format!("Framework with id {} not found", framework_id_value),
                 };
                 Err(Custom(
                     Status::NotFound,

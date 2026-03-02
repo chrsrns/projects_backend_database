@@ -3,7 +3,7 @@ use domain::models::{Resume, WorkExperience, WorkExperienceKeyPoint};
 use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn delete_work_experience(
     user_id_value: i32,
@@ -18,11 +18,8 @@ pub fn delete_work_experience(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Work experience with id {} not found",
-                    work_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Work experience with id {} not found", work_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -38,8 +35,8 @@ pub fn delete_work_experience(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Resume not found".to_string()),
+            let response = Response::<String> {
+                body: "Resume not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -52,8 +49,8 @@ pub fn delete_work_experience(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -67,11 +64,8 @@ pub fn delete_work_experience(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
-                        "Work experience with id {} not found",
-                        work_id_value
-                    )),
+                let response = Response::<String> {
+                    body: format!("Work experience with id {} not found", work_id_value),
                 };
                 Err(Custom(
                     Status::NotFound,
@@ -99,11 +93,11 @@ pub fn delete_work_experience_key_point(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
+            let response = Response::<String> {
+                body: format!(
                     "Work experience key point with id {} not found",
                     kp_id_value
-                )),
+                ),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -119,8 +113,8 @@ pub fn delete_work_experience_key_point(
     {
         Ok(w) => w,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Work experience not found".to_string()),
+            let response = Response::<String> {
+                body: "Work experience not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -136,8 +130,8 @@ pub fn delete_work_experience_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Resume not found".to_string()),
+            let response = Response::<String> {
+                body: "Resume not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -150,8 +144,8 @@ pub fn delete_work_experience_key_point(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -165,11 +159,11 @@ pub fn delete_work_experience_key_point(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
+                let response = Response::<String> {
+                    body: format!(
                         "Work experience key point with id {} not found",
                         kp_id_value
-                    )),
+                    ),
                 };
                 Err(Custom(
                     Status::NotFound,

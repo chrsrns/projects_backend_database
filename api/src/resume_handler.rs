@@ -3,7 +3,7 @@ use domain::models::{NewResumeRequest, Resume, UpdateResume};
 use rocket::response::status::{Conflict, Created, NoContent, NotFound};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 use crate::auth::{AuthSession, MaybeAuthSession};
 
@@ -11,9 +11,7 @@ use crate::auth::{AuthSession, MaybeAuthSession};
 pub fn list_resumes_handler(maybe_auth: MaybeAuthSession) -> String {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     let resumes: Vec<Resume> = read::list_resumes(user_id_value);
-    let response = Response {
-        body: ResponseBody::Resumes(resumes),
-    };
+    let response = Response { body: resumes };
 
     serde_json::to_string(&response).unwrap()
 }
@@ -25,9 +23,7 @@ pub fn list_resume_handler(
 ) -> Result<String, NotFound<String>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     let resume = read::list_resume(resume_id, user_id_value)?;
-    let response = Response {
-        body: ResponseBody::Resume(resume),
-    };
+    let response = Response { body: resume };
 
     Ok(serde_json::to_string(&response).unwrap())
 }

@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::{Created, Custom};
 use rocket::serde::json::Json;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn create_language(
     user_id_value: i32,
@@ -20,11 +20,8 @@ pub fn create_language(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -37,8 +34,8 @@ pub fn create_language(
     match existing_resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -59,9 +56,7 @@ pub fn create_language(
         .get_result::<Language>(&mut establish_connection())
     {
         Ok(language) => {
-            let response = Response {
-                body: ResponseBody::Language(language),
-            };
+            let response = Response::<Language> { body: language };
             Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
         }
         Err(err) => {

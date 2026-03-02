@@ -3,7 +3,7 @@ use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, R
 use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn delete_portfolio_project(
     user_id_value: i32,
@@ -18,11 +18,8 @@ pub fn delete_portfolio_project(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Portfolio project with id {} not found",
-                    project_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Portfolio project with id {} not found", project_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -38,8 +35,8 @@ pub fn delete_portfolio_project(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Resume not found".to_string()),
+            let response = Response::<String> {
+                body: "Resume not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -52,8 +49,8 @@ pub fn delete_portfolio_project(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -67,11 +64,8 @@ pub fn delete_portfolio_project(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
-                        "Portfolio project with id {} not found",
-                        project_id_value
-                    )),
+                let response = Response::<String> {
+                    body: format!("Portfolio project with id {} not found", project_id_value),
                 };
                 Err(Custom(
                     Status::NotFound,
@@ -99,11 +93,11 @@ pub fn delete_portfolio_key_point(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
+            let response = Response::<String> {
+                body: format!(
                     "Portfolio key point with id {} not found",
                     key_point_id_value
-                )),
+                ),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -119,8 +113,8 @@ pub fn delete_portfolio_key_point(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Portfolio project not found".to_string()),
+            let response = Response::<String> {
+                body: "Portfolio project not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -136,8 +130,8 @@ pub fn delete_portfolio_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Resume not found".to_string()),
+            let response = Response::<String> {
+                body: "Resume not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -150,8 +144,8 @@ pub fn delete_portfolio_key_point(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -165,11 +159,11 @@ pub fn delete_portfolio_key_point(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
+                let response = Response::<String> {
+                    body: format!(
                         "Portfolio key point with id {} not found",
                         key_point_id_value
-                    )),
+                    ),
                 };
                 Err(Custom(
                     Status::NotFound,
@@ -197,11 +191,8 @@ pub fn delete_portfolio_technology(
     {
         Ok(v) => v,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Portfolio technology with id {} not found",
-                    tech_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Portfolio technology with id {} not found", tech_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -217,8 +208,8 @@ pub fn delete_portfolio_technology(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Portfolio project not found".to_string()),
+            let response = Response::<String> {
+                body: "Portfolio project not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -234,8 +225,8 @@ pub fn delete_portfolio_technology(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Resume not found".to_string()),
+            let response = Response::<String> {
+                body: "Resume not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -248,8 +239,8 @@ pub fn delete_portfolio_technology(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -263,11 +254,8 @@ pub fn delete_portfolio_technology(
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
-                        "Portfolio technology with id {} not found",
-                        tech_id_value
-                    )),
+                let response = Response::<String> {
+                    body: format!("Portfolio technology with id {} not found", tech_id_value),
                 };
                 Err(Custom(
                     Status::NotFound,

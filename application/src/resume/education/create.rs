@@ -7,7 +7,7 @@ use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::{Created, Custom};
 use rocket::serde::json::Json;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn create_education(
     user_id_value: i32,
@@ -23,11 +23,8 @@ pub fn create_education(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -40,8 +37,8 @@ pub fn create_education(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -67,9 +64,7 @@ pub fn create_education(
         .get_result::<Education>(&mut establish_connection())
     {
         Ok(item) => {
-            let response = Response {
-                body: ResponseBody::Education(item),
-            };
+            let response = Response::<Education> { body: item };
             Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
         }
         Err(err) => panic!("Database error - {}", err),
@@ -92,11 +87,8 @@ pub fn create_education_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -109,8 +101,8 @@ pub fn create_education_key_point(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -126,8 +118,8 @@ pub fn create_education_key_point(
     {
         Ok(e) => e,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Education not found".to_string()),
+            let response = Response::<String> {
+                body: "Education not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -149,9 +141,7 @@ pub fn create_education_key_point(
         .get_result::<EducationKeyPoint>(&mut establish_connection())
     {
         Ok(item) => {
-            let response = Response {
-                body: ResponseBody::EducationKeyPoint(item),
-            };
+            let response = Response::<EducationKeyPoint> { body: item };
             Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
         }
         Err(err) => panic!("Database error - {}", err),

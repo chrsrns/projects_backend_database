@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume};
 use infrastructure::establish_connection;
 use rocket::response::status::NotFound;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn list_portfolio_projects(
     resume_id_value: i32,
@@ -25,11 +25,8 @@ pub fn list_portfolio_projects(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(NotFound(serde_json::to_string(&response).unwrap()));
         }
@@ -46,9 +43,7 @@ pub fn list_portfolio_projects(
 
     items.sort_by_key(|p| (p.display_order.unwrap_or(0), p.id));
 
-    let response = Response {
-        body: ResponseBody::PortfolioProjects(items),
-    };
+    let response = Response::<Vec<PortfolioProject>> { body: items };
 
     Ok(serde_json::to_string(&response).unwrap())
 }
@@ -76,11 +71,8 @@ pub fn list_portfolio_key_points(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(NotFound(serde_json::to_string(&response).unwrap()));
         }
@@ -94,8 +86,8 @@ pub fn list_portfolio_key_points(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Portfolio project not found".to_string()),
+            let response = Response::<String> {
+                body: "Portfolio project not found".to_string(),
             };
             return Err(NotFound(serde_json::to_string(&response).unwrap()));
         }
@@ -112,9 +104,7 @@ pub fn list_portfolio_key_points(
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));
 
-    let response = Response {
-        body: ResponseBody::PortfolioKeyPoints(items),
-    };
+    let response = Response::<Vec<PortfolioKeyPoint>> { body: items };
 
     Ok(serde_json::to_string(&response).unwrap())
 }
@@ -142,11 +132,8 @@ pub fn list_portfolio_technologies(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(NotFound(serde_json::to_string(&response).unwrap()));
         }
@@ -160,8 +147,8 @@ pub fn list_portfolio_technologies(
     {
         Ok(p) => p,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Portfolio project not found".to_string()),
+            let response = Response::<String> {
+                body: "Portfolio project not found".to_string(),
             };
             return Err(NotFound(serde_json::to_string(&response).unwrap()));
         }
@@ -178,9 +165,7 @@ pub fn list_portfolio_technologies(
 
     items.sort_by_key(|t| (t.display_order.unwrap_or(0), t.id));
 
-    let response = Response {
-        body: ResponseBody::PortfolioTechnologies(items),
-    };
+    let response = Response::<Vec<PortfolioTechnology>> { body: items };
 
     Ok(serde_json::to_string(&response).unwrap())
 }

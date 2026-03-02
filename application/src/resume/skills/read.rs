@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{Resume, Skill};
 use infrastructure::establish_connection;
 use rocket::response::status::NotFound;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn list_skills(
     resume_id_value: i32,
@@ -25,11 +25,8 @@ pub fn list_skills(
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(NotFound(serde_json::to_string(&response).unwrap()));
         }
@@ -46,9 +43,7 @@ pub fn list_skills(
 
     items.sort_by_key(|s| (s.display_order.unwrap_or(0), s.id));
 
-    let response = Response {
-        body: ResponseBody::Skills(items),
-    };
+    let response = Response::<Vec<Skill>> { body: items };
 
     Ok(serde_json::to_string(&response).unwrap())
 }

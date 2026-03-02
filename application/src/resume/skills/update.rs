@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::Custom;
 use rocket::serde::json::Json;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn update_skill(
     user_id_value: i32,
@@ -20,8 +20,8 @@ pub fn update_skill(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!("Skill with id {} not found", skill_id_value)),
+            let response = Response::<String> {
+                body: format!("Skill with id {} not found", skill_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -37,8 +37,8 @@ pub fn update_skill(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Resume not found".to_string()),
+            let response = Response::<String> {
+                body: "Resume not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -51,8 +51,8 @@ pub fn update_skill(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -68,14 +68,12 @@ pub fn update_skill(
         .get_result::<Skill>(&mut establish_connection())
     {
         Ok(updated) => {
-            let response = Response {
-                body: ResponseBody::Skill(updated),
-            };
+            let response = Response::<Skill> { body: updated };
             Ok(serde_json::to_string(&response).unwrap())
         }
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!("Skill with id {} not found", skill_id_value)),
+            let response = Response::<String> {
+                body: format!("Skill with id {} not found", skill_id_value),
             };
             Err(Custom(
                 Status::NotFound,

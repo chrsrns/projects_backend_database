@@ -5,7 +5,7 @@ use infrastructure::establish_connection;
 use rand_core::OsRng;
 use rocket::response::status::{Conflict, Created};
 use rocket::serde::json::Json;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn register(payload: Json<AuthRegisterRequest>) -> Result<Created<String>, Conflict<String>> {
     use domain::schema::users;
@@ -17,8 +17,8 @@ pub fn register(payload: Json<AuthRegisterRequest>) -> Result<Created<String>, C
     let password_hash = argon2
         .hash_password(payload.password.as_bytes(), &salt)
         .map_err(|_| {
-            let response = Response {
-                body: ResponseBody::Message("Password hashing failed".to_string()),
+            let response = Response::<String> {
+                body: "Password hashing failed".to_string(),
             };
             Conflict(serde_json::to_string(&response).unwrap())
         })?
@@ -34,9 +34,7 @@ pub fn register(payload: Json<AuthRegisterRequest>) -> Result<Created<String>, C
         .get_result::<User>(&mut establish_connection())
     {
         Ok(user) => {
-            let response = Response {
-                body: ResponseBody::User(user),
-            };
+            let response = Response::<User> { body: user };
             Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
         }
         Err(err) => match err {
@@ -44,8 +42,8 @@ pub fn register(payload: Json<AuthRegisterRequest>) -> Result<Created<String>, C
                 diesel::result::DatabaseErrorKind::UniqueViolation,
                 _,
             ) => {
-                let response = Response {
-                    body: ResponseBody::Message("User with this email already exists".to_string()),
+                let response = Response::<String> {
+                    body: "User with this email already exists".to_string(),
                 };
                 Err(Conflict(serde_json::to_string(&response).unwrap()))
             }

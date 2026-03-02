@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::User;
 use infrastructure::establish_connection;
 use rocket::response::status::Unauthorized;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 use uuid::Uuid;
 
 pub fn resolve_session_user_id(session_id: Uuid) -> Result<Option<i32>, diesel::result::Error> {
@@ -25,16 +25,14 @@ pub fn me(user_id_value: i32) -> Result<String, Unauthorized<String>> {
     {
         Ok(u) => u,
         Err(_) => {
-            let response = Response {
-                body: ResponseBody::Message("Unauthorized".to_string()),
+            let response = Response::<String> {
+                body: "Unauthorized".to_string(),
             };
             return Err(Unauthorized(serde_json::to_string(&response).unwrap()));
         }
     };
 
-    let response = Response {
-        body: ResponseBody::User(user),
-    };
+    let response = Response::<User> { body: user };
 
     Ok(serde_json::to_string(&response).unwrap())
 }

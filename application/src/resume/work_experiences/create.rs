@@ -7,7 +7,7 @@ use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::{Created, Custom};
 use rocket::serde::json::Json;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 fn normalize_optional_text(value: Option<String>) -> Option<String> {
     value.and_then(|v| {
@@ -34,11 +34,8 @@ pub fn create_work_experience(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -51,8 +48,8 @@ pub fn create_work_experience(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -79,9 +76,7 @@ pub fn create_work_experience(
         .get_result::<WorkExperience>(&mut establish_connection())
     {
         Ok(item) => {
-            let response = Response {
-                body: ResponseBody::WorkExperience(item),
-            };
+            let response = Response::<WorkExperience> { body: item };
             Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
         }
         Err(err) => panic!("Database error - {}", err),
@@ -104,11 +99,8 @@ pub fn create_work_experience_key_point(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
-                    "Resume with id {} not found",
-                    resume_id_value
-                )),
+            let response = Response::<String> {
+                body: format!("Resume with id {} not found", resume_id_value),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -121,8 +113,8 @@ pub fn create_work_experience_key_point(
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -138,8 +130,8 @@ pub fn create_work_experience_key_point(
     {
         Ok(w) => w,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message("Work experience not found".to_string()),
+            let response = Response::<String> {
+                body: "Work experience not found".to_string(),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -161,9 +153,7 @@ pub fn create_work_experience_key_point(
         .get_result::<WorkExperienceKeyPoint>(&mut establish_connection())
     {
         Ok(item) => {
-            let response = Response {
-                body: ResponseBody::WorkExperienceKeyPoint(item),
-            };
+            let response = Response::<WorkExperienceKeyPoint> { body: item };
             Ok(Created::new("").tagged_body(serde_json::to_string(&response).unwrap()))
         }
         Err(err) => panic!("Database error - {}", err),

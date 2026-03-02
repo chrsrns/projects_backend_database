@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 use rocket::http::Status;
 use rocket::response::status::Custom;
 use rocket::serde::json::Json;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn update_resume(
     user_id_value: i32,
@@ -19,12 +19,12 @@ pub fn update_resume(
     {
         Ok(r) => r,
         Err(diesel::result::Error::NotFound) => {
-            let response = Response {
-                body: ResponseBody::Message(format!(
+            let response = Response::<String> {
+                body: format!(
                     "Error updating resume with id {} - {}",
                     resume_id,
                     diesel::result::Error::NotFound
-                )),
+                ),
             };
             return Err(Custom(
                 Status::NotFound,
@@ -37,8 +37,8 @@ pub fn update_resume(
     match existing.created_by {
         Some(owner) if owner == user_id_value => {}
         Some(_) | None => {
-            let response = Response {
-                body: ResponseBody::Message("Forbidden".to_string()),
+            let response = Response::<String> {
+                body: "Forbidden".to_string(),
             };
             return Err(Custom(
                 Status::Forbidden,
@@ -54,18 +54,15 @@ pub fn update_resume(
         .get_result::<Resume>(&mut establish_connection())
     {
         Ok(updated_resume) => {
-            let response = Response {
-                body: ResponseBody::Resume(updated_resume),
+            let response = Response::<Resume> {
+                body: updated_resume,
             };
             Ok(serde_json::to_string(&response).unwrap())
         }
         Err(err) => match err {
             diesel::result::Error::NotFound => {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
-                        "Error updating resume with id {} - {}",
-                        resume_id, err
-                    )),
+                let response = Response::<String> {
+                    body: format!("Error updating resume with id {} - {}", resume_id, err),
                 };
                 Err(Custom(
                     Status::NotFound,

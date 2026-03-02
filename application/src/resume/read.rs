@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::Resume;
 use infrastructure::establish_connection;
 use rocket::response::status::NotFound;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 
 pub fn list_resume(resume_id: i32, user_id_value: Option<i32>) -> Result<Resume, NotFound<String>> {
     use domain::schema::resumes;
@@ -19,11 +19,8 @@ pub fn list_resume(resume_id: i32, user_id_value: Option<i32>) -> Result<Resume,
         Ok(resume) => Ok(resume),
         Err(err) => match err {
             diesel::result::Error::NotFound => {
-                let response = Response {
-                    body: ResponseBody::Message(format!(
-                        "Error selecting resume with id {} - {}",
-                        resume_id, err
-                    )),
+                let response = Response::<String> {
+                    body: format!("Error selecting resume with id {} - {}", resume_id, err),
                 };
                 return Err(NotFound(serde_json::to_string(&response).unwrap()));
             }

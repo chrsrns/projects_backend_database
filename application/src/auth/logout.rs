@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use infrastructure::establish_connection;
 use rocket::response::status::Unauthorized;
-use shared::response_models::{Response, ResponseBody};
+use shared::response_models::Response;
 use uuid::Uuid;
 
 pub fn logout(session_id_value: Uuid) -> Result<String, Unauthorized<String>> {
@@ -12,20 +12,20 @@ pub fn logout(session_id_value: Uuid) -> Result<String, Unauthorized<String>> {
     {
         Ok(count) => {
             if count == 0 {
-                let response = Response {
-                    body: ResponseBody::Message("Unauthorized".to_string()),
+                let response = Response::<String> {
+                    body: "Unauthorized".to_string(),
                 };
                 Err(Unauthorized(serde_json::to_string(&response).unwrap()))
             } else {
-                let response = Response {
-                    body: ResponseBody::Message("Logged out".to_string()),
+                let response = Response::<String> {
+                    body: "Logged out".to_string(),
                 };
                 Ok(serde_json::to_string(&response).unwrap())
             }
         }
         Err(_) => {
-            let response = Response {
-                body: ResponseBody::Message("Unauthorized".to_string()),
+            let response = Response::<String> {
+                body: "Unauthorized".to_string(),
             };
             Err(Unauthorized(serde_json::to_string(&response).unwrap()))
         }
