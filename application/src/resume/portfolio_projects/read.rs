@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
 
 pub fn list_portfolio_projects(
     resume_id_value: i32,
@@ -24,18 +24,7 @@ pub fn list_portfolio_projects(
 
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let mut items: Vec<PortfolioProject> = match projects_dsl::portfolio_projects
@@ -43,12 +32,7 @@ pub fn list_portfolio_projects(
         .load::<PortfolioProject>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     items.sort_by_key(|p| (p.display_order.unwrap_or(0), p.id));
@@ -78,18 +62,7 @@ pub fn list_portfolio_key_points(
 
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let _project: PortfolioProject = match projects_dsl::portfolio_projects
@@ -98,17 +71,7 @@ pub fn list_portfolio_key_points(
         .first(&mut establish_connection())
     {
         Ok(p) => p,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Portfolio project not found".to_string(),
-            ));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let mut items: Vec<PortfolioKeyPoint> = match kps_dsl::portfolio_key_points
@@ -116,12 +79,7 @@ pub fn list_portfolio_key_points(
         .load::<PortfolioKeyPoint>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));
@@ -151,18 +109,7 @@ pub fn list_portfolio_technologies(
 
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let _project: PortfolioProject = match projects_dsl::portfolio_projects
@@ -171,17 +118,7 @@ pub fn list_portfolio_technologies(
         .first(&mut establish_connection())
     {
         Ok(p) => p,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Portfolio project not found".to_string(),
-            ));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let mut items: Vec<PortfolioTechnology> = match tech_dsl::portfolio_technologies
@@ -189,12 +126,7 @@ pub fn list_portfolio_technologies(
         .load::<PortfolioTechnology>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     items.sort_by_key(|t| (t.display_order.unwrap_or(0), t.id));

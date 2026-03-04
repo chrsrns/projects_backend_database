@@ -2,48 +2,28 @@ use diesel::prelude::*;
 use domain::models::{Language, Resume};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 pub fn delete_language(
     user_id_value: i32,
     language_id_value: i32,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::languages;
-    use domain::schema::resumes;
 
     let existing: Language = match languages::table
         .find(language_id_value)
         .first(&mut establish_connection())
     {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Language with id {} not found",
-                language_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(existing.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(existing.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -66,9 +46,6 @@ pub fn delete_language(
                 Ok(existing.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{Resume, Skill};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
 
 pub fn list_skills(
     resume_id_value: i32,
@@ -24,18 +24,7 @@ pub fn list_skills(
 
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let mut items: Vec<Skill> = match skills_dsl::skills
@@ -43,12 +32,7 @@ pub fn list_skills(
         .load::<Skill>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     items.sort_by_key(|s| (s.display_order.unwrap_or(0), s.id));

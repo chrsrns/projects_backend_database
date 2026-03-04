@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{Language, Resume};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
 
 pub fn list_languages(
     resume_id_value: i32,
@@ -24,17 +24,8 @@ pub fn list_languages(
 
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
         Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
+            return Err(app_err_from_diesel_err(err));
         }
     };
 
@@ -44,10 +35,7 @@ pub fn list_languages(
     {
         Ok(v) => v,
         Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
+            return Err(app_err_from_diesel_err(err));
         }
     };
 

@@ -2,48 +2,28 @@ use diesel::prelude::*;
 use domain::models::{Education, EducationKeyPoint, Resume};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 pub fn delete_education(
     user_id_value: i32,
     education_id_value: i32,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::education;
-    use domain::schema::resumes;
 
     let existing: Education = match education::table
         .find(education_id_value)
         .first(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Education with id {} not found",
-                education_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(existing.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(existing.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -66,10 +46,7 @@ pub fn delete_education(
                 Ok(existing.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -79,7 +56,6 @@ pub fn delete_education_key_point(
 ) -> Result<i32, ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
-    use domain::schema::resumes;
 
     let existing: EducationKeyPoint = match education_key_points::table
         .find(key_point_id_value)
@@ -92,12 +68,7 @@ pub fn delete_education_key_point(
                 key_point_id_value
             )));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let edu: Education = match education::table
@@ -110,28 +81,12 @@ pub fn delete_education_key_point(
                 "Education not found".to_string(),
             ));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(edu.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(edu.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -154,9 +109,6 @@ pub fn delete_education_key_point(
                 Ok(edu.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

@@ -2,13 +2,15 @@ use diesel::prelude::*;
 use domain::models::{Resume, WorkExperience, WorkExperienceKeyPoint};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 pub fn delete_work_experience(
     user_id_value: i32,
     work_id_value: i32,
 ) -> Result<i32, ApplicationError> {
-    use domain::schema::resumes;
     use domain::schema::work_experiences;
 
     let existing: WorkExperience = match work_experiences::table
@@ -16,34 +18,12 @@ pub fn delete_work_experience(
         .first(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Work experience with id {} not found",
-                work_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(existing.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(existing.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -66,10 +46,7 @@ pub fn delete_work_experience(
                 Ok(existing.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -77,7 +54,6 @@ pub fn delete_work_experience_key_point(
     user_id_value: i32,
     kp_id_value: i32,
 ) -> Result<i32, ApplicationError> {
-    use domain::schema::resumes;
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
 
@@ -86,18 +62,7 @@ pub fn delete_work_experience_key_point(
         .first(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Work experience key point with id {} not found",
-                kp_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let work: WorkExperience = match work_experiences::table
@@ -105,33 +70,12 @@ pub fn delete_work_experience_key_point(
         .first(&mut establish_connection())
     {
         Ok(w) => w,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Work experience not found".to_string(),
-            ));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(work.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(work.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -154,9 +98,6 @@ pub fn delete_work_experience_key_point(
                 Ok(work.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

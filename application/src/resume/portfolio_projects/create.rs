@@ -6,7 +6,10 @@ use domain::models::{
 };
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 pub fn create_portfolio_project(
     user_id_value: i32,
@@ -14,25 +17,10 @@ pub fn create_portfolio_project(
     payload: NewPortfolioProjectRequest,
 ) -> Result<PortfolioProject, ApplicationError> {
     use domain::schema::portfolio_projects;
-    use domain::schema::resumes;
 
-    let resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -57,10 +45,7 @@ pub fn create_portfolio_project(
         .get_result::<PortfolioProject>(&mut establish_connection())
     {
         Ok(item) => Ok(item),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -72,25 +57,10 @@ pub fn create_portfolio_key_point(
 ) -> Result<PortfolioKeyPoint, ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects::dsl as projects_dsl;
-    use domain::schema::resumes;
 
-    let resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -106,16 +76,8 @@ pub fn create_portfolio_key_point(
         .first(&mut establish_connection())
     {
         Ok(p) => p,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Portfolio project not found".to_string(),
-            ));
-        }
         Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
+            return Err(app_err_from_diesel_err(err));
         }
     };
 
@@ -130,10 +92,7 @@ pub fn create_portfolio_key_point(
         .get_result::<PortfolioKeyPoint>(&mut establish_connection())
     {
         Ok(item) => Ok(item),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -145,25 +104,10 @@ pub fn create_portfolio_technology(
 ) -> Result<PortfolioTechnology, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::portfolio_technologies;
-    use domain::schema::resumes;
 
-    let resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -179,17 +123,7 @@ pub fn create_portfolio_technology(
         .first(&mut establish_connection())
     {
         Ok(p) => p,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Portfolio project not found".to_string(),
-            ));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let new_item = NewPortfolioTechnology {
@@ -203,9 +137,6 @@ pub fn create_portfolio_technology(
         .get_result::<PortfolioTechnology>(&mut establish_connection())
     {
         Ok(item) => Ok(item),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

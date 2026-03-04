@@ -5,7 +5,10 @@ use domain::models::{
 };
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 fn normalize_optional_text(value: Option<String>) -> Option<String> {
     value.and_then(|v| {
@@ -23,26 +26,11 @@ pub fn create_work_experience(
     resume_id_value: i32,
     payload: NewWorkExperienceRequest,
 ) -> Result<WorkExperience, ApplicationError> {
-    use domain::schema::resumes;
     use domain::schema::work_experiences;
 
-    let resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -69,10 +57,7 @@ pub fn create_work_experience(
         .get_result::<WorkExperience>(&mut establish_connection())
     {
         Ok(item) => Ok(item),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -82,27 +67,12 @@ pub fn create_work_experience_key_point(
     work_id_value: i32,
     payload: NewWorkExperienceKeyPointRequest,
 ) -> Result<WorkExperienceKeyPoint, ApplicationError> {
-    use domain::schema::resumes;
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences::dsl as work_dsl;
 
-    let resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -118,17 +88,7 @@ pub fn create_work_experience_key_point(
         .first(&mut establish_connection())
     {
         Ok(w) => w,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Work experience not found".to_string(),
-            ));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let new_kp = NewWorkExperienceKeyPoint {
@@ -142,9 +102,6 @@ pub fn create_work_experience_key_point(
         .get_result::<WorkExperienceKeyPoint>(&mut establish_connection())
     {
         Ok(item) => Ok(item),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

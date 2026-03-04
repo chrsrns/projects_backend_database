@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{Resume, WorkExperience, WorkExperienceKeyPoint};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
 
 pub fn list_work_experiences(
     resume_id_value: i32,
@@ -24,18 +24,7 @@ pub fn list_work_experiences(
 
     let _resume: Resume = match resume_query.first(&mut establish_connection()) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let mut items: Vec<WorkExperience> = match work_dsl::work_experiences
@@ -43,12 +32,7 @@ pub fn list_work_experiences(
         .load::<WorkExperience>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     items.sort_by_key(|w| (w.display_order.unwrap_or(0), w.id));
@@ -84,12 +68,7 @@ pub fn list_work_experience_key_points(
                 resume_id_value
             )));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let _work: WorkExperience = match work_dsl::work_experiences
@@ -103,12 +82,7 @@ pub fn list_work_experience_key_points(
                 "Work experience not found".to_string(),
             ));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let mut items: Vec<WorkExperienceKeyPoint> = match kps_dsl::work_experience_key_points
@@ -116,12 +90,7 @@ pub fn list_work_experience_key_points(
         .load::<WorkExperienceKeyPoint>(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));

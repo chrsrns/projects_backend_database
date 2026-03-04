@@ -2,7 +2,10 @@ use diesel::prelude::*;
 use domain::models::{Language, NewLanguage, NewLanguageRequest, Resume};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 pub fn create_language(
     user_id_value: i32,
@@ -10,25 +13,10 @@ pub fn create_language(
     payload: NewLanguageRequest,
 ) -> Result<Language, ApplicationError> {
     use domain::schema::languages;
-    use domain::schema::resumes;
 
-    let existing_resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let existing_resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match existing_resume.created_by {
@@ -49,9 +37,6 @@ pub fn create_language(
         .get_result::<Language>(&mut establish_connection())
     {
         Ok(language) => Ok(language),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

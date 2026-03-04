@@ -2,48 +2,28 @@ use diesel::prelude::*;
 use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 pub fn delete_portfolio_project(
     user_id_value: i32,
     project_id_value: i32,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::portfolio_projects;
-    use domain::schema::resumes;
 
     let existing: PortfolioProject = match portfolio_projects::table
         .find(project_id_value)
         .first(&mut establish_connection())
     {
         Ok(v) => v,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Portfolio project with id {} not found",
-                project_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(existing.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(existing.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -66,10 +46,7 @@ pub fn delete_portfolio_project(
                 Ok(existing.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -79,7 +56,6 @@ pub fn delete_portfolio_key_point(
 ) -> Result<i32, ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects;
-    use domain::schema::resumes;
 
     let existing: PortfolioKeyPoint = match portfolio_key_points::table
         .find(key_point_id_value)
@@ -92,12 +68,7 @@ pub fn delete_portfolio_key_point(
                 key_point_id_value
             )));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let project: PortfolioProject = match portfolio_projects::table
@@ -110,28 +81,12 @@ pub fn delete_portfolio_key_point(
                 "Portfolio project not found".to_string(),
             ));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(project.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(project.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -154,10 +109,7 @@ pub fn delete_portfolio_key_point(
                 Ok(project.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -167,7 +119,6 @@ pub fn delete_portfolio_technology(
 ) -> Result<i32, ApplicationError> {
     use domain::schema::portfolio_projects;
     use domain::schema::portfolio_technologies;
-    use domain::schema::resumes;
 
     let existing: PortfolioTechnology = match portfolio_technologies::table
         .find(tech_id_value)
@@ -180,12 +131,7 @@ pub fn delete_portfolio_technology(
                 tech_id_value
             )));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let project: PortfolioProject = match portfolio_projects::table
@@ -198,28 +144,12 @@ pub fn delete_portfolio_technology(
                 "Portfolio project not found".to_string(),
             ));
         }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match resumes::table
-        .find(project.resume_id)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(project.resume_id) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound("Resume not found".to_string()));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -242,9 +172,6 @@ pub fn delete_portfolio_technology(
                 Ok(project.resume_id)
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

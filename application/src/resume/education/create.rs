@@ -5,7 +5,10 @@ use domain::models::{
 };
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_resume},
+};
 
 pub fn create_education(
     user_id_value: i32,
@@ -13,25 +16,10 @@ pub fn create_education(
     payload: NewEducationRequest,
 ) -> Result<Education, ApplicationError> {
     use domain::schema::education;
-    use domain::schema::resumes;
 
-    let resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -57,10 +45,7 @@ pub fn create_education(
         .get_result::<Education>(&mut establish_connection())
     {
         Ok(item) => Ok(item),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -72,25 +57,10 @@ pub fn create_education_key_point(
 ) -> Result<EducationKeyPoint, ApplicationError> {
     use domain::schema::education::dsl as education_dsl;
     use domain::schema::education_key_points;
-    use domain::schema::resumes;
 
-    let resume: Resume = match resumes::table
-        .find(resume_id_value)
-        .first(&mut establish_connection())
-    {
+    let resume: Resume = match find_resume(resume_id_value) {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(err),
     };
 
     match resume.created_by {
@@ -106,17 +76,7 @@ pub fn create_education_key_point(
         .first(&mut establish_connection())
     {
         Ok(e) => e,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Education not found".to_string(),
-            ));
-        }
-        Err(err) => {
-            return Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            )));
-        }
+        Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
     let new_kp = NewEducationKeyPoint {
@@ -130,9 +90,6 @@ pub fn create_education_key_point(
         .get_result::<EducationKeyPoint>(&mut establish_connection())
     {
         Ok(item) => Ok(item),
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
