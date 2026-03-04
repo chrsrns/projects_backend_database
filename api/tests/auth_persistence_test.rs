@@ -1,89 +1,14 @@
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use infrastructure::establish_connection;
-use rocket::http::{ContentType, Header, Status};
-use rocket::local::blocking::Client;
+use rocket::http::{ContentType, Status};
 use serde_json::Value;
 
-/// Test fixture that automatically cleans up created users/sessions
-struct TestFixture {
-    client: Client,
-    created_user_ids: Vec<i32>,
-    created_session_ids: Vec<String>,
-    lock_key: i64,
-    lock_connection: PgConnection,
-}
-
-impl TestFixture {
-    fn new() -> Self {
-        let lock_key: i64 = 9_225_338;
-        let mut lock_connection = establish_connection();
-        diesel::sql_query(format!("SELECT pg_advisory_lock({})", lock_key))
-            .execute(&mut lock_connection)
-            .expect("acquire advisory lock");
-
-        let rocket = api::build_rocket();
-        let client = Client::tracked(rocket).expect("valid rocket instance");
-
-        TestFixture {
-            client,
-            created_user_ids: Vec::new(),
-            created_session_ids: Vec::new(),
-            lock_key,
-            lock_connection,
-        }
-    }
-
-    fn client(&self) -> &Client {
-        &self.client
-    }
-
-    fn track_user_id(&mut self, id: i32) {
-        self.created_user_ids.push(id);
-    }
-
-    fn track_session_id(&mut self, id: String) {
-        self.created_session_ids.push(id);
-    }
-}
-
-impl Drop for TestFixture {
-    fn drop(&mut self) {
-        use domain::schema::users::dsl as users_dsl;
-
-        let connection = &mut self.lock_connection;
-
-        for session_id in &self.created_session_ids {
-            let _ = diesel::sql_query("DELETE FROM sessions WHERE id = $1")
-                .bind::<diesel::sql_types::Uuid, _>(
-                    session_id
-                        .parse::<uuid::Uuid>()
-                        .expect("valid uuid session id"),
-                )
-                .execute(connection);
-        }
-
-        for user_id in &self.created_user_ids {
-            let _ = diesel::delete(users_dsl::users.find(user_id)).execute(connection);
-        }
-
-        diesel::sql_query(format!("SELECT pg_advisory_unlock({})", self.lock_key))
-            .execute(&mut self.lock_connection)
-            .expect("release advisory lock");
-    }
-}
+mod support;
+use support::Fixture;
 
 #[test]
 fn test_register_login_me_logout_flow() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = Fixture::new(9_225_338);
 
-    let unique_email = format!(
-        "auth.user.{}@example.com",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
+    let unique_email = support::unique_email("auth.user");
 
     let register_payload = serde_json::json!({
         "email": unique_email,
@@ -131,7 +56,7 @@ fn test_register_login_me_logout_flow() {
     let me_response = fixture
         .client()
         .get("/api/auth/me")
-        .header(Header::new("Authorization", format!("Bearer {}", token)))
+        .header(support::auth_header(&token))
         .dispatch();
 
     assert_eq!(me_response.status(), Status::Ok);
@@ -142,14 +67,14 @@ fn test_register_login_me_logout_flow() {
     let logout_response = fixture
         .client()
         .post("/api/auth/logout")
-        .header(Header::new("Authorization", format!("Bearer {}", token)))
+        .header(support::auth_header(&token))
         .dispatch();
     assert_eq!(logout_response.status(), Status::Ok);
 
     let me_after_logout = fixture
         .client()
         .get("/api/auth/me")
-        .header(Header::new("Authorization", format!("Bearer {}", token)))
+        .header(support::auth_header(&token))
         .dispatch();
 
     assert_eq!(me_after_logout.status(), Status::Unauthorized);

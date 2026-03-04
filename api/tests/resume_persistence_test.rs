@@ -1,129 +1,12 @@
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use infrastructure::establish_connection;
-use rocket::http::{ContentType, Header, Status};
-use rocket::local::blocking::Client;
+use rocket::http::{ContentType, Status};
 use serde_json::Value;
 use std::time::Duration;
 
-/// Test fixture that automatically cleans up created resumes
-struct TestFixture {
-    client: Client,
-    created_resume_ids: Vec<i32>,
-    auth_token: String,
-    lock_key: i64,
-    lock_connection: PgConnection,
-}
-
-impl TestFixture {
-    fn new() -> Self {
-        let lock_key: i64 = 9_225_337;
-        let mut lock_connection = establish_connection();
-        diesel::sql_query(format!("SELECT pg_advisory_lock({})", lock_key))
-            .execute(&mut lock_connection)
-            .expect("acquire advisory lock");
-
-        let rocket = api::build_rocket();
-        let client = Client::tracked(rocket).expect("valid rocket instance");
-
-        // Create a dedicated user for this fixture and login to get a Bearer token.
-        // Note: responses borrow the client, so compute token in a scope that ends
-        // before we move the client into the fixture.
-        let auth_token = {
-            let unique_email = format!(
-                "resume.tests.{}@example.com",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis()
-            );
-
-            let register_payload = serde_json::json!({
-                "email": unique_email,
-                "password": "test-password"
-            });
-
-            let register_response = client
-                .post("/api/auth/register")
-                .header(ContentType::JSON)
-                .body(register_payload.to_string())
-                .dispatch();
-            assert_eq!(register_response.status(), Status::Created);
-
-            let login_payload = serde_json::json!({
-                "email": register_payload["email"].as_str().unwrap(),
-                "password": "test-password"
-            });
-
-            let login_response = client
-                .post("/api/auth/login")
-                .header(ContentType::JSON)
-                .body(login_payload.to_string())
-                .dispatch();
-            assert_eq!(login_response.status(), Status::Ok);
-
-            let login_body = login_response.into_string().expect("login body");
-            let login_json: Value = serde_json::from_str(&login_body).expect("valid json");
-            login_json["body"]["token"]
-                .as_str()
-                .expect("token")
-                .to_string()
-        };
-
-        TestFixture {
-            client,
-            created_resume_ids: Vec::new(),
-            auth_token,
-            lock_key,
-            lock_connection,
-        }
-    }
-
-    fn client(&self) -> &Client {
-        &self.client
-    }
-
-    fn auth_header(&self) -> Header<'static> {
-        Header::new("Authorization", format!("Bearer {}", self.auth_token))
-    }
-
-    fn track_resume_id(&mut self, id: i32) {
-        self.created_resume_ids.push(id);
-        println!("Tracking resume ID {} for cleanup", id);
-    }
-
-    fn untrack_resume_id(&mut self, id: i32) {
-        self.created_resume_ids.retain(|&existing| existing != id);
-    }
-}
-
-impl Drop for TestFixture {
-    fn drop(&mut self) {
-        if !self.created_resume_ids.is_empty() {
-            println!("Cleaning up {} resume(s)...", self.created_resume_ids.len());
-
-            use domain::schema::resumes::dsl::*;
-            let connection = &mut self.lock_connection;
-
-            for resume_id in &self.created_resume_ids {
-                match diesel::delete(resumes.find(resume_id)).execute(connection) {
-                    Ok(_) => println!("✓ Deleted resume ID {}", resume_id),
-                    Err(e) => eprintln!("✗ Failed to delete resume ID {}: {}", resume_id, e),
-                }
-            }
-
-            println!("Cleanup complete!");
-        }
-
-        diesel::sql_query(format!("SELECT pg_advisory_unlock({})", self.lock_key))
-            .execute(&mut self.lock_connection)
-            .expect("release advisory lock");
-    }
-}
+mod support;
 
 #[test]
 fn test_create_and_retrieve_resume_persistence() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_001);
 
     // Test data to create
     let new_resume_json = serde_json::json!({
@@ -203,7 +86,7 @@ fn test_create_and_retrieve_resume_persistence() {
 
 #[test]
 fn test_create_resume_appears_in_list() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_002);
 
     // Create a new resume with unique email to avoid conflicts
     let unique_email = format!(
@@ -289,7 +172,7 @@ fn test_create_resume_appears_in_list() {
 
 #[test]
 fn test_retrieve_nonexistent_resume() {
-    let fixture = TestFixture::new();
+    let fixture = support::Fixture::new(9_226_003);
 
     // Try to retrieve a resume with an ID that doesn't exist
     let nonexistent_id = 999999;
@@ -306,7 +189,7 @@ fn test_retrieve_nonexistent_resume() {
 
 #[test]
 fn test_update_and_retrieve_resume_persistence() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_004);
 
     let unique_email = format!(
         "update.user.{}@example.com",
@@ -381,7 +264,7 @@ fn test_update_and_retrieve_resume_persistence() {
 
 #[test]
 fn test_update_nonexistent_resume() {
-    let fixture = TestFixture::new();
+    let fixture = support::Fixture::new(9_226_005);
 
     let nonexistent_id = 999999;
     let update_resume_json = serde_json::json!({
@@ -401,7 +284,7 @@ fn test_update_nonexistent_resume() {
 
 #[test]
 fn test_delete_resume_then_not_found() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_006);
 
     let unique_email = format!(
         "delete.user.{}@example.com",
@@ -462,7 +345,7 @@ fn test_delete_resume_then_not_found() {
 
 #[test]
 fn test_delete_nonexistent_resume() {
-    let fixture = TestFixture::new();
+    let fixture = support::Fixture::new(9_226_006);
 
     let nonexistent_id = 999999;
     let response = fixture
@@ -476,7 +359,7 @@ fn test_delete_nonexistent_resume() {
 
 #[test]
 fn test_create_resume_missing_required_fields_returns_422() {
-    let fixture = TestFixture::new();
+    let fixture = support::Fixture::new(9_226_007);
 
     let invalid_json_missing_email = serde_json::json!({
         "name": "Missing Email"
@@ -495,7 +378,7 @@ fn test_create_resume_missing_required_fields_returns_422() {
 
 #[test]
 fn test_create_resume_duplicate_email_returns_409() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_008);
 
     let unique_email = format!(
         "dupe.user.{}@example.com",
@@ -550,7 +433,7 @@ fn test_create_resume_duplicate_email_returns_409() {
 
 #[test]
 fn test_list_resumes_ordering_is_deterministic_for_created_records() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_009);
 
     let email_a = format!(
         "order.a.{}@example.com",
@@ -652,7 +535,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
 
 #[test]
 fn test_updated_at_changes_on_update_created_at_stays_same() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_010);
 
     let unique_email = format!(
         "timestamp.user.{}@example.com",
@@ -731,7 +614,7 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
 
 #[test]
 fn test_skills_crud_flow() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_011);
 
     let unique_email = format!(
         "skills.user.{}@example.com",
@@ -884,7 +767,7 @@ fn test_skills_crud_flow() {
 
 #[test]
 fn test_languages_crud_flow() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_012);
 
     let unique_email = format!(
         "languages.user.{}@example.com",
@@ -1017,7 +900,7 @@ fn test_languages_crud_flow() {
 
 #[test]
 fn test_frameworks_crud_flow() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_013);
 
     let unique_email = format!(
         "frameworks.user.{}@example.com",
@@ -1179,7 +1062,7 @@ fn test_frameworks_crud_flow() {
 
 #[test]
 fn test_education_and_key_points_crud_flow() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_014);
 
     let unique_email = format!(
         "education.user.{}@example.com",
@@ -1382,7 +1265,7 @@ fn test_education_and_key_points_crud_flow() {
 
 #[test]
 fn test_work_experiences_and_key_points_crud_flow() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_015);
 
     let unique_email = format!(
         "work.user.{}@example.com",
@@ -1626,7 +1509,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
 
 #[test]
 fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
-    let mut fixture = TestFixture::new();
+    let mut fixture = support::Fixture::new(9_226_016);
 
     let unique_email = format!(
         "portfolio.user.{}@example.com",
