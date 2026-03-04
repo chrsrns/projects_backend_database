@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::Resume;
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
 
 pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), ApplicationError> {
     use domain::schema::resumes;
@@ -12,13 +12,9 @@ pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), Applicati
         .first(&mut establish_connection())
     {
         Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id
-            )));
+        Err(err) => {
+            return Err(app_err_from_diesel_err(err));
         }
-        Err(err) => return Err(ApplicationError::Internal(format!("Database error - {}", err))),
     };
 
     match existing.created_by {
@@ -39,6 +35,6 @@ pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), Applicati
                 Ok(())
             }
         }
-        Err(err) => Err(ApplicationError::Internal(format!("Database error - {}", err))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

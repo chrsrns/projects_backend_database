@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::Resume;
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
 
 pub fn list_resume(resume_id: i32, user_id_value: Option<i32>) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes;
@@ -17,16 +17,7 @@ pub fn list_resume(resume_id: i32, user_id_value: Option<i32>) -> Result<Resume,
 
     match query.first::<Resume>(&mut establish_connection()) {
         Ok(resume) => Ok(resume),
-        Err(err) => match err {
-            diesel::result::Error::NotFound => Err(ApplicationError::NotFound(format!(
-                "Error selecting resume with id {} - {}",
-                resume_id, err
-            ))),
-            _ => Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            ))),
-        },
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
 
@@ -48,9 +39,6 @@ pub fn list_resumes(user_id_value: Option<i32>) -> Result<Vec<Resume>, Applicati
             items.sort();
             Ok(items)
         }
-        Err(err) => Err(ApplicationError::Internal(format!(
-            "Database error - {}",
-            err
-        ))),
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

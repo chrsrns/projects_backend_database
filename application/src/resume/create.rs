@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{NewResume, NewResumeRequest, Resume};
 use infrastructure::establish_connection;
 
-use crate::error::ApplicationError;
+use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
 
 pub fn create_resume(
     user_id_value: i32,
@@ -26,17 +26,6 @@ pub fn create_resume(
         .get_result::<Resume>(&mut establish_connection())
     {
         Ok(resume) => Ok(resume),
-        Err(err) => match err {
-            diesel::result::Error::DatabaseError(
-                diesel::result::DatabaseErrorKind::UniqueViolation,
-                _,
-            ) => Err(ApplicationError::Conflict(
-                "Resume with this email already exists".to_string(),
-            )),
-            _ => Err(ApplicationError::Internal(format!(
-                "Database error - {}",
-                err
-            ))),
-        },
+        Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
