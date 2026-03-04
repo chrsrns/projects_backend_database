@@ -1,31 +1,21 @@
 use diesel::prelude::*;
-use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume};
+use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology};
 use infrastructure::establish_connection;
 
-use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_accessible_resume},
+};
 
 pub fn list_portfolio_projects(
     resume_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<PortfolioProject>, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
-    use domain::schema::resumes::dsl as resumes_dsl;
 
-    let mut resume_query = resumes_dsl::resumes.into_boxed();
-    resume_query = resume_query.filter(resumes_dsl::id.eq(resume_id_value));
-    resume_query = match user_id_value {
-        Some(uid) => resume_query.filter(
-            resumes_dsl::is_public
-                .eq(true)
-                .or(resumes_dsl::created_by.eq(uid)),
-        ),
-        None => resume_query.filter(resumes_dsl::is_public.eq(true)),
-    };
-
-    let _resume: Resume = match resume_query.first(&mut establish_connection()) {
-        Ok(r) => r,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
+        return Err(err);
+    }
 
     let mut items: Vec<PortfolioProject> = match projects_dsl::portfolio_projects
         .filter(projects_dsl::resume_id.eq(resume_id_value))
@@ -47,23 +37,10 @@ pub fn list_portfolio_key_points(
 ) -> Result<Vec<PortfolioKeyPoint>, ApplicationError> {
     use domain::schema::portfolio_key_points::dsl as kps_dsl;
     use domain::schema::portfolio_projects::dsl as projects_dsl;
-    use domain::schema::resumes::dsl as resumes_dsl;
 
-    let mut resume_query = resumes_dsl::resumes.into_boxed();
-    resume_query = resume_query.filter(resumes_dsl::id.eq(resume_id_value));
-    resume_query = match user_id_value {
-        Some(uid) => resume_query.filter(
-            resumes_dsl::is_public
-                .eq(true)
-                .or(resumes_dsl::created_by.eq(uid)),
-        ),
-        None => resume_query.filter(resumes_dsl::is_public.eq(true)),
-    };
-
-    let _resume: Resume = match resume_query.first(&mut establish_connection()) {
-        Ok(r) => r,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
+        return Err(err);
+    }
 
     let _project: PortfolioProject = match projects_dsl::portfolio_projects
         .filter(projects_dsl::id.eq(project_id_value))
@@ -94,23 +71,10 @@ pub fn list_portfolio_technologies(
 ) -> Result<Vec<PortfolioTechnology>, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::portfolio_technologies::dsl as tech_dsl;
-    use domain::schema::resumes::dsl as resumes_dsl;
 
-    let mut resume_query = resumes_dsl::resumes.into_boxed();
-    resume_query = resume_query.filter(resumes_dsl::id.eq(resume_id_value));
-    resume_query = match user_id_value {
-        Some(uid) => resume_query.filter(
-            resumes_dsl::is_public
-                .eq(true)
-                .or(resumes_dsl::created_by.eq(uid)),
-        ),
-        None => resume_query.filter(resumes_dsl::is_public.eq(true)),
-    };
-
-    let _resume: Resume = match resume_query.first(&mut establish_connection()) {
-        Ok(r) => r,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
+        return Err(err);
+    }
 
     let _project: PortfolioProject = match projects_dsl::portfolio_projects
         .filter(projects_dsl::id.eq(project_id_value))

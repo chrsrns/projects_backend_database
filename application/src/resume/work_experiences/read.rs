@@ -1,31 +1,21 @@
 use diesel::prelude::*;
-use domain::models::{Resume, WorkExperience, WorkExperienceKeyPoint};
+use domain::models::{WorkExperience, WorkExperienceKeyPoint};
 use infrastructure::establish_connection;
 
-use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_accessible_resume},
+};
 
 pub fn list_work_experiences(
     resume_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<WorkExperience>, ApplicationError> {
-    use domain::schema::resumes::dsl as resumes_dsl;
     use domain::schema::work_experiences::dsl as work_dsl;
 
-    let mut resume_query = resumes_dsl::resumes.into_boxed();
-    resume_query = resume_query.filter(resumes_dsl::id.eq(resume_id_value));
-    resume_query = match user_id_value {
-        Some(uid) => resume_query.filter(
-            resumes_dsl::is_public
-                .eq(true)
-                .or(resumes_dsl::created_by.eq(uid)),
-        ),
-        None => resume_query.filter(resumes_dsl::is_public.eq(true)),
-    };
-
-    let _resume: Resume = match resume_query.first(&mut establish_connection()) {
-        Ok(r) => r,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
+        return Err(err);
+    }
 
     let mut items: Vec<WorkExperience> = match work_dsl::work_experiences
         .filter(work_dsl::resume_id.eq(resume_id_value))
@@ -45,31 +35,12 @@ pub fn list_work_experience_key_points(
     work_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<WorkExperienceKeyPoint>, ApplicationError> {
-    use domain::schema::resumes::dsl as resumes_dsl;
     use domain::schema::work_experience_key_points::dsl as kps_dsl;
     use domain::schema::work_experiences::dsl as work_dsl;
 
-    let mut resume_query = resumes_dsl::resumes.into_boxed();
-    resume_query = resume_query.filter(resumes_dsl::id.eq(resume_id_value));
-    resume_query = match user_id_value {
-        Some(uid) => resume_query.filter(
-            resumes_dsl::is_public
-                .eq(true)
-                .or(resumes_dsl::created_by.eq(uid)),
-        ),
-        None => resume_query.filter(resumes_dsl::is_public.eq(true)),
-    };
-
-    let _resume: Resume = match resume_query.first(&mut establish_connection()) {
-        Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Resume with id {} not found",
-                resume_id_value
-            )));
-        }
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
+        return Err(err);
+    }
 
     let _work: WorkExperience = match work_dsl::work_experiences
         .filter(work_dsl::id.eq(work_id_value))

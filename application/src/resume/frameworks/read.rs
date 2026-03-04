@@ -1,8 +1,11 @@
 use diesel::prelude::*;
-use domain::models::{Framework, Language, Resume};
+use domain::models::{Framework, Language};
 use infrastructure::establish_connection;
 
-use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, find_accessible_resume},
+};
 
 pub fn list_frameworks(
     resume_id_value: i32,
@@ -11,25 +14,10 @@ pub fn list_frameworks(
 ) -> Result<Vec<Framework>, ApplicationError> {
     use domain::schema::frameworks::dsl as frameworks_dsl;
     use domain::schema::languages::dsl as languages_dsl;
-    use domain::schema::resumes::dsl as resumes_dsl;
 
-    let mut resume_query = resumes_dsl::resumes.into_boxed();
-    resume_query = resume_query.filter(resumes_dsl::id.eq(resume_id_value));
-    resume_query = match user_id_value {
-        Some(uid) => resume_query.filter(
-            resumes_dsl::is_public
-                .eq(true)
-                .or(resumes_dsl::created_by.eq(uid)),
-        ),
-        None => resume_query.filter(resumes_dsl::is_public.eq(true)),
-    };
-
-    let _resume: Resume = match resume_query.first(&mut establish_connection()) {
-        Ok(r) => r,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
+    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
+        return Err(err);
+    }
 
     let language: Language = match languages_dsl::languages
         .filter(languages_dsl::id.eq(language_id_value))
