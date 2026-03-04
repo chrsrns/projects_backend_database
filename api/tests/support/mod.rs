@@ -6,11 +6,15 @@ use infrastructure::establish_connection;
 use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 use serde_json::Value;
-use std::sync::OnceLock;
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicU64, Ordering},
+};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../infrastructure/migrations");
 
 static MIGRATIONS_RAN: OnceLock<()> = OnceLock::new();
+static UNIQUE_EMAIL_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub fn run_migrations_once() {
     MIGRATIONS_RAN.get_or_init(|| {
@@ -32,14 +36,14 @@ pub fn run_migrations_once() {
 }
 
 pub fn unique_email(prefix: &str) -> String {
-    format!(
-        "{}.{}@example.com",
-        prefix,
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    )
+    let counter = UNIQUE_EMAIL_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+
+    format!("{}.{}.{}.{}@example.com", prefix, pid, nanos, counter)
 }
 
 pub fn auth_header(token: &str) -> Header<'static> {
