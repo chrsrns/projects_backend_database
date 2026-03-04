@@ -8,3 +8,5 @@ pub mod read;
 pub mod skills;
 pub mod update;
 pub mod work_experiences;
+
+pub mod common;
