@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use api::realtime::Hub;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
@@ -106,9 +107,11 @@ pub fn register_and_login(client: &Client, email_prefix: &str) -> AuthContext {
 
 pub struct Fixture {
     client: Client,
+    pub(crate) hub: Hub,
     created_resume_ids: Vec<i32>,
     created_user_ids: Vec<i32>,
     created_session_ids: Vec<String>,
+    auth_token: String,
     lock_key: i64,
     lock_connection: PgConnection,
 }
@@ -122,14 +125,22 @@ impl Fixture {
             .execute(&mut lock_connection)
             .expect("acquire advisory lock");
 
-        let rocket = api::build_rocket();
+        let hub = Hub::new();
+        let rocket = api::build_rocket_with_hub(hub.clone());
         let client = Client::tracked(rocket).expect("valid rocket instance");
+
+        let auth_ctx = register_and_login(&client, "realtime.tests");
+        let auth_token = auth_ctx.token;
+        let created_user_ids = vec![auth_ctx.user_id];
+        let created_session_ids = vec![auth_token.clone()];
 
         Fixture {
             client,
+            hub,
             created_resume_ids: Vec::new(),
-            created_user_ids: Vec::new(),
-            created_session_ids: Vec::new(),
+            created_user_ids,
+            created_session_ids,
+            auth_token,
             lock_key,
             lock_connection,
         }
@@ -137,6 +148,10 @@ impl Fixture {
 
     pub fn client(&self) -> &Client {
         &self.client
+    }
+
+    pub fn auth_header(&self) -> Header<'static> {
+        Header::new("Authorization", format!("Bearer {}", self.auth_token))
     }
 
     pub fn track_resume_id(&mut self, id: i32) {
@@ -150,6 +165,10 @@ impl Fixture {
     pub fn track_session_id(&mut self, id: String) {
         self.created_session_ids.push(id);
     }
+
+    pub fn untrack_resume_id(&mut self, id: i32) {
+        self.created_resume_ids.retain(|&existing| existing != id);
+    }
 }
 
 impl Drop for Fixture {
@@ -159,18 +178,20 @@ impl Drop for Fixture {
         if !self.created_resume_ids.is_empty() {
             use domain::schema::resumes::dsl::*;
 
-            for resume_id_value in &self.created_resume_ids {
-                let _ = diesel::delete(resumes.find(resume_id_value)).execute(connection);
+            for resume_id in &self.created_resume_ids {
+                match diesel::delete(resumes.find(resume_id)).execute(connection) {
+                    Ok(_) => println!("✓ Deleted resume ID {}", resume_id),
+                    Err(e) => eprintln!("✗ Failed to delete resume ID {}: {}", resume_id, e),
+                }
             }
         }
 
         for session_id in &self.created_session_ids {
+            let Ok(session_uuid) = session_id.parse::<uuid::Uuid>() else {
+                continue;
+            };
             let _ = diesel::sql_query("DELETE FROM sessions WHERE id = $1")
-                .bind::<diesel::sql_types::Uuid, _>(
-                    session_id
-                        .parse::<uuid::Uuid>()
-                        .expect("valid uuid session id"),
-                )
+                .bind::<diesel::sql_types::Uuid, _>(session_uuid)
                 .execute(connection);
         }
 
