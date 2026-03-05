@@ -1,6 +1,6 @@
-# projects_backend_database
+# Rust Profile Management Backend
 
-Rust backend service for managing some profile data. This uses a CLEAN architecture to make extensibility easier.
+Rust backend server I wrote for managing some of my online profile data. I intend to use this to centralize my profile information across my other projects. This uses a CLEAN architecture to make extensibility easier.
 
 ## Workspace layout
 
