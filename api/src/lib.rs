@@ -4,17 +4,12 @@ extern crate rocket;
 use utoipa::OpenApi;
 
 pub mod auth;
-pub mod auth_handler;
-pub mod education_handler;
-pub mod frameworks_handler;
-pub mod languages_handler;
 pub mod openapi;
-pub mod portfolio_projects_handler;
 pub mod realtime;
-pub mod resume_handler;
-pub mod skills_handler;
-pub mod work_experiences_handler;
+pub mod route_handlers;
 pub mod ws_handler;
+
+use route_handlers::resume::*;
 
 pub fn build_rocket() -> rocket::Rocket<rocket::Build> {
     build_rocket_with_hub(realtime::Hub::new())
