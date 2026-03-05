@@ -9,7 +9,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Serve,
+    Serve { port: Option<u16> },
 }
 
 #[rocket::main]
@@ -17,8 +17,11 @@ async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Serve => {
-            let _ = api::build_rocket().launch().await;
+        Commands::Serve { port } => {
+            let _ = api::build_rocket()
+                .configure(rocket::Config::figment().merge(("port", port)))
+                .launch()
+                .await;
         }
     }
 }
