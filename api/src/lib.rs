@@ -9,7 +9,104 @@ pub mod realtime;
 pub mod route_handlers;
 pub mod ws_handler;
 
+use std::path::PathBuf;
+use std::sync::Once;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use route_handlers::resume::*;
+
+static LOG_INIT: Once = Once::new();
+
+fn parse_level_filter(raw: &str) -> log::LevelFilter {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "off" => log::LevelFilter::Off,
+        "error" => log::LevelFilter::Error,
+        "warn" | "warning" => log::LevelFilter::Warn,
+        "info" => log::LevelFilter::Info,
+        "debug" => log::LevelFilter::Debug,
+        "trace" => log::LevelFilter::Trace,
+        _ => log::LevelFilter::Info,
+    }
+}
+
+fn log_level_from_env() -> log::LevelFilter {
+    if let Ok(v) = std::env::var("RUST_LOG") {
+        return parse_level_filter(&v);
+    }
+
+    if let Ok(v) = std::env::var("ROCKET_LOG_LEVEL") {
+        return match v.to_ascii_lowercase().as_str() {
+            "off" => log::LevelFilter::Off,
+            "critical" => log::LevelFilter::Warn,
+            "normal" => log::LevelFilter::Info,
+            "debug" => log::LevelFilter::Debug,
+            _ => log::LevelFilter::Info,
+        };
+    }
+
+    log::LevelFilter::Info
+}
+
+pub fn init_logging() {
+    LOG_INIT.call_once(|| {
+        let level = log_level_from_env();
+
+        let exe_dir: PathBuf = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|parent| parent.to_path_buf()))
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_else(|| PathBuf::from("."));
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| (d.as_secs(), d.subsec_nanos()))
+            .unwrap_or((0, 0));
+
+        let log_path = exe_dir.join(format!("server-{}-{}.log", now.0, now.1));
+        println!("Log path: {}", log_path.display());
+
+        let stdout_dispatch = fern::Dispatch::new()
+            .format(|out, message, record| {
+                out.finish(format_args!(
+                    "[{} {}] {}",
+                    humantime::format_rfc3339_seconds(SystemTime::now()),
+                    record.level(),
+                    message
+                ))
+            })
+            .chain(std::io::stdout());
+
+        let mut dispatch = fern::Dispatch::new().level(level).chain(stdout_dispatch);
+
+        match fern::log_file(&log_path) {
+            Ok(file) => {
+                let file_dispatch = fern::Dispatch::new()
+                    .format(|out, message, record| {
+                        let msg = message.to_string();
+                        let stripped = strip_ansi_escapes::strip(&msg);
+                        out.finish(format_args!(
+                            "[{} {}] {}",
+                            humantime::format_rfc3339_seconds(SystemTime::now()),
+                            record.level(),
+                            String::from_utf8_lossy(&stripped)
+                        ))
+                    })
+                    .chain(file);
+
+                dispatch = dispatch.chain(file_dispatch);
+            }
+            Err(err) => {
+                eprintln!(
+                    "Failed to create log file at {}: {}",
+                    log_path.display(),
+                    err
+                );
+            }
+        };
+
+        let _ = dispatch.apply();
+    });
+}
 
 pub fn build_rocket() -> rocket::Rocket<rocket::Build> {
     build_rocket_with_hub(realtime::Hub::new())

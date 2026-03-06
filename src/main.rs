@@ -16,6 +16,8 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
 
+    api::init_logging();
+
     match cli.command {
         Commands::Serve { port } => {
             let rocket_port_env = std::env::var("ROCKET_PORT")

@@ -14,9 +14,13 @@ ws = { package = "rocket_ws", version = "0.1.1" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
+fern = "0.7.1"
+log = "0.4.28"
+strip-ansi-escapes = "0.2.1"
 
 utoipa = { version = "5", features = ["rocket_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["rocket", "vendored"] }
+humantime = "2.3.0"
 
 [dev-dependencies]
 chrono = { version = "0.4.42", features = ["serde"] }
