@@ -21,8 +21,8 @@ fn parse_level_filter(raw: &str) -> log::LevelFilter {
     match raw.trim().to_ascii_lowercase().as_str() {
         "off" => log::LevelFilter::Off,
         "error" => log::LevelFilter::Error,
-        "warn" | "warning" => log::LevelFilter::Warn,
-        "info" => log::LevelFilter::Info,
+        "warn" | "warning" | "critical" => log::LevelFilter::Warn,
+        "info" | "normal" => log::LevelFilter::Info,
         "debug" => log::LevelFilter::Debug,
         "trace" => log::LevelFilter::Trace,
         _ => log::LevelFilter::Info,
