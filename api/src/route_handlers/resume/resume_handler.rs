@@ -147,7 +147,10 @@ pub fn update_resume_handler(
 ) -> Result<Json<Response<Resume>>, Custom<Json<Response<String>>>> {
     match update::update_resume(auth.user_id, resume_id, resume.into_inner()) {
         Ok(updated) => {
-            hub.publish_resume_changed(updated.id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                updated.id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::PersonalInfo),
+            );
             Ok(Json(Response { body: updated }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

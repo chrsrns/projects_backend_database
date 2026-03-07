@@ -96,7 +96,10 @@ pub fn create_work_experience_handler(
 ) -> Result<Custom<Json<Response<WorkExperience>>>, Custom<Json<Response<String>>>> {
     match work_experiences::create_work_experience(auth.user_id, resume_id, payload.into_inner()) {
         Ok(item) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: item }),
@@ -162,7 +165,10 @@ pub fn update_work_experience_handler(
 ) -> Result<Json<Response<WorkExperience>>, Custom<Json<Response<String>>>> {
     match work_experiences::update_work_experience(auth.user_id, work_id, payload.into_inner()) {
         Ok(item) => {
-            hub.publish_resume_changed(item.resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                item.resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
+            );
             Ok(Json(Response { body: item }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -219,7 +225,10 @@ pub fn delete_work_experience_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match work_experiences::delete_work_experience(auth.user_id, work_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -345,7 +354,10 @@ pub fn create_work_experience_key_point_handler(
         payload.into_inner(),
     ) {
         Ok(item) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: item }),
@@ -415,7 +427,10 @@ pub fn update_work_experience_key_point_handler(
         payload.into_inner(),
     ) {
         Ok((item, resume_id)) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
+            );
             Ok(Json(Response { body: item }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -472,7 +487,10 @@ pub fn delete_work_experience_key_point_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match work_experiences::delete_work_experience_key_point(auth.user_id, key_point_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

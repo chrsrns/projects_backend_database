@@ -101,7 +101,10 @@ pub fn create_portfolio_project_handler(
         payload.into_inner(),
     ) {
         Ok(item) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: item }),
@@ -171,7 +174,10 @@ pub fn update_portfolio_project_handler(
         payload.into_inner(),
     ) {
         Ok(item) => {
-            hub.publish_resume_changed(item.resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                item.resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(Json(Response { body: item }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -228,7 +234,10 @@ pub fn delete_portfolio_project_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match portfolio_projects::delete_portfolio_project(auth.user_id, project_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -354,7 +363,10 @@ pub fn create_portfolio_key_point_handler(
         payload.into_inner(),
     ) {
         Ok(item) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: item }),
@@ -424,7 +436,10 @@ pub fn update_portfolio_key_point_handler(
         payload.into_inner(),
     ) {
         Ok((item, resume_id)) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(Json(Response { body: item }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -481,7 +496,10 @@ pub fn delete_portfolio_key_point_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match portfolio_projects::delete_portfolio_key_point(auth.user_id, key_point_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -607,7 +625,10 @@ pub fn create_portfolio_technology_handler(
         payload.into_inner(),
     ) {
         Ok(item) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: item }),
@@ -677,7 +698,10 @@ pub fn update_portfolio_technology_handler(
         payload.into_inner(),
     ) {
         Ok((item, resume_id)) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(Json(Response { body: item }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -734,7 +758,10 @@ pub fn delete_portfolio_technology_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match portfolio_projects::delete_portfolio_technology(auth.user_id, technology_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Projects),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

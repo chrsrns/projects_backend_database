@@ -97,7 +97,10 @@ pub fn create_framework_handler(
 ) -> Result<Custom<Json<Response<Framework>>>, Custom<Json<Response<String>>>> {
     match frameworks::create_framework(auth.user_id, resume_id, language_id, payload.into_inner()) {
         Ok(framework) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Frameworks),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: framework }),
@@ -163,7 +166,10 @@ pub fn update_framework_handler(
 ) -> Result<Json<Response<Framework>>, Custom<Json<Response<String>>>> {
     match frameworks::update_framework(auth.user_id, framework_id, payload.into_inner()) {
         Ok((framework, resume_id)) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Frameworks),
+            );
             Ok(Json(Response { body: framework }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -220,7 +226,10 @@ pub fn delete_framework_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match frameworks::delete_framework(auth.user_id, framework_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Frameworks),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

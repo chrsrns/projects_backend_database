@@ -96,7 +96,10 @@ pub fn create_education_handler(
 ) -> Result<Custom<Json<Response<Education>>>, Custom<Json<Response<String>>>> {
     match education::create_education(auth.user_id, resume_id, payload.into_inner()) {
         Ok(item) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: item }),
@@ -162,7 +165,10 @@ pub fn update_education_handler(
 ) -> Result<Json<Response<Education>>, Custom<Json<Response<String>>>> {
     match education::update_education(auth.user_id, education_id, payload.into_inner()) {
         Ok(item) => {
-            hub.publish_resume_changed(item.resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                item.resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
+            );
             Ok(Json(Response { body: item }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -219,7 +225,10 @@ pub fn delete_education_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match education::delete_education(auth.user_id, education_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -345,7 +354,10 @@ pub fn create_education_key_point_handler(
         payload.into_inner(),
     ) {
         Ok(item) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: item }),
@@ -411,7 +423,10 @@ pub fn update_education_key_point_handler(
 ) -> Result<Json<Response<EducationKeyPoint>>, Custom<Json<Response<String>>>> {
     match education::update_education_key_point(auth.user_id, key_point_id, payload.into_inner()) {
         Ok((item, resume_id)) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
+            );
             Ok(Json(Response { body: item }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -468,7 +483,10 @@ pub fn delete_education_key_point_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match education::delete_education_key_point(auth.user_id, key_point_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

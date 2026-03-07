@@ -93,7 +93,10 @@ pub fn create_language_handler(
 ) -> Result<Custom<Json<Response<Language>>>, Custom<Json<Response<String>>>> {
     match languages::create_language(auth.user_id, resume_id, payload.into_inner()) {
         Ok(language) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Languages),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: language }),
@@ -159,7 +162,10 @@ pub fn update_language_handler(
 ) -> Result<Json<Response<Language>>, Custom<Json<Response<String>>>> {
     match languages::update_language(auth.user_id, language_id, payload.into_inner()) {
         Ok(language) => {
-            hub.publish_resume_changed(language.resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                language.resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Languages),
+            );
             Ok(Json(Response { body: language }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -216,7 +222,10 @@ pub fn delete_language_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match languages::delete_language(auth.user_id, language_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Languages),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

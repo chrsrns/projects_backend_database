@@ -93,7 +93,10 @@ pub fn create_skill_handler(
 ) -> Result<Custom<Json<Response<Skill>>>, Custom<Json<Response<String>>>> {
     match skills::create_skill(auth.user_id, resume_id, payload.into_inner()) {
         Ok(skill) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Skills),
+            );
             Ok(Custom(
                 rocket::http::Status::Created,
                 Json(Response { body: skill }),
@@ -155,7 +158,10 @@ pub fn update_skill_handler(
 ) -> Result<Json<Response<Skill>>, Custom<Json<Response<String>>>> {
     match skills::update_skill(auth.user_id, skill_id, payload.into_inner()) {
         Ok(skill) => {
-            hub.publish_resume_changed(skill.resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                skill.resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Skills),
+            );
             Ok(Json(Response { body: skill }))
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(
@@ -212,7 +218,10 @@ pub fn delete_skill_handler(
 ) -> Result<NoContent, Custom<Json<Response<String>>>> {
     match skills::delete_skill(auth.user_id, skill_id) {
         Ok(resume_id) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Updated);
+            hub.publish_resume_changed(
+                resume_id,
+                ResumeChangedAction::Updated(crate::realtime::SectionType::Skills),
+            );
             Ok(NoContent)
         }
         Err(ApplicationError::NotFound(msg)) => Err(Custom(

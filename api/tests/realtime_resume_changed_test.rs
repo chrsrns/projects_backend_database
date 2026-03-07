@@ -61,7 +61,10 @@ fn test_resume_update_publishes_resume_changed_event() {
 
     let evt = rx.try_recv().expect("resume.changed event");
     assert_eq!(evt.resume_id, resume_id);
-    assert_eq!(evt.action, ResumeChangedAction::Updated);
+    assert_eq!(
+        evt.action,
+        ResumeChangedAction::Updated(api::realtime::SectionType::PersonalInfo)
+    );
 }
 
 #[test]

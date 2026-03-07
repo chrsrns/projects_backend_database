@@ -5,9 +5,21 @@ use std::sync::{Arc, RwLock};
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+pub enum SectionType {
+    PersonalInfo,
+    Education,
+    Frameworks,
+    Languages,
+    Projects,
+    Skills,
+    Experience,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
 pub enum ResumeChangedAction {
     Created,
-    Updated,
+    Updated(SectionType),
     Deleted,
 }
 
@@ -90,11 +102,14 @@ mod tests {
         let hub = Hub::new();
         let mut rx = hub.subscribe(123);
 
-        hub.publish_resume_changed(123, ResumeChangedAction::Updated);
+        hub.publish_resume_changed(123, ResumeChangedAction::Updated(SectionType::PersonalInfo));
 
         let evt = rx.try_recv().expect("event should be delivered");
         assert_eq!(evt.resume_id, 123);
-        assert_eq!(evt.action, ResumeChangedAction::Updated);
+        assert_eq!(
+            evt.action,
+            ResumeChangedAction::Updated(SectionType::PersonalInfo)
+        );
         assert_eq!(evt.kind, "resume.changed");
     }
 }
