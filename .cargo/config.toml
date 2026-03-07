@@ -1,0 +1,4 @@
+[target.aarch64-unknown-linux-gnu]
+# you can skip `linker = ` if you're using `mold`[^3]
+linker = "/usr/bin/aarch64-linux-gnu-gcc"
+rustflags = ["-C", "link-arg=--sysroot=/usr/aarch64-redhat-linux/sys-root/fc42"]

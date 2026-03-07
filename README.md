@@ -55,6 +55,33 @@ From the repository root:
 cargo run -- serve
 ```
 
+### Cross-Compilation
+
+#### Cargo configuration
+
+- `.cargo/config.toml` contains the Cargo settings that does not affect host compilation.
+- `.cargo/config.aarch64.toml` contains additional environment configuration used only when cross-compiling for `aarch64-unknown-linux-gnu`.
+    - Keeping the `aarch64` cross-compilation settings in a separate TOML file avoids interfering with native `cargo run` on x86-64 while still allowing cross-target builds when explicitly requested.
+
+#### Host machine setup
+
+On my Fedora machine, I needed to install the following packages to cross-compile for `aarch64-unknown-linux-gnu`:
+
+```bash
+sudo dnf install sysroot-aarch64-fc42-glibc.noarch
+
+sudo dnf --installroot=/usr/aarch64-redhat-linux/sys-root/fc42 \
+         --releasever=42 \
+         --forcearch=aarch64 \
+         --use-host-config \
+         install sqlite-devel libgcc glibc-devel gcc libpq-devel
+
+# BUG: Create development symlink for libgcc_s.so since it's missing in fedora:42
+cd /usr/aarch64-redhat-linux/sys-root/fc42/usr/lib64
+sudo ln -sf libgcc_s.so.1 libgcc_s.so
+cd -
+```
+
 ## TODO
 
 - [x] Setup basic project structure and architecture
