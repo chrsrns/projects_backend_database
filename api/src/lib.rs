@@ -11,7 +11,7 @@ pub mod ws_handler;
 
 use std::path::PathBuf;
 use std::sync::Once;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use route_handlers::resume::*;
 
@@ -57,12 +57,8 @@ pub fn init_logging() {
             .or_else(|| std::env::current_dir().ok())
             .unwrap_or_else(|| PathBuf::from("."));
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| (d.as_secs(), d.subsec_nanos()))
-            .unwrap_or((0, 0));
-
-        let log_path = exe_dir.join(format!("server-{}-{}.log", now.0, now.1));
+        let timestamp = humantime::format_rfc3339_seconds(SystemTime::now());
+        let log_path = exe_dir.join(format!("server-{}.log", timestamp));
         println!("Log path: {}", log_path.display());
 
         let stdout_dispatch = fern::Dispatch::new()
