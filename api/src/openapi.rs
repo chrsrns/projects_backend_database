@@ -53,6 +53,7 @@ impl Modify for ServerAddon {
         crate::auth_handler::login_handler,
         crate::auth_handler::me_handler,
         crate::auth_handler::logout_handler,
+        crate::ws_handler::ws_handler,
         crate::resume_handler::list_resumes_handler,
         crate::resume_handler::list_resume_handler,
         crate::resume_handler::create_resume_handler,

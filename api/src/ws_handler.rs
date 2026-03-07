@@ -11,6 +11,16 @@ struct ClientMessage {
     token: Option<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/ws",
+    tag = "WebSocket",
+    responses(
+        (status = 101, description = "WebSocket Upgrade Successful"),
+        (status = 400, description = "Bad Request - Invalid message format"),
+        (status = 403, description = "Forbidden - Invalid token or unauthorized")
+    )
+)]
 #[rocket::get("/ws")]
 pub fn ws_handler(ws: ws::WebSocket, hub: &State<Hub>) -> ws::Channel<'static> {
     let hub = hub.inner().clone();
