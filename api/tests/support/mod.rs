@@ -150,6 +150,10 @@ impl Fixture {
         &self.client
     }
 
+    pub fn auth_token(&self) -> &str {
+        &self.auth_token
+    }
+
     pub fn auth_header(&self) -> Header<'static> {
         Header::new("Authorization", format!("Bearer {}", self.auth_token))
     }
