@@ -9,10 +9,16 @@ pub mod realtime;
 pub mod route_handlers;
 pub mod ws_handler;
 
+use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Once;
 use std::time::SystemTime;
 
+use rocket::Request;
+use rocket::http::Status;
+use rocket::http::uri::{Segments, fmt::Path as UriPath};
+use rocket::request::FromSegments;
+use rocket::response::{Responder, Response};
 use route_handlers::resume::*;
 
 static LOG_INIT: Once = Once::new();
@@ -108,6 +114,137 @@ pub fn build_rocket() -> rocket::Rocket<rocket::Build> {
     build_rocket_with_hub(realtime::Hub::new())
 }
 
+struct ProxyResponse {
+    status: Status,
+    content_type: Option<String>,
+    body: Vec<u8>,
+}
+
+struct FrontendProxyPath(String);
+
+impl<'r> FromSegments<'r> for FrontendProxyPath {
+    type Error = std::convert::Infallible;
+
+    fn from_segments(segments: Segments<'r, UriPath>) -> Result<Self, Self::Error> {
+        let segments_vec: Vec<_> = segments.collect();
+
+        for (i, segment) in segments_vec.iter().enumerate() {
+            log::info!("FrontendProxyPath segment[{}]: {}", i, segment);
+        }
+        Ok(Self(segments_vec.join("/")))
+    }
+}
+
+impl<'r> Responder<'r, 'static> for ProxyResponse {
+    fn respond_to(self, _req: &'r Request<'_>) -> rocket::response::Result<'static> {
+        let mut builder = Response::build();
+        builder.status(self.status);
+        if let Some(content_type) = self.content_type {
+            builder.raw_header("Content-Type", content_type);
+        }
+
+        builder
+            .sized_body(self.body.len(), Cursor::new(self.body))
+            .ok()
+    }
+}
+
+async fn proxy_frontend_path(path: &str) -> Result<ProxyResponse, Status> {
+    let upstream_url = format!("http://localhost:4173{path}");
+    log::info!(
+        "frontend proxy step=prepare_request path={} upstream_url={}",
+        path,
+        upstream_url
+    );
+
+    let upstream_response = reqwest::get(&upstream_url).await.map_err(|err| {
+        log::error!(
+            "frontend proxy step=send_request path={} upstream_url={} error={}",
+            path,
+            upstream_url,
+            err
+        );
+        Status::BadGateway
+    })?;
+
+    log::info!(
+        "frontend proxy step=received_response path={} upstream_url={} upstream_status={}",
+        path,
+        upstream_url,
+        upstream_response.status()
+    );
+
+    let status =
+        Status::from_code(upstream_response.status().as_u16()).unwrap_or(Status::BadGateway);
+    log::info!(
+        "frontend proxy step=map_status path={} upstream_status={} rocket_status={}",
+        path,
+        upstream_response.status(),
+        status
+    );
+
+    let content_type = upstream_response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    log::info!(
+        "frontend proxy step=read_headers path={} content_type={}",
+        path,
+        content_type.as_deref().unwrap_or("<none>")
+    );
+
+    let body = upstream_response.bytes().await.map_err(|err| {
+        log::error!(
+            "frontend proxy step=read_body path={} upstream_url={} error={}",
+            path,
+            upstream_url,
+            err
+        );
+        Status::BadGateway
+    })?;
+
+    log::info!(
+        "frontend proxy step=complete path={} status={} body_bytes={}",
+        path,
+        status,
+        body.len()
+    );
+
+    Ok(ProxyResponse {
+        status,
+        content_type,
+        body: body.to_vec(),
+    })
+}
+
+#[get("/", rank = 100)]
+async fn frontend_index_proxy_handler() -> Result<ProxyResponse, Status> {
+    proxy_frontend_path("/").await
+}
+
+#[get("/<path..>?<query..>", rank = 101)]
+async fn frontend_proxy_handler(
+    path: FrontendProxyPath,
+    query: Option<std::collections::HashMap<String, String>>,
+) -> Result<ProxyResponse, Status> {
+    let normalized_path = path.0;
+
+    let full_path = match query {
+        Some(q) if !q.is_empty() => {
+            let query_string: String = q
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&");
+            format!("/{}?{}", normalized_path, query_string)
+        }
+        _ => format!("/{}", normalized_path),
+    };
+
+    proxy_frontend_path(&full_path).await
+}
+
 pub fn build_rocket_with_hub(hub: realtime::Hub) -> rocket::Rocket<rocket::Build> {
     let allowed_origins = rocket_cors::AllowedOrigins::all();
 
@@ -186,6 +323,10 @@ pub fn build_rocket_with_hub(hub: realtime::Hub) -> rocket::Rocket<rocket::Build
                 portfolio_projects_handler::update_portfolio_technology_handler,
                 portfolio_projects_handler::delete_portfolio_technology_handler,
             ],
+        )
+        .mount(
+            "/resume_builder",
+            routes![frontend_index_proxy_handler, frontend_proxy_handler],
         )
         .mount(
             "/",
