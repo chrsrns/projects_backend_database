@@ -128,9 +128,6 @@ impl<'r> FromSegments<'r> for FrontendProxyPath {
     fn from_segments(segments: Segments<'r, UriPath>) -> Result<Self, Self::Error> {
         let segments_vec: Vec<_> = segments.collect();
 
-        for (i, segment) in segments_vec.iter().enumerate() {
-            log::info!("FrontendProxyPath segment[{}]: {}", i, segment);
-        }
         Ok(Self(segments_vec.join("/")))
     }
 }
