@@ -5,7 +5,9 @@ edition = "2024"
 
 [dependencies]
 api = { path = "./api" }
+shared = { path = "./shared" }
 clap = { version = "4.5.23", features = ["derive", "cargo"] }
+rand = "0.10.0"
 rocket = { version = "0.5.1" }
 
 [workspace]
