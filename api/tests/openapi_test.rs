@@ -4,7 +4,7 @@ use serde_json::Value;
 
 #[test]
 fn test_openapi_json_is_served() {
-    let rocket = api::build_rocket();
+    let rocket = api::build_rocket(shared::node_config::NodeConfig { port: 53421 });
     let client = Client::tracked(rocket).expect("valid rocket instance");
 
     let response = client.get("/api/openapi.json").dispatch();

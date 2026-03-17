@@ -177,11 +177,13 @@ fn test_ws_endpoint_subscribe_receives_resume_changed_event() {
 
     let runtime = rocket::tokio::runtime::Runtime::new().expect("tokio runtime");
     let (shutdown, server) = runtime.block_on(async move {
-        let rocket = api::build_rocket_with_hub(hub).configure(
-            rocket::Config::figment()
-                .merge(("address", "127.0.0.1"))
-                .merge(("port", port)),
-        );
+        let rocket =
+            api::build_rocket_with_hub(hub, shared::node_config::NodeConfig { port: 53421 })
+                .configure(
+                    rocket::Config::figment()
+                        .merge(("address", "127.0.0.1"))
+                        .merge(("port", port)),
+                );
 
         let ignited = rocket.ignite().await.expect("ignite rocket");
         let shutdown = ignited.shutdown();

@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use shared::node_config::NodeConfig;
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -24,7 +25,15 @@ async fn main() {
                 .ok()
                 .and_then(|p| p.parse::<u16>().ok());
             let server_port = port.or(rocket_port_env).unwrap_or(8000);
-            let _ = api::build_rocket()
+
+            let node_port: u16 = loop {
+                let port = rand::random::<u16>() % (65535 - 1024) + 1024;
+                if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+                    break port;
+                }
+            };
+
+            let _ = api::build_rocket(NodeConfig { port: node_port })
                 .configure(rocket::Config::figment().merge(("port", server_port)))
                 .launch()
                 .await;

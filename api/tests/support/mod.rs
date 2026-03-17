@@ -126,7 +126,10 @@ impl Fixture {
             .expect("acquire advisory lock");
 
         let hub = Hub::new();
-        let rocket = api::build_rocket_with_hub(hub.clone());
+        let rocket = api::build_rocket_with_hub(
+            hub.clone(),
+            shared::node_config::NodeConfig { port: 53421 },
+        );
         let client = Client::tracked(rocket).expect("valid rocket instance");
 
         let auth_ctx = register_and_login(&client, "realtime.tests");

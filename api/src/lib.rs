@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
+use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
 
 pub mod auth;
@@ -110,8 +111,8 @@ pub fn init_logging() {
     });
 }
 
-pub fn build_rocket() -> rocket::Rocket<rocket::Build> {
-    build_rocket_with_hub(realtime::Hub::new())
+pub fn build_rocket(node_cfg: NodeConfig) -> rocket::Rocket<rocket::Build> {
+    build_rocket_with_hub(realtime::Hub::new(), node_cfg)
 }
 
 struct ProxyResponse {
@@ -146,8 +147,8 @@ impl<'r> Responder<'r, 'static> for ProxyResponse {
     }
 }
 
-async fn proxy_frontend_path(path: &str) -> Result<ProxyResponse, Status> {
-    let upstream_url = format!("http://localhost:4173{path}");
+async fn proxy_frontend_path(path: &str, node_port: u16) -> Result<ProxyResponse, Status> {
+    let upstream_url = format!("http://localhost:{}{path}", node_port);
     log::info!(
         "frontend proxy step=prepare_request path={} upstream_url={}",
         path,
@@ -216,14 +217,17 @@ async fn proxy_frontend_path(path: &str) -> Result<ProxyResponse, Status> {
 }
 
 #[get("/", rank = 100)]
-async fn frontend_index_proxy_handler() -> Result<ProxyResponse, Status> {
-    proxy_frontend_path("/").await
+async fn frontend_index_proxy_handler(
+    node_cfg: &rocket::State<NodeConfig>,
+) -> Result<ProxyResponse, Status> {
+    proxy_frontend_path("/", node_cfg.port).await
 }
 
-#[get("/<path..>?<query..>", rank = 101)]
+#[get("/resume_editor/<path..>?<query..>", rank = 101)]
 async fn frontend_proxy_handler(
     path: FrontendProxyPath,
     query: Option<std::collections::HashMap<String, String>>,
+    node_cfg: &rocket::State<NodeConfig>,
 ) -> Result<ProxyResponse, Status> {
     let normalized_path = path.0;
 
@@ -234,15 +238,18 @@ async fn frontend_proxy_handler(
                 .map(|(k, v)| format!("{}={}", k, v))
                 .collect::<Vec<_>>()
                 .join("&");
-            format!("/{}?{}", normalized_path, query_string)
+            format!("/resume_editor/{}?{}", normalized_path, query_string)
         }
-        _ => format!("/{}", normalized_path),
+        _ => format!("/resume_editor/{}", normalized_path),
     };
 
-    proxy_frontend_path(&full_path).await
+    proxy_frontend_path(&full_path, node_cfg.port).await
 }
 
-pub fn build_rocket_with_hub(hub: realtime::Hub) -> rocket::Rocket<rocket::Build> {
+pub fn build_rocket_with_hub(
+    hub: realtime::Hub,
+    node_cfg: NodeConfig,
+) -> rocket::Rocket<rocket::Build> {
     let allowed_origins = rocket_cors::AllowedOrigins::all();
 
     let cors = rocket_cors::CorsOptions {
@@ -266,6 +273,7 @@ pub fn build_rocket_with_hub(hub: realtime::Hub) -> rocket::Rocket<rocket::Build
     rocket::build()
         .attach(cors)
         .manage(hub)
+        .manage(node_cfg)
         .mount(
             "/api",
             routes![
