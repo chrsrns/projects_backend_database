@@ -5,3 +5,4 @@ Cargo.lock
 *.snap.new
 migrations/.diesel_lock
 bruno
+node_build/
