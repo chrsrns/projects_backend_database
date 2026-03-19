@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
+use reqwest::redirect::Policy;
 use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
 
@@ -16,10 +17,11 @@ use std::sync::Once;
 use std::time::SystemTime;
 
 use rocket::Request;
-use rocket::http::Status;
 use rocket::http::uri::{Segments, fmt::Path as UriPath};
+use rocket::http::{Method, Status};
 use rocket::request::FromSegments;
-use rocket::response::{Responder, Response};
+use rocket::response::{Redirect, Responder, Response};
+use rocket::route::{Handler, Outcome, Route};
 use route_handlers::resume::*;
 
 static LOG_INIT: Once = Once::new();
@@ -118,10 +120,14 @@ pub fn build_rocket(node_cfg: NodeConfig) -> rocket::Rocket<rocket::Build> {
 struct ProxyResponse {
     status: Status,
     content_type: Option<String>,
+    location: Option<String>,
     body: Vec<u8>,
 }
 
 struct FrontendProxyPath(String);
+
+#[derive(Clone)]
+struct FrontendTrailingSlashRedirectHandler;
 
 impl<'r> FromSegments<'r> for FrontendProxyPath {
     type Error = std::convert::Infallible;
@@ -140,11 +146,47 @@ impl<'r> Responder<'r, 'static> for ProxyResponse {
         if let Some(content_type) = self.content_type {
             builder.raw_header("Content-Type", content_type);
         }
+        if let Some(location) = self.location {
+            builder.raw_header("Location", location);
+        }
 
         builder
             .sized_body(self.body.len(), Cursor::new(self.body))
             .ok()
     }
+}
+
+#[rocket::async_trait]
+impl Handler for FrontendTrailingSlashRedirectHandler {
+    async fn handle<'r>(&self, req: &'r Request<'_>, data: rocket::Data<'r>) -> Outcome<'r> {
+        if should_redirect_frontend_trailing_slash(req.uri().path().as_str()) {
+            return Outcome::from(req, Redirect::to(normalized_frontend_redirect_target(req)));
+        }
+
+        Outcome::forward(data, Status::NotFound)
+    }
+}
+
+fn should_redirect_frontend_trailing_slash(path: &str) -> bool {
+    path.starts_with("/resume_editor/") && path.ends_with('/') && path.len() > 1
+}
+
+fn normalized_frontend_redirect_target(req: &Request<'_>) -> String {
+    let request_uri = req.uri().to_string();
+
+    match request_uri.split_once('?') {
+        Some((path, query)) => format!("{}?{}", path.trim_end_matches('/'), query),
+        None => request_uri.trim_end_matches('/').to_string(),
+    }
+}
+
+fn frontend_trailing_slash_redirect_routes() -> Vec<Route> {
+    vec![Route::ranked(
+        99,
+        Method::Get,
+        "/<path..>",
+        FrontendTrailingSlashRedirectHandler,
+    )]
 }
 
 async fn proxy_frontend_path(path: &str, node_port: u16) -> Result<ProxyResponse, Status> {
@@ -155,7 +197,20 @@ async fn proxy_frontend_path(path: &str, node_port: u16) -> Result<ProxyResponse
         upstream_url
     );
 
-    let upstream_response = reqwest::get(&upstream_url).await.map_err(|err| {
+    let client = reqwest::Client::builder()
+        .redirect(Policy::none())
+        .build()
+        .map_err(|err| {
+            log::error!(
+                "frontend proxy step=build_client path={} upstream_url={} error={}",
+                path,
+                upstream_url,
+                err
+            );
+            Status::InternalServerError
+        })?;
+
+    let upstream_response = client.get(&upstream_url).send().await.map_err(|err| {
         log::error!(
             "frontend proxy step=send_request path={} upstream_url={} error={}",
             path,
@@ -186,10 +241,16 @@ async fn proxy_frontend_path(path: &str, node_port: u16) -> Result<ProxyResponse
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
+    let location = upstream_response
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
     log::info!(
-        "frontend proxy step=read_headers path={} content_type={}",
+        "frontend proxy step=read_headers path={} content_type={} location={}",
         path,
-        content_type.as_deref().unwrap_or("<none>")
+        content_type.as_deref().unwrap_or("<none>"),
+        location.as_deref().unwrap_or("<none>")
     );
 
     let body = upstream_response.bytes().await.map_err(|err| {
@@ -212,6 +273,7 @@ async fn proxy_frontend_path(path: &str, node_port: u16) -> Result<ProxyResponse
     Ok(ProxyResponse {
         status,
         content_type,
+        location,
         body: body.to_vec(),
     })
 }
@@ -329,6 +391,7 @@ pub fn build_rocket_with_hub(
                 portfolio_projects_handler::delete_portfolio_technology_handler,
             ],
         )
+        .mount("/", frontend_trailing_slash_redirect_routes())
         .mount(
             "/",
             routes![frontend_index_proxy_handler, frontend_proxy_handler],
