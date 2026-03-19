@@ -1,8 +1,9 @@
 #[macro_use]
 extern crate rocket;
 
-use crate::route_handlers::frontend_resume_editor_svelte::proxy_handlers::{
-    frontend_index_proxy_handler, frontend_proxy_handler,
+use crate::route_handlers::frontend_resume_editor_svelte::{
+    proxy_handlers::{frontend_index_proxy_handler, frontend_proxy_handler},
+    trailing_backslash_redirect::frontend_trailing_slash_redirect_routes,
 };
 use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
@@ -17,10 +18,6 @@ use std::path::PathBuf;
 use std::sync::Once;
 use std::time::SystemTime;
 
-use rocket::Request;
-use rocket::http::{Method, Status};
-use rocket::response::Redirect;
-use rocket::route::{Handler, Outcome, Route};
 use route_handlers::resume::*;
 
 static LOG_INIT: Once = Once::new();
@@ -114,42 +111,6 @@ pub fn init_logging() {
 
 pub fn build_rocket(node_cfg: NodeConfig) -> rocket::Rocket<rocket::Build> {
     build_rocket_with_hub(realtime::Hub::new(), node_cfg)
-}
-
-#[derive(Clone)]
-struct FrontendTrailingSlashRedirectHandler;
-
-#[rocket::async_trait]
-impl Handler for FrontendTrailingSlashRedirectHandler {
-    async fn handle<'r>(&self, req: &'r Request<'_>, data: rocket::Data<'r>) -> Outcome<'r> {
-        if should_redirect_frontend_trailing_slash(req.uri().path().as_str()) {
-            return Outcome::from(req, Redirect::to(normalized_frontend_redirect_target(req)));
-        }
-
-        Outcome::forward(data, Status::NotFound)
-    }
-}
-
-fn should_redirect_frontend_trailing_slash(path: &str) -> bool {
-    path.starts_with("/resume_editor/") && path.ends_with('/') && path.len() > 1
-}
-
-fn normalized_frontend_redirect_target(req: &Request<'_>) -> String {
-    let request_uri = req.uri().to_string();
-
-    match request_uri.split_once('?') {
-        Some((path, query)) => format!("{}?{}", path.trim_end_matches('/'), query),
-        None => request_uri.trim_end_matches('/').to_string(),
-    }
-}
-
-fn frontend_trailing_slash_redirect_routes() -> Vec<Route> {
-    vec![Route::ranked(
-        99,
-        Method::Get,
-        "/<path..>",
-        FrontendTrailingSlashRedirectHandler,
-    )]
 }
 
 pub fn build_rocket_with_hub(
