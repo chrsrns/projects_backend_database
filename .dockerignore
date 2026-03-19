@@ -1,0 +1,8 @@
+.git
+.github
+.vscode
+.windsurf
+target
+node_build
+.env
+*.snap.new
