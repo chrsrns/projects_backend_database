@@ -330,7 +330,7 @@ pub fn build_rocket_with_hub(
             ],
         )
         .mount(
-            "/resume_builder",
+            "/",
             routes![frontend_index_proxy_handler, frontend_proxy_handler],
         )
         .mount(
