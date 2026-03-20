@@ -82,6 +82,19 @@ sudo ln -sf libgcc_s.so.1 libgcc_s.so
 cd -
 ```
 
+#### Using Docker for Cross-Compilation
+
+A `Containerfile` is written to make it easier to cross-compile. To cross-compile a binary for aarch64 and on Domcloud's platform, run:
+
+```bash
+docker buildx build \
+  --platform linux/arm64 \
+  --target artifact \
+  --output type=local,dest=./docker-build-out \
+  -f Containerfile \
+  .
+```
+
 ## TODO
 
 - [x] Setup basic project structure and architecture
