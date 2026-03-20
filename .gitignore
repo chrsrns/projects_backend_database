@@ -6,3 +6,4 @@ Cargo.lock
 migrations/.diesel_lock
 bruno
 node_build/
+docker-build-out/
