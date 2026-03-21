@@ -3,6 +3,10 @@ name = "projects_backend_database"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+frontend_resume_editor_svelte = ["api/frontend_resume_editor_svelte"]
+
 [dependencies]
 api = { path = "./api" }
 shared = { path = "./shared" }

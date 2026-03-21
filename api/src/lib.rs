@@ -1,10 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
-use crate::route_handlers::frontend_resume_editor_svelte::{
-    proxy_handlers::{frontend_index_proxy_handler, frontend_proxy_handler},
-    trailing_backslash_redirect::frontend_trailing_slash_redirect_routes,
-};
+use crate::route_handlers::frontend_resume_editor_svelte::mount_frontend_resume_editor_svelte;
 use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
 
@@ -137,7 +134,7 @@ pub fn build_rocket_with_hub(
     .to_cors()
     .unwrap();
 
-    rocket::build()
+    let rocket = rocket::build()
         .attach(cors)
         .manage(hub)
         .manage(node_cfg)
@@ -196,14 +193,11 @@ pub fn build_rocket_with_hub(
                 portfolio_projects_handler::delete_portfolio_technology_handler,
             ],
         )
-        .mount("/", frontend_trailing_slash_redirect_routes())
-        .mount(
-            "/",
-            routes![frontend_index_proxy_handler, frontend_proxy_handler],
-        )
         .mount(
             "/",
             utoipa_swagger_ui::SwaggerUi::new("/api/docs/<_..>")
                 .url("/api/openapi.json", openapi::ApiDoc::openapi()),
-        )
+        );
+
+    mount_frontend_resume_editor_svelte(rocket)
 }
