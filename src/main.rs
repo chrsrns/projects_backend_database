@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use shared::node_config::NodeConfig;
 use std::{
     io::{BufRead, BufReader, Error, ErrorKind},
+    path::PathBuf,
     process::{Command, Stdio},
     sync::mpsc,
     thread,
@@ -25,6 +26,64 @@ enum Commands {
         #[arg(long = "skip-node-run", short = 's', default_value_t = false)]
         skip_node_run: bool,
     },
+}
+
+fn resolve_node_build_dir() -> Result<PathBuf, Error> {
+    let current_dir = std::env::current_dir()?;
+    let node_build_dir = current_dir.join("node_build");
+
+    if !node_build_dir.exists() {
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            format!(
+                "Node server directory was not found at {}",
+                node_build_dir.display()
+            ),
+        ));
+    }
+
+    if !node_build_dir.is_dir() {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "Node server path is not a directory: {}",
+                node_build_dir.display()
+            ),
+        ));
+    }
+
+    for required_path in ["index.js", "handler.js", "server"] {
+        let required_path = node_build_dir.join(required_path);
+        if !required_path.exists() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "Node server build is missing required path: {}",
+                    required_path.display()
+                ),
+            ));
+        }
+    }
+
+    if !node_build_dir.join("server").is_dir() {
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            format!(
+                "Node server build path is not a directory: {}",
+                node_build_dir.join("server").display()
+            ),
+        ));
+    }
+
+    Ok(node_build_dir)
+}
+
+fn log_node_server_warning_banner(message: &str) {
+    let border = "=".repeat(88);
+    log::warn!("{}", border);
+    log::warn!("NODE SERVER WARNING");
+    log::warn!("{}", message);
+    log::warn!("{}", border);
 }
 
 #[rocket::main]
@@ -57,11 +116,28 @@ async fn main() -> Result<(), Error> {
             let mut stderr_thread = None;
 
             if !skip_node_run {
+                let node_build_dir = resolve_node_build_dir().map_err(|err| {
+                    log_node_server_warning_banner(&format!(
+                        "The Rust server could not load the Node server under 'node_build'. {}",
+                        err
+                    ));
+                    err
+                })?;
+                let port_env = format!("PORT={}", node_port);
+                let node_build_dir_arg = node_build_dir.to_string_lossy().into_owned();
                 let node_child = Command::new("env")
-                    .args([&format!("PORT={}", node_port), "node", "node_build"])
+                    .args([port_env.as_str(), "node", node_build_dir_arg.as_str()])
                     .stderr(Stdio::piped())
                     .stdout(Stdio::piped())
-                    .spawn()?;
+                    .spawn()
+                    .map_err(|err| {
+                        log_node_server_warning_banner(&format!(
+                            "The Rust server could not load the Node server under '{}'. {}",
+                            node_build_dir.display(),
+                            err
+                        ));
+                        err
+                    })?;
 
                 let node_stdout = node_child.stdout.ok_or_else(|| {
                     Error::new(ErrorKind::Other, "Could not capture standard output.")
@@ -123,12 +199,18 @@ async fn main() -> Result<(), Error> {
                 match node_ready_receiver.recv_timeout(Duration::from_secs(30)) {
                     Ok(()) => {}
                     Err(mpsc::RecvTimeoutError::Timeout) => {
+                        log_node_server_warning_banner(
+                            "The Rust server could not load the Node server under 'node_build'. Timed out waiting for Node server readiness.",
+                        );
                         return Err(Error::new(
                             ErrorKind::TimedOut,
                             "Timed out waiting for Node server readiness.",
                         ));
                     }
                     Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        log_node_server_warning_banner(
+                            "The Rust server could not load the Node server under 'node_build'. Node server exited before signaling readiness.",
+                        );
                         return Err(Error::new(
                             ErrorKind::BrokenPipe,
                             "Node server exited before signaling readiness.",
