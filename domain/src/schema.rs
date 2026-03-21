@@ -15,6 +15,7 @@ diesel::table! {
         description -> Nullable<Text>,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        active -> Bool,
     }
 }
 
@@ -25,6 +26,7 @@ diesel::table! {
         key_point -> Text,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        active -> Bool,
     }
 }
 
@@ -57,6 +59,7 @@ diesel::table! {
         key_point -> Text,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        active -> Bool,
     }
 }
 
@@ -75,6 +78,7 @@ diesel::table! {
         description -> Nullable<Text>,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        active -> Bool,
     }
 }
 
@@ -86,6 +90,7 @@ diesel::table! {
         technology_name -> Varchar,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        active -> Bool,
     }
 }
 
@@ -152,6 +157,7 @@ diesel::table! {
         key_point -> Text,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        active -> Bool,
     }
 }
 
@@ -168,6 +174,7 @@ diesel::table! {
         description -> Nullable<Text>,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        active -> Bool,
     }
 }
 

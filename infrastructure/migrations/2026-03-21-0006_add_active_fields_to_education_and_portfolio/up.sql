@@ -1,0 +1,14 @@
+ALTER TABLE education
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE education_key_points
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE portfolio_projects
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE portfolio_key_points
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE portfolio_technologies
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;

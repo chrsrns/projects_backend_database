@@ -1,4 +1,4 @@
-use crate::schema::{work_experiences, work_experience_key_points};
+use crate::schema::{work_experience_key_points, work_experiences};
 use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use rocket::serde::de::{Deserializer, Error as DeError};
@@ -54,6 +54,7 @@ pub struct WorkExperience {
     pub description: Option<String>,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
@@ -93,6 +94,7 @@ pub struct UpdateWorkExperience {
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,
+    pub active: Option<bool>,
 }
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
@@ -102,6 +104,7 @@ pub struct WorkExperienceKeyPoint {
     pub key_point: String,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
@@ -126,4 +129,5 @@ pub struct NewWorkExperienceKeyPointRequest {
 pub struct UpdateWorkExperienceKeyPoint {
     pub key_point: Option<String>,
     pub display_order: Option<i32>,
+    pub active: Option<bool>,
 }

@@ -1,0 +1,5 @@
+ALTER TABLE work_experiences
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE work_experience_key_points
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;

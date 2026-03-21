@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_accessible_resume},
+    resume::common::{app_err_from_diesel_err, find_accessible_resume, find_resume},
 };
 
 pub fn list_educations(
@@ -17,10 +17,21 @@ pub fn list_educations(
         return Err(err);
     }
 
-    let mut items: Vec<Education> = match education_dsl::education
-        .filter(education_dsl::resume_id.eq(resume_id_value))
-        .load::<Education>(&mut establish_connection())
-    {
+    let is_owner = match user_id_value {
+        Some(uid) => match find_resume(resume_id_value) {
+            Ok(resume) => resume.created_by == Some(uid),
+            Err(_) => false,
+        },
+        None => false,
+    };
+
+    let mut query = education_dsl::education.into_boxed();
+    query = query.filter(education_dsl::resume_id.eq(resume_id_value));
+    if !is_owner {
+        query = query.filter(education_dsl::active.eq(true));
+    }
+
+    let mut items: Vec<Education> = match query.load::<Education>(&mut establish_connection()) {
         Ok(v) => v,
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };
@@ -42,11 +53,23 @@ pub fn list_education_key_points(
         return Err(err);
     }
 
-    let _education: Education = match education_dsl::education
+    let is_owner = match user_id_value {
+        Some(uid) => match find_resume(resume_id_value) {
+            Ok(resume) => resume.created_by == Some(uid),
+            Err(_) => false,
+        },
+        None => false,
+    };
+
+    let mut education_query = education_dsl::education.into_boxed();
+    education_query = education_query
         .filter(education_dsl::id.eq(education_id_value))
-        .filter(education_dsl::resume_id.eq(resume_id_value))
-        .first(&mut establish_connection())
-    {
+        .filter(education_dsl::resume_id.eq(resume_id_value));
+    if !is_owner {
+        education_query = education_query.filter(education_dsl::active.eq(true));
+    }
+
+    let _education: Education = match education_query.first(&mut establish_connection()) {
         Ok(e) => e,
         Err(err) => {
             return Err(app_err_from_diesel_err(err));

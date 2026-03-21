@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_accessible_resume},
+    resume::common::{app_err_from_diesel_err, find_accessible_resume, find_resume},
 };
 
 pub fn list_portfolio_projects(
@@ -17,13 +17,25 @@ pub fn list_portfolio_projects(
         return Err(err);
     }
 
-    let mut items: Vec<PortfolioProject> = match projects_dsl::portfolio_projects
-        .filter(projects_dsl::resume_id.eq(resume_id_value))
-        .load::<PortfolioProject>(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
+    let is_owner = match user_id_value {
+        Some(uid) => match find_resume(resume_id_value) {
+            Ok(resume) => resume.created_by == Some(uid),
+            Err(_) => false,
+        },
+        None => false,
     };
+
+    let mut query = projects_dsl::portfolio_projects.into_boxed();
+    query = query.filter(projects_dsl::resume_id.eq(resume_id_value));
+    if !is_owner {
+        query = query.filter(projects_dsl::active.eq(true));
+    }
+
+    let mut items: Vec<PortfolioProject> =
+        match query.load::<PortfolioProject>(&mut establish_connection()) {
+            Ok(v) => v,
+            Err(err) => return Err(app_err_from_diesel_err(err)),
+        };
 
     items.sort_by_key(|p| (p.display_order.unwrap_or(0), p.id));
 
@@ -42,11 +54,23 @@ pub fn list_portfolio_key_points(
         return Err(err);
     }
 
-    let _project: PortfolioProject = match projects_dsl::portfolio_projects
+    let is_owner = match user_id_value {
+        Some(uid) => match find_resume(resume_id_value) {
+            Ok(resume) => resume.created_by == Some(uid),
+            Err(_) => false,
+        },
+        None => false,
+    };
+
+    let mut project_query = projects_dsl::portfolio_projects.into_boxed();
+    project_query = project_query
         .filter(projects_dsl::id.eq(project_id_value))
-        .filter(projects_dsl::resume_id.eq(resume_id_value))
-        .first(&mut establish_connection())
-    {
+        .filter(projects_dsl::resume_id.eq(resume_id_value));
+    if !is_owner {
+        project_query = project_query.filter(projects_dsl::active.eq(true));
+    }
+
+    let _project: PortfolioProject = match project_query.first(&mut establish_connection()) {
         Ok(p) => p,
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };
@@ -76,11 +100,23 @@ pub fn list_portfolio_technologies(
         return Err(err);
     }
 
-    let _project: PortfolioProject = match projects_dsl::portfolio_projects
+    let is_owner = match user_id_value {
+        Some(uid) => match find_resume(resume_id_value) {
+            Ok(resume) => resume.created_by == Some(uid),
+            Err(_) => false,
+        },
+        None => false,
+    };
+
+    let mut project_query = projects_dsl::portfolio_projects.into_boxed();
+    project_query = project_query
         .filter(projects_dsl::id.eq(project_id_value))
-        .filter(projects_dsl::resume_id.eq(resume_id_value))
-        .first(&mut establish_connection())
-    {
+        .filter(projects_dsl::resume_id.eq(resume_id_value));
+    if !is_owner {
+        project_query = project_query.filter(projects_dsl::active.eq(true));
+    }
+
+    let _project: PortfolioProject = match project_query.first(&mut establish_connection()) {
         Ok(p) => p,
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };

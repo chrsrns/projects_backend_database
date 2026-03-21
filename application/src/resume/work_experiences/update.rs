@@ -57,6 +57,7 @@ pub fn update_work_experience(
         end_date: payload.end_date,
         description: normalize_optional_string_change(payload.description),
         display_order: payload.display_order,
+        active: payload.active,
     };
     match diesel::update(work_experiences::table.find(work_id_value))
         .set(&payload)

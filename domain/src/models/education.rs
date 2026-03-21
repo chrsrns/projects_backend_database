@@ -55,6 +55,7 @@ pub struct Education {
     pub description: Option<String>,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
@@ -97,6 +98,7 @@ pub struct UpdateEducation {
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,
+    pub active: Option<bool>,
 }
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
@@ -106,6 +108,7 @@ pub struct EducationKeyPoint {
     pub key_point: String,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
@@ -130,4 +133,5 @@ pub struct NewEducationKeyPointRequest {
 pub struct UpdateEducationKeyPoint {
     pub key_point: Option<String>,
     pub display_order: Option<i32>,
+    pub active: Option<bool>,
 }

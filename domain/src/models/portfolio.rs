@@ -34,6 +34,7 @@ pub struct PortfolioProject {
     pub description: Option<String>,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
@@ -74,6 +75,7 @@ pub struct UpdatePortfolioProject {
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,
+    pub active: Option<bool>,
 }
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
@@ -83,6 +85,7 @@ pub struct PortfolioKeyPoint {
     pub key_point: String,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
@@ -107,6 +110,7 @@ pub struct NewPortfolioKeyPointRequest {
 pub struct UpdatePortfolioKeyPoint {
     pub key_point: Option<String>,
     pub display_order: Option<i32>,
+    pub active: Option<bool>,
 }
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
@@ -116,6 +120,7 @@ pub struct PortfolioTechnology {
     pub technology_name: String,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
@@ -140,4 +145,5 @@ pub struct NewPortfolioTechnologyRequest {
 pub struct UpdatePortfolioTechnology {
     pub technology_name: Option<String>,
     pub display_order: Option<i32>,
+    pub active: Option<bool>,
 }
