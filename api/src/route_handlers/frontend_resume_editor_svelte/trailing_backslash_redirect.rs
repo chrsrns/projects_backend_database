@@ -6,9 +6,24 @@ use rocket::route::{Handler, Outcome, Route};
 #[derive(Clone)]
 pub struct FrontendTrailingSlashRedirectHandler;
 
+fn is_websocket_upgrade(req: &Request<'_>) -> bool {
+    let connection_header = req
+        .headers()
+        .get_one("Connection")
+        .map(|v| v.to_lowercase());
+    let upgrade_header = req.headers().get_one("Upgrade").map(|v| v.to_lowercase());
+
+    matches!(connection_header.as_deref(), Some(h) if h.contains("upgrade"))
+        && matches!(upgrade_header.as_deref(), Some("websocket"))
+}
+
 #[rocket::async_trait]
 impl Handler for FrontendTrailingSlashRedirectHandler {
     async fn handle<'r>(&self, req: &'r Request<'_>, data: rocket::Data<'r>) -> Outcome<'r> {
+        if is_websocket_upgrade(req) {
+            return Outcome::forward(data, Status::NotFound);
+        }
+
         if should_redirect_frontend_trailing_slash(req.uri().path().as_str()) {
             return Outcome::from(req, Redirect::to(normalized_frontend_redirect_target(req)));
         }

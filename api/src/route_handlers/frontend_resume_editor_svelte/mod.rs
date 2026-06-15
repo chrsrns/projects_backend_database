@@ -16,7 +16,8 @@ pub fn mount_frontend_resume_editor_svelte(
             "/",
             routes![
                 proxy_handlers::frontend_index_proxy_handler,
-                proxy_handlers::frontend_proxy_handler
+                proxy_handlers::frontend_proxy_handler,
+                proxy_handlers::frontend_websocket_proxy_handler
             ],
         )
 }
