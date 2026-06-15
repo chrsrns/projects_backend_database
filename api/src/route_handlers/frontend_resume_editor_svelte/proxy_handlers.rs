@@ -34,6 +34,18 @@ impl<'r> rocket::request::FromRequest<'r> for Subprotocol {
     }
 }
 
+pub struct RawQuery(Option<String>);
+
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for RawQuery {
+    type Error = std::convert::Infallible;
+
+    async fn from_request(request: &'r Request<'_>) -> rocket::request::Outcome<Self, Self::Error> {
+        let query = request.uri().query().map(|q| q.as_str().to_string());
+        rocket::request::Outcome::Success(RawQuery(query))
+    }
+}
+
 pub struct FrontendProxyPath(String);
 
 impl<'r> FromSegments<'r> for FrontendProxyPath {
@@ -159,22 +171,17 @@ pub async fn frontend_index_proxy_handler(
     proxy_frontend_path("/", node_cfg.port).await
 }
 
-#[get("/resume_editor/<path..>?<query..>", rank = 101)]
+#[get("/resume_editor/<path..>", rank = 101)]
 pub async fn frontend_proxy_handler(
     path: FrontendProxyPath,
-    query: Option<std::collections::HashMap<String, String>>,
+    raw_query: RawQuery,
     node_cfg: &rocket::State<NodeConfig>,
 ) -> Result<ProxyResponse, Status> {
     let normalized_path = path.0;
 
-    let full_path = match query {
+    let full_path = match raw_query.0 {
         Some(q) if !q.is_empty() => {
-            let query_string: String = q
-                .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
-                .collect::<Vec<_>>()
-                .join("&");
-            format!("/resume_editor/{}?{}", normalized_path, query_string)
+            format!("/resume_editor/{}?{}", normalized_path, q)
         }
         _ => format!("/resume_editor/{}", normalized_path),
     };
@@ -183,10 +190,10 @@ pub async fn frontend_proxy_handler(
 }
 
 #[cfg(feature = "frontend_resume_editor_svelte")]
-#[get("/resume_editor/<path..>?<query..>", rank = 100)]
+#[get("/resume_editor/<path..>", rank = 100)]
 pub async fn frontend_websocket_proxy_handler(
     path: FrontendProxyPath,
-    query: Option<std::collections::HashMap<String, String>>,
+    raw_query: RawQuery,
     node_cfg: &rocket::State<NodeConfig>,
     subprotocol: Subprotocol,
     ws: ws::WebSocket,
@@ -196,14 +203,9 @@ pub async fn frontend_websocket_proxy_handler(
 
     let normalized_path = path.0;
 
-    let full_path = match query {
+    let full_path = match raw_query.0 {
         Some(q) if !q.is_empty() => {
-            let query_string: String = q
-                .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
-                .collect::<Vec<_>>()
-                .join("&");
-            format!("/resume_editor/{}?{}", normalized_path, query_string)
+            format!("/resume_editor/{}?{}", normalized_path, q)
         }
         _ => format!("/resume_editor/{}", normalized_path),
     };
