@@ -16,4 +16,4 @@ rocket = { version = "0.5.1" }
 log = "0.4.28"
 
 [workspace]
-members = ["api", "domain", "infrastructure", "application", "shared"]
+members = ["api", "domain", "infrastructure", "application", "shared", "api_playground"]

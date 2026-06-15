@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
+use crate::route_handlers::api_playground::mount_api_playground;
 use crate::route_handlers::frontend_resume_editor_svelte::mount_frontend_resume_editor_svelte;
 use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
@@ -199,5 +200,6 @@ pub fn build_rocket_with_hub(
                 .url("/api/openapi.json", openapi::ApiDoc::openapi()),
         );
 
+    let rocket = mount_api_playground(rocket);
     mount_frontend_resume_editor_svelte(rocket)
 }
