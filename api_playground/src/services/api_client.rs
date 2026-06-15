@@ -133,6 +133,15 @@ pub fn parse_endpoints_from_schema(schema: &serde_json::Value) -> Vec<EndpointIn
         .cloned()
         .unwrap_or_default();
 
+    let server_prefix = schema
+        .get("servers")
+        .and_then(|s| s.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|srv| srv.get("url"))
+        .and_then(|u| u.as_str())
+        .unwrap_or("")
+        .to_string();
+
     if let Some(paths) = schema.get("paths").and_then(|p| p.as_object()) {
         for (path, path_item) in paths {
             for method in ["get", "post", "put", "delete", "patch"] {
@@ -151,8 +160,15 @@ pub fn parse_endpoints_from_schema(schema: &serde_json::Value) -> Vec<EndpointIn
                         })
                         .unwrap_or_default();
 
+                    let full_path = if server_prefix.is_empty() || path.starts_with(&server_prefix)
+                    {
+                        path.clone()
+                    } else {
+                        format!("{}{}", server_prefix, path)
+                    };
+
                     endpoints.push(EndpointInfo {
-                        path: path.clone(),
+                        path: full_path,
                         method: method.to_uppercase(),
                         summary: operation
                             .get("summary")
