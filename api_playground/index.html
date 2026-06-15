@@ -114,10 +114,17 @@
         }
 
         /* Layout */
+        .playground-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
         .playground-layout {
             display: grid;
             grid-template-columns: 380px 1fr;
-            height: calc(100vh - 180px);
+            flex: 1;
             overflow: hidden;
         }
 
@@ -130,6 +137,21 @@
             display: grid;
             grid-template-rows: 1fr 1fr;
             overflow: hidden;
+        }
+
+        .builder-panel {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-primary);
+        }
+
+        .response-panel {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-secondary);
+            border-top: 2px solid var(--accent-primary);
         }
 
         /* Endpoint Browser */
@@ -288,8 +310,10 @@
 
         /* Request Builder */
         .request-builder {
+            flex: 1;
             padding: 1.5rem;
             overflow-y: auto;
+            overflow-x: hidden;
             border-bottom: 1px solid var(--border-color);
         }
 
@@ -424,20 +448,26 @@
 
         /* Response Viewer */
         .response-viewer {
+            flex: 1;
             padding: 1.5rem;
             overflow-y: auto;
-            background: var(--bg-secondary);
         }
 
         .response-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
+            margin: -1.5rem -1.5rem 1rem -1.5rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .response-header h3 {
-            font-size: 1.1rem;
+            font-size: 1rem;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .status-line {
@@ -558,6 +588,236 @@
             color: var(--text-muted);
             text-align: center;
             padding: 2rem;
+        }
+
+        /* Schema Form Styles */
+        .schema-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .schema-form-empty {
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 0.5rem 0;
+        }
+
+        .schema-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .schema-field-label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .schema-field-label .field-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .required-indicator {
+            color: var(--error);
+            font-weight: 700;
+        }
+
+        .optional-indicator {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .field-description {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: normal;
+            width: 100%;
+        }
+
+        .schema-input {
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .schema-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .schema-number {
+            font-family: 'Fira Code', 'Monaco', monospace;
+        }
+
+        .schema-textarea {
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+            width: 100%;
+        }
+
+        .schema-field-checkbox {
+            flex-direction: row;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .schema-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+        }
+
+        .schema-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-primary);
+        }
+
+        /* Object nesting */
+        .schema-field-object {
+            border-left: 2px solid var(--border-color);
+            padding-left: 1rem;
+            margin-left: 0.25rem;
+        }
+
+        .schema-object-container {
+            padding: 0.5rem 0;
+        }
+
+        .schema-field-depth-1 {
+            border-color: var(--accent-primary);
+        }
+
+        .schema-field-depth-2 {
+            border-color: var(--accent-secondary);
+        }
+
+        .schema-field-depth-3 {
+            border-color: var(--success);
+        }
+
+        /* Array fields */
+        .schema-array {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .array-add-btn {
+            align-self: flex-start;
+            padding: 0.4rem 1rem;
+            background: var(--bg-hover);
+            border: 1px dashed var(--accent-primary);
+            border-radius: var(--radius-sm);
+            color: var(--accent-primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .array-add-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .array-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .array-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.75rem;
+        }
+
+        .array-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .array-item-index {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .array-remove-btn {
+            padding: 0.2rem 0.6rem;
+            background: transparent;
+            border: 1px solid var(--error);
+            border-radius: var(--radius-sm);
+            color: var(--error);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .array-remove-btn:hover {
+            background: var(--error);
+            color: white;
+        }
+
+        .array-item-content {
+            padding-left: 0.5rem;
+        }
+
+        /* Schema debug fallback */
+        .schema-form-empty {
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 0.5rem 0;
+        }
+
+        .schema-form-empty p {
+            margin-bottom: 0.5rem;
+        }
+
+        .schema-debug {
+            margin-top: 0.5rem;
+        }
+
+        .schema-debug summary {
+            color: var(--accent-primary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .schema-debug pre {
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+        }
+
+        .schema-debug code {
+            font-family: 'Fira Code', 'Monaco', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
         }
 
         /* Scrollbar */
