@@ -9,6 +9,7 @@ pub fn ResponseViewer(
 ) -> impl IntoView {
     let (show_token_banner, set_show_token_banner) = signal(false);
     let (detected_token, set_detected_token) = signal(String::new());
+    let (active_tab, set_active_tab) = signal(0usize);
 
     // Watch for new responses and detect tokens
     Effect::new(move |_| {
@@ -23,6 +24,12 @@ pub fn ResponseViewer(
                 }
             }
         }
+    });
+
+    // Reset to Body tab on new response
+    Effect::new(move |_| {
+        let _ = response.get();
+        set_active_tab.set(0);
     });
 
     let use_token = move |_| {
@@ -97,18 +104,28 @@ pub fn ResponseViewer(
                 }}
 
                 <div class="response-tabs">
-                    <button class="tab-btn active">"Body"</button>
-                    <button class="tab-btn">"Headers"</button>
+                    <button
+                        class=move || format!("tab-btn {}", if active_tab.get() == 0 { "active" } else { "" })
+                        on:click=move |_| set_active_tab.set(0)
+                    >
+                        "Body"
+                    </button>
+                    <button
+                        class=move || format!("tab-btn {}", if active_tab.get() == 1 { "active" } else { "" })
+                        on:click=move |_| set_active_tab.set(1)
+                    >
+                        "Headers"
+                    </button>
                 </div>
 
                 <div class="response-content">
-                    <div class="tab-panel active">
+                    <div class=move || format!("tab-panel {}", if active_tab.get() == 0 { "active" } else { "" })>
                         <pre class="response-body">
                             <code>{format_json(&body_str)}</code>
                         </pre>
                     </div>
 
-                    <div class="tab-panel">
+                    <div class=move || format!("tab-panel {}", if active_tab.get() == 1 { "active" } else { "" })>
                         <div class="headers-list">
                             {headers
                                 .into_iter()
