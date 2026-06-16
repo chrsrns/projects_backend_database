@@ -108,7 +108,7 @@ pub fn ResponseViewer(
                         class=move || format!("tab-btn {}", if active_tab.get() == 0 { "active" } else { "" })
                         on:click=move |_| set_active_tab.set(0)
                     >
-                        "Body"
+                        "JSON Body"
                     </button>
                     <button
                         class=move || format!("tab-btn {}", if active_tab.get() == 1 { "active" } else { "" })
@@ -145,8 +145,8 @@ pub fn ResponseViewer(
             .into_any()
         } else {
             view! {
-                <div class="no-response">
-                    <p>"Send a request to see the response here"</p>
+                <div class="response-empty-state">
+                    <p>"Send a request to see the response data."</p>
                 </div>
             }
             .into_any()

@@ -149,8 +149,8 @@ pub fn App() -> impl IntoView {
                 <aside class="sidebar">
                     <EndpointBrowser
                         endpoints=endpoints
+                        selected_endpoint_read=selected_endpoint
                         selected_endpoint=set_selected_endpoint
-                        base_url=base_url
                     />
                 </aside>
 

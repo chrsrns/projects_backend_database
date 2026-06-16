@@ -6,8 +6,8 @@ use wasm_bindgen::JsCast;
 #[component]
 pub fn EndpointBrowser(
     #[prop(into)] endpoints: Signal<Vec<EndpointInfo>>,
+    #[prop(into)] selected_endpoint_read: Signal<Option<EndpointInfo>>,
     #[prop(into)] selected_endpoint: WriteSignal<Option<EndpointInfo>>,
-    #[prop(into)] base_url: Signal<String>,
 ) -> impl IntoView {
     let (search_term, set_search_term) = signal(String::new());
     let (expanded_tags, set_expanded_tags) = signal::<Vec<String>>(Vec::new());
@@ -52,17 +52,6 @@ pub fn EndpointBrowser(
         <div class="endpoint-browser">
             <div class="browser-header">
                 <h2>"API Endpoints"</h2>
-                <div class="base-url-input">
-                    <label>"Base URL:"</label>
-                    <input
-                        type="text"
-                        prop:value=base_url
-                        on:input=move |ev| {
-                            let value = event_target_value(&ev);
-                            let _ = value;
-                        }
-                    />
-                </div>
                 <input
                     type="text"
                     placeholder="Search endpoints..."
@@ -108,9 +97,18 @@ pub fn EndpointBrowser(
 
                                                             let method_badge_class = format!("method-badge method-{}", method.to_lowercase());
 
+                                                            let is_selected = selected_endpoint_read.get().as_ref()
+                                                                .map(|s| s.path == endpoint.path && s.method == endpoint.method)
+                                                                .unwrap_or(false);
+                                                            let item_class = if is_selected {
+                                                                "endpoint-item selected".to_string()
+                                                            } else {
+                                                                "endpoint-item".to_string()
+                                                            };
+
                                                             view! {
                                                                 <button
-                                                                    class="endpoint-item"
+                                                                    class=item_class
                                                                     on:click=move |_| {
                                                                         selected_endpoint.set(Some(endpoint_clone.clone()));
                                                                     }

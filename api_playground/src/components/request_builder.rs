@@ -17,6 +17,7 @@ pub fn RequestBuilder(
     let request_body: RwSignal<Value> = RwSignal::new(Value::Null);
     let (loading, set_loading) = signal(false);
     let (error, set_error) = signal::<Option<String>>(None);
+    let (local_token, set_local_token) = signal(String::new());
 
     // Reset body signal when endpoint changes and pre-populate defaults
     Effect::new(move |_| {
@@ -27,9 +28,17 @@ pub fn RequestBuilder(
             } else {
                 request_body.set(Value::Null);
             }
+            // Initialize local token from global when endpoint changes
+            set_local_token.set(token.get());
         } else {
             request_body.set(Value::Null);
         }
+    });
+
+    // Sync global token changes back into the local input
+    Effect::new(move |_| {
+        let _ = endpoint.get(); // re-run on endpoint change too
+        set_local_token.set(token.get());
     });
 
     let path_params_view = move || {
@@ -126,14 +135,32 @@ pub fn RequestBuilder(
         let body_desc = body_info.description.clone();
         let schema = body_info.schema.clone();
 
+        let json_preview = move || {
+            let body = request_body.get();
+            let json_str =
+                serde_json::to_string_pretty(&body).unwrap_or_else(|_| "null".to_string());
+            view! {
+                <div class="json-preview-panel">
+                    <label>"Payload Preview"</label>
+                    <pre><code>{json_str}</code></pre>
+                </div>
+            }
+        };
+
         Some(view! {
             <div class="params-section">
                 <h4>"Request Body"</h4>
                 <p class="body-description">{body_desc}</p>
-                <SchemaForm
-                    schema=schema
-                    value=request_body
-                />
+                <div class="request-body-grid">
+                    {json_preview}
+                    <div>
+                        <p class="payload-hint">"Edit payload values here"</p>
+                        <SchemaForm
+                            schema=schema
+                            value=request_body
+                        />
+                    </div>
+                </div>
             </div>
         })
     };
@@ -220,22 +247,30 @@ pub fn RequestBuilder(
 
                     <div class="params-section">
                         <h4>"Authorization"</h4>
-                        <div class="param-field">
-                            <label>"Bearer Token"</label>
+                        <div class="param-field" style="display: flex; gap: 0.5rem; align-items: center;">
                             <input
                                 type="text"
                                 placeholder="Enter your JWT token..."
-                                prop:value=token
+                                prop:value=local_token
                                 on:input=move |ev| {
-                                    token.set(event_target_value(&ev));
+                                    set_local_token.set(event_target_value(&ev));
                                 }
+                                style="flex: 1;"
                             />
+                            <button
+                                class="auth-global-btn"
+                                on:click=move |_| {
+                                    token.set(local_token.get());
+                                }
+                            >
+                                "Set as token globally"
+                            </button>
                         </div>
                     </div>
 
-                    <div class="builder-actions">
+                    <div class="builder-actions" style="text-align: center; margin-top: 1.5rem;">
                         <button
-                            class="send-btn"
+                            class="send-request-btn"
                             on:click=send_request
                             disabled=loading
                         >
