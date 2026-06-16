@@ -10,7 +10,7 @@ use wasm_bindgen::JsCast;
 #[component]
 pub fn App() -> impl IntoView {
     let (base_url, set_base_url) = signal("http://localhost:8000".to_string());
-    let (token, _set_token) = signal(String::new());
+    let token: RwSignal<String> = RwSignal::new(String::new());
     let (endpoints, set_endpoints) = signal(Vec::<EndpointInfo>::new());
     let (selected_endpoint, set_selected_endpoint) = signal::<Option<EndpointInfo>>(None);
     let (response, set_response) = signal::<Option<ApiResponse>>(None);
@@ -65,8 +65,46 @@ pub fn App() -> impl IntoView {
     view! {
         <div class="playground-container">
             <header class="playground-header">
-                <h1>"API Playground"</h1>
-                <p class="subtitle">"Interactive API Explorer for Resume Profile Manager"</p>
+                <div class="header-top">
+                    <div class="header-title">
+                        <h1>"API Playground"</h1>
+                        <p class="subtitle">"Interactive API Explorer for Resume Profile Manager"</p>
+                    </div>
+                    <div class="token-status">
+                        {move || {
+                            let t = token.get();
+                            if t.is_empty() {
+                                view! {
+                                    <div class="token-status-inner">
+                                        <span class="token-badge token-none">"No Token"</span>
+                                    </div>
+                                }
+                                .into_any()
+                            } else {
+                                let preview = if t.len() > 16 {
+                                    format!("{}...", &t[..16])
+                                } else {
+                                    t.clone()
+                                };
+                                view! {
+                                    <div class="token-status-inner">
+                                        <span class="token-badge token-active">
+                                            {"Token: "}
+                                            {preview}
+                                        </span>
+                                        <button
+                                            class="token-clear-btn"
+                                            on:click=move |_| token.set(String::new())
+                                        >
+                                            "Clear"
+                                        </button>
+                                    </div>
+                                }
+                                .into_any()
+                            }
+                        }}
+                    </div>
+                </div>
                 <div class="connection-config">
                     <label>"Base URL:"</label>
                     <input
@@ -127,7 +165,7 @@ pub fn App() -> impl IntoView {
                     </div>
 
                     <div class="response-panel">
-                        <ResponseViewer response=response />
+                        <ResponseViewer response=response token=token />
                     </div>
                 </main>
             </div>

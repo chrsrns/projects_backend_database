@@ -9,7 +9,7 @@ use wasm_bindgen::JsCast;
 pub fn RequestBuilder(
     #[prop(into)] endpoint: Signal<Option<EndpointInfo>>,
     #[prop(into)] base_url: Signal<String>,
-    #[prop(into)] token: Signal<String>,
+    #[prop(into)] token: RwSignal<String>,
     #[prop(into)] on_response: WriteSignal<Option<crate::services::api_client::ApiResponse>>,
 ) -> impl IntoView {
     let (path_params, set_path_params) = signal::<HashMap<String, String>>(HashMap::new());
@@ -227,7 +227,7 @@ pub fn RequestBuilder(
                                 placeholder="Enter your JWT token..."
                                 prop:value=token
                                 on:input=move |ev| {
-                                    let _ = event_target_value(&ev);
+                                    token.set(event_target_value(&ev));
                                 }
                             />
                         </div>
