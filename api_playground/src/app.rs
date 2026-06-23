@@ -1,4 +1,5 @@
 use crate::components::endpoint_browser::EndpointBrowser;
+use crate::components::heads_up_dialog::HeadsUpDialog;
 use crate::components::request_builder::RequestBuilder;
 use crate::components::response_viewer::ResponseViewer;
 use crate::services::api_client::{
@@ -63,6 +64,7 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
+        <HeadsUpDialog />
         <div class="playground-container">
             <header class="playground-header">
                 <div class="header-top">

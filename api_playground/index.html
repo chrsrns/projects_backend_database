@@ -1055,6 +1055,155 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--bg-hover);
         }
+
+        /* Heads Up Dialog */
+        .heads-up-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .heads-up-dialog {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            max-width: 560px;
+            width: 100%;
+            padding: 2rem;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+            animation: headsUpIn 0.3s ease-out;
+        }
+
+        @keyframes headsUpIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .heads-up-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            margin-bottom: 1.25rem;
+            text-align: center;
+        }
+
+        .heads-up-illustration {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .heads-up-illustration svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .heads-up-body {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.7;
+            margin-bottom: 1rem;
+        }
+
+        .heads-up-projects {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1.25rem 0;
+        }
+
+        .project-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+        }
+
+        .project-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .project-card:active {
+            transform: translateY(0);
+        }
+
+        .project-card-accent {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+        }
+
+        .project-card-accent.accent-2 {
+            background: linear-gradient(90deg, var(--success), var(--warning));
+        }
+
+        .project-card h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .project-card p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .heads-up-ok-btn {
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--bg-primary);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.15s;
+            margin-top: 0.5rem;
+        }
+
+        .heads-up-ok-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .heads-up-ok-btn:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 1024px) {
+            .heads-up-projects {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
