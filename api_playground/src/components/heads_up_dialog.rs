@@ -57,16 +57,6 @@ pub fn HeadsUpDialog() -> impl IntoView {
 
                             <div class="heads-up-illustration">
                                 <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
-                                    /* Central backend server */
-                                    <rect x="150" y="70" width="100" height="60" rx="8"
-                                        fill="none" stroke="#38bdf8" stroke-width="2.5" />
-                                    <rect x="160" y="82" width="80" height="6" rx="3"
-                                        fill="#38bdf8" opacity="0.6" />
-                                    <rect x="160" y="96" width="60" height="6" rx="3"
-                                        fill="#38bdf8" opacity="0.4" />
-                                    <rect x="160" y="110" width="70" height="6" rx="3"
-                                        fill="#38bdf8" opacity="0.3" />
-
                                     /* Server label */
                                     <text x="200" y="155" text-anchor="middle"
                                         fill="#94a3b8" font-size="11" font-family="sans-serif">
@@ -79,7 +69,7 @@ pub fn HeadsUpDialog() -> impl IntoView {
                                     <circle cx="60" cy="100" r="6" fill="#818cf8" />
                                     <text x="60" y="80" text-anchor="middle"
                                         fill="#94a3b8" font-size="10" font-family="sans-serif">
-                                        "Project A"
+                                        "Resume Editor Project"
                                     </text>
 
                                     /* Right top connection */
@@ -88,7 +78,7 @@ pub fn HeadsUpDialog() -> impl IntoView {
                                     <circle cx="330" cy="55" r="6" fill="#22c55e" />
                                     <text x="330" y="40" text-anchor="middle"
                                         fill="#94a3b8" font-size="10" font-family="sans-serif">
-                                        "Project B"
+                                        "Static Resume Page"
                                     </text>
 
                                     /* Right bottom connection */
@@ -97,8 +87,18 @@ pub fn HeadsUpDialog() -> impl IntoView {
                                     <circle cx="330" cy="145" r="6" fill="#eab308" />
                                     <text x="330" y="170" text-anchor="middle"
                                         fill="#94a3b8" font-size="10" font-family="sans-serif">
-                                        "Project C"
+                                        "Portfolio"
                                     </text>
+
+                                    /* Central backend server */
+                                    <rect x="150" y="70" width="100" height="60" rx="8"
+                                        fill="none" stroke="#38bdf8" stroke-width="2.5" />
+                                    <rect x="160" y="82" width="80" height="6" rx="3"
+                                        fill="#38bdf8" opacity="0.6" />
+                                    <rect x="160" y="96" width="60" height="6" rx="3"
+                                        fill="#38bdf8" opacity="0.4" />
+                                    <rect x="160" y="110" width="70" height="6" rx="3"
+                                        fill="#38bdf8" opacity="0.3" />
                                 </svg>
                             </div>
 
@@ -113,12 +113,12 @@ pub fn HeadsUpDialog() -> impl IntoView {
                             </p>
 
                             <div class="heads-up-projects">
-                                <a href="/resume_editor/resumes?source=backend" class="project-card">
+                                <a href="/resume_editor/resumes?source=backend" target="_blank" rel="noopener noreferrer" class="project-card">
                                     <div class="project-card-accent" />
                                     <h3>"Resume Editor"</h3>
                                     <p>"Create and edit resume data with full CRUD capabilities."</p>
                                 </a>
-                                <a href="https://chrsrns.github.io/css-resume/" target="_blank" rel="noopener noreferrer" class="project-card">
+                                <a href="https://chrsrns.github.io/css-resume?source=backend" target="_blank" rel="noopener noreferrer" class="project-card">
                                     <div class="project-card-accent accent-2" />
                                     <h3>"Resume Page"</h3>
                                     <p>"View my resume — a clean, readable presentation of my data."</p>
