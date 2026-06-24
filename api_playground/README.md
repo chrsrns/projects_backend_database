@@ -5,8 +5,8 @@ An interactive API explorer built with **Leptos** (Rust WebAssembly) for the Res
 ## Features
 
 - **Auto-discovery**: Automatically fetches and parses your OpenAPI schema
-- **Endpoint Browser**: Search and browse all API endpoints grouped by tags
-- **Interactive Request Builder**: Dynamic forms for path params, query params, and request bodies
+- **Endpoint Browser**: Search and browse all API endpoints grouped by tags, with selected endpoint highlighting
+- **Interactive Request Builder**: Dynamic forms for path params, query params, and request bodies, with a live JSON payload preview
 - **Live Response Viewer**: See formatted JSON responses with syntax highlighting
 - **Dark Mode UI**: Modern, developer-friendly dark theme
 
@@ -23,7 +23,9 @@ api_playground/
 │   ├── components/
 │   │   ├── endpoint_browser.rs    # Sidebar endpoint list
 │   │   ├── request_builder.rs     # Request form
-│   │   └── response_viewer.rs     # Response display
+│   │   ├── response_viewer.rs     # Response display
+│   │   ├── schema_form.rs         # Dynamic form generator from JSON Schema
+│   │   └── mod.rs                 # Component module exports
 │   └── services/
 │       └── api_client.rs          # HTTP client + OpenAPI parser
 └── dist/               # Build output (generated)
@@ -70,17 +72,17 @@ Then open `http://localhost:9000` in your browser.
 
 The playground expects your Rocket backend to be running (default: `http://localhost:8000`) and serving the OpenAPI schema at `/api/openapi.json`.
 
-To serve this from your Rocket backend, copy the `dist/` contents to your static file serving directory, or use Rocket's `FileServer` to serve the files.
+The Rocket backend automatically mounts a `FileServer` at `/api_playground` that serves files directly from `api_playground/dist/`. Just run `./build.sh` and start the backend — no manual copying or extra configuration is needed.
 
 ## Usage
 
-1. Enter your backend base URL (default: `http://localhost:8000`)
-2. Click "Refresh Endpoints" to load the API schema
-3. Browse endpoints by tag in the sidebar
-4. Click an endpoint to see its details
-5. Fill in parameters and request body
-6. Click "Send Request" to execute
-7. View the formatted response
+*The playground loads the API schema automatically on startup, but if it fails to load, you can manually specify the backend URL.*
+
+1. Browse endpoints by tag in the sidebar
+2. Click an endpoint to see its details
+3. Fill in parameters and request body
+4. Click "Send Request" to execute
+5. View the formatted response
 
 ## Technology Stack
 

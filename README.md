@@ -11,6 +11,7 @@ This repository is a Rust Cargo workspace with the following crates:
 - **domain**: Core models + Diesel schema mapping
 - **infrastructure**: Database connection + migrations
 - **shared**: Shared response models and cross-cutting utilities
+- **api_playground**: Leptos WASM interactive API explorer
 
 ## API server
 
@@ -26,6 +27,7 @@ The API is documented using OpenAPI 3.0 and served via Swagger UI.
 
 - Swagger UI: **GET** `/api/docs/`
 - OpenAPI JSON: **GET** `/api/openapi.json`
+- API Playground (interactive explorer): **GET** `/api_playground/`
 
 ### WebSocket (realtime resume change notifications)
 
