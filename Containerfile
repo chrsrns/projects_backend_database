@@ -32,6 +32,7 @@ WORKDIR /app
 COPY . .
 
 RUN cargo build --release --bin projects_backend_database \
+    --features frontend_resume_editor_svelte \
     --config target.aarch64-unknown-linux-gnu.linker='"gcc"' \
     --config target.aarch64-unknown-linux-gnu.rustflags=[]
 
