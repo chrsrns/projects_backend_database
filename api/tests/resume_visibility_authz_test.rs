@@ -36,7 +36,9 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
 
     assert_eq!(public_create_response.status(), Status::Created);
 
-    let public_create_body = public_create_response.into_string().expect("public create body");
+    let public_create_body = public_create_response
+        .into_string()
+        .expect("public create body");
     let public_create_json: Value = serde_json::from_str(&public_create_body).expect("valid json");
     let public_resume_id = public_create_json["body"]["id"].as_i64().expect("id") as i32;
     fixture.track_resume_id(public_resume_id);
@@ -62,7 +64,9 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
 
     assert_eq!(private_create_response.status(), Status::Created);
 
-    let private_create_body = private_create_response.into_string().expect("private create body");
+    let private_create_body = private_create_response
+        .into_string()
+        .expect("private create body");
     let private_create_json: Value =
         serde_json::from_str(&private_create_body).expect("valid json");
     let private_resume_id = private_create_json["body"]["id"].as_i64().expect("id") as i32;
@@ -74,12 +78,16 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     let anon_list_json: Value = serde_json::from_str(&anon_list_body).expect("valid json");
     let anon_items = anon_list_json["body"].as_array().expect("array");
 
-    assert!(anon_items
-        .iter()
-        .any(|r| r["id"].as_i64() == Some(public_resume_id as i64)));
-    assert!(!anon_items
-        .iter()
-        .any(|r| r["id"].as_i64() == Some(private_resume_id as i64)));
+    assert!(
+        anon_items
+            .iter()
+            .any(|r| r["id"].as_i64() == Some(public_resume_id as i64))
+    );
+    assert!(
+        !anon_items
+            .iter()
+            .any(|r| r["id"].as_i64() == Some(private_resume_id as i64))
+    );
 
     let owner_list_response = fixture
         .client()
@@ -91,12 +99,16 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     let owner_list_json: Value = serde_json::from_str(&owner_list_body).expect("valid json");
     let owner_items = owner_list_json["body"].as_array().expect("array");
 
-    assert!(owner_items
-        .iter()
-        .any(|r| r["id"].as_i64() == Some(public_resume_id as i64)));
-    assert!(owner_items
-        .iter()
-        .any(|r| r["id"].as_i64() == Some(private_resume_id as i64)));
+    assert!(
+        owner_items
+            .iter()
+            .any(|r| r["id"].as_i64() == Some(public_resume_id as i64))
+    );
+    assert!(
+        owner_items
+            .iter()
+            .any(|r| r["id"].as_i64() == Some(private_resume_id as i64))
+    );
 
     let anon_get_private = fixture
         .client()
