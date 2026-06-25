@@ -8,9 +8,17 @@ use crate::services::api_client::{
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 
+fn get_current_origin() -> String {
+    let window = web_sys::window().expect("no global `window` exists");
+    let location = window.location();
+    location
+        .origin()
+        .unwrap_or_else(|_| "http://localhost:8000".to_string())
+}
+
 #[component]
 pub fn App() -> impl IntoView {
-    let (base_url, set_base_url) = signal("http://localhost:8000".to_string());
+    let (base_url, set_base_url) = signal(get_current_origin());
     let token: RwSignal<String> = RwSignal::new(String::new());
     let (endpoints, set_endpoints) = signal(Vec::<EndpointInfo>::new());
     let (selected_endpoint, set_selected_endpoint) = signal::<Option<EndpointInfo>>(None);
