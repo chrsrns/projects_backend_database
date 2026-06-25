@@ -19,6 +19,27 @@ pub struct ProxyResponse {
     body: Vec<u8>,
 }
 
+#[cfg(feature = "frontend_resume_editor_svelte")]
+fn rewrite_upstream_location(upstream_url: &str, location: &str) -> Option<String> {
+    let base = reqwest::Url::parse(upstream_url).ok()?;
+    let resolved = base.join(location).ok()?;
+
+    if resolved.origin() == base.origin() {
+        let mut result = resolved.path().to_string();
+        if let Some(query) = resolved.query() {
+            result.push('?');
+            result.push_str(query);
+        }
+        if let Some(fragment) = resolved.fragment() {
+            result.push('#');
+            result.push_str(fragment);
+        }
+        Some(result)
+    } else {
+        Some(location.to_string())
+    }
+}
+
 pub struct Subprotocol(Option<String>);
 
 #[rocket::async_trait]
@@ -131,7 +152,10 @@ async fn proxy_frontend_path(path: &str, node_port: u16) -> Result<ProxyResponse
         .headers()
         .get(reqwest::header::LOCATION)
         .and_then(|value| value.to_str().ok())
-        .map(str::to_owned);
+        .map(|location| {
+            rewrite_upstream_location(&upstream_url, location)
+                .unwrap_or_else(|| location.to_string())
+        });
     log::info!(
         "frontend proxy step=read_headers path={} content_type={} location={}",
         path,
@@ -339,5 +363,47 @@ fn convert_tungstenite_to_rocket(msg: tokio_tungstenite::tungstenite::Message) -
         tokio_tungstenite::tungstenite::Message::Ping(data) => ws::Message::Ping(data.to_vec()),
         tokio_tungstenite::tungstenite::Message::Pong(data) => ws::Message::Pong(data.to_vec()),
         _ => ws::Message::Close(None),
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "frontend_resume_editor_svelte")]
+mod tests {
+    use super::rewrite_upstream_location;
+
+    #[test]
+    fn rewrites_relative_location_to_proxy_path() {
+        let upstream = "http://localhost:5173/resume_editor/";
+        assert_eq!(
+            rewrite_upstream_location(upstream, "./resumes"),
+            Some("/resume_editor/resumes".to_string())
+        );
+    }
+
+    #[test]
+    fn preserves_absolute_location_to_same_origin() {
+        let upstream = "http://localhost:5173/resume_editor/";
+        assert_eq!(
+            rewrite_upstream_location(upstream, "/resume_editor/resumes"),
+            Some("/resume_editor/resumes".to_string())
+        );
+    }
+
+    #[test]
+    fn preserves_cross_origin_location() {
+        let upstream = "http://localhost:5173/resume_editor/";
+        assert_eq!(
+            rewrite_upstream_location(upstream, "http://example.com/foo"),
+            Some("http://example.com/foo".to_string())
+        );
+    }
+
+    #[test]
+    fn rewrites_absolute_upstream_url_to_path() {
+        let upstream = "http://localhost:5173/resume_editor/";
+        assert_eq!(
+            rewrite_upstream_location(upstream, "http://localhost:5173/resume_editor/auth/login"),
+            Some("/resume_editor/auth/login".to_string())
+        );
     }
 }
