@@ -16,10 +16,7 @@ pub fn create_framework(
     use domain::schema::frameworks;
     use domain::schema::languages::dsl as languages_dsl;
 
-    let existing_resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let existing_resume: Resume = find_resume(resume_id_value)?;
 
     match existing_resume.created_by {
         Some(owner) if owner == user_id_value => {}

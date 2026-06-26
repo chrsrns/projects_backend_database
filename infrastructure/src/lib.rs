@@ -11,3 +11,10 @@ pub fn establish_connection() -> PgConnection {
     PgConnection::establish(&database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
+
+pub fn run_in_transaction<T, F>(conn: &mut PgConnection, f: F) -> Result<T, diesel::result::Error>
+where
+    F: FnOnce(&mut PgConnection) -> Result<T, diesel::result::Error>,
+{
+    conn.transaction::<T, _, _>(|conn| f(conn))
+}

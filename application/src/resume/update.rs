@@ -11,10 +11,7 @@ pub fn update_resume(
     resume_id: i32,
     resume: UpdateResume,
 ) -> Result<Resume, ApplicationError> {
-    let existing = match find_resume(resume_id) {
-        Ok(value) => value,
-        Err(value) => return Err(value),
-    };
+    let existing = find_resume(resume_id)?;
 
     match existing.created_by {
         Some(owner) if owner == user_id_value => {}

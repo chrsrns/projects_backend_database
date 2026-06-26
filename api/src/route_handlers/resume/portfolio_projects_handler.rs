@@ -11,6 +11,7 @@ use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
+use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -32,7 +33,7 @@ use crate::realtime::{Hub, ResumeChangedAction};
 pub fn list_portfolio_projects_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<PortfolioProject>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<PortfolioProject>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match portfolio_projects::list_portfolio_projects(resume_id, user_id_value) {
@@ -94,7 +95,7 @@ pub fn create_portfolio_project_handler(
     hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewPortfolioProjectRequest>,
-) -> Result<Custom<Json<Response<PortfolioProject>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<PortfolioProject> {
     match portfolio_projects::create_portfolio_project(
         auth.user_id,
         resume_id,
@@ -167,7 +168,7 @@ pub fn update_portfolio_project_handler(
     hub: &State<Hub>,
     project_id: i32,
     payload: Json<UpdatePortfolioProject>,
-) -> Result<Json<Response<PortfolioProject>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<PortfolioProject> {
     match portfolio_projects::update_portfolio_project(
         auth.user_id,
         project_id,
@@ -231,7 +232,7 @@ pub fn delete_portfolio_project_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     project_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match portfolio_projects::delete_portfolio_project(auth.user_id, project_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(
@@ -291,7 +292,7 @@ pub fn list_portfolio_key_points_handler(
     resume_id: i32,
     project_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<PortfolioKeyPoint>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<PortfolioKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match portfolio_projects::list_portfolio_key_points(resume_id, project_id, user_id_value) {
@@ -355,7 +356,7 @@ pub fn create_portfolio_key_point_handler(
     resume_id: i32,
     project_id: i32,
     payload: Json<NewPortfolioKeyPointRequest>,
-) -> Result<Custom<Json<Response<PortfolioKeyPoint>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<PortfolioKeyPoint> {
     match portfolio_projects::create_portfolio_key_point(
         auth.user_id,
         resume_id,
@@ -429,7 +430,7 @@ pub fn update_portfolio_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
     payload: Json<UpdatePortfolioKeyPoint>,
-) -> Result<Json<Response<PortfolioKeyPoint>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<PortfolioKeyPoint> {
     match portfolio_projects::update_portfolio_key_point(
         auth.user_id,
         key_point_id,
@@ -493,7 +494,7 @@ pub fn delete_portfolio_key_point_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     key_point_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match portfolio_projects::delete_portfolio_key_point(auth.user_id, key_point_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(
@@ -553,7 +554,7 @@ pub fn list_portfolio_technologies_handler(
     resume_id: i32,
     project_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<PortfolioTechnology>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<PortfolioTechnology>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match portfolio_projects::list_portfolio_technologies(resume_id, project_id, user_id_value) {
@@ -617,7 +618,7 @@ pub fn create_portfolio_technology_handler(
     resume_id: i32,
     project_id: i32,
     payload: Json<NewPortfolioTechnologyRequest>,
-) -> Result<Custom<Json<Response<PortfolioTechnology>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<PortfolioTechnology> {
     match portfolio_projects::create_portfolio_technology(
         auth.user_id,
         resume_id,
@@ -691,7 +692,7 @@ pub fn update_portfolio_technology_handler(
     hub: &State<Hub>,
     technology_id: i32,
     payload: Json<UpdatePortfolioTechnology>,
-) -> Result<Json<Response<PortfolioTechnology>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<PortfolioTechnology> {
     match portfolio_projects::update_portfolio_technology(
         auth.user_id,
         technology_id,
@@ -755,7 +756,7 @@ pub fn delete_portfolio_technology_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     technology_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match portfolio_projects::delete_portfolio_technology(auth.user_id, technology_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(

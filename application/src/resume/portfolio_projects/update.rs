@@ -25,10 +25,7 @@ pub fn update_portfolio_project(
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match find_resume(existing.resume_id) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(existing.resume_id)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
@@ -75,10 +72,7 @@ pub fn update_portfolio_key_point(
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match find_resume(project.resume_id) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(project.resume_id)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
@@ -120,10 +114,7 @@ pub fn update_portfolio_technology(
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let resume: Resume = match find_resume(project.resume_id) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(project.resume_id)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}

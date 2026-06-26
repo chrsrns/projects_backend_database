@@ -7,6 +7,7 @@ use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
+use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -30,7 +31,7 @@ pub fn list_frameworks_handler(
     resume_id: i32,
     language_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<Framework>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<Framework>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match frameworks::list_frameworks(resume_id, language_id, user_id_value) {
@@ -94,7 +95,7 @@ pub fn create_framework_handler(
     resume_id: i32,
     language_id: i32,
     payload: Json<NewFrameworkRequest>,
-) -> Result<Custom<Json<Response<Framework>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<Framework> {
     match frameworks::create_framework(auth.user_id, resume_id, language_id, payload.into_inner()) {
         Ok(framework) => {
             hub.publish_resume_changed(
@@ -163,7 +164,7 @@ pub fn update_framework_handler(
     hub: &State<Hub>,
     framework_id: i32,
     payload: Json<UpdateFramework>,
-) -> Result<Json<Response<Framework>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Framework> {
     match frameworks::update_framework(auth.user_id, framework_id, payload.into_inner()) {
         Ok((framework, resume_id)) => {
             hub.publish_resume_changed(
@@ -223,7 +224,7 @@ pub fn delete_framework_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     framework_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match frameworks::delete_framework(auth.user_id, framework_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(

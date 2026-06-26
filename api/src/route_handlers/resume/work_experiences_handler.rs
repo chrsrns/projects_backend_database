@@ -10,6 +10,7 @@ use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
+use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -31,7 +32,7 @@ use crate::realtime::{Hub, ResumeChangedAction};
 pub fn list_work_experiences_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<WorkExperience>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<WorkExperience>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match work_experiences::list_work_experiences(resume_id, user_id_value) {
@@ -93,7 +94,7 @@ pub fn create_work_experience_handler(
     hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewWorkExperienceRequest>,
-) -> Result<Custom<Json<Response<WorkExperience>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<WorkExperience> {
     match work_experiences::create_work_experience(auth.user_id, resume_id, payload.into_inner()) {
         Ok(item) => {
             hub.publish_resume_changed(
@@ -162,7 +163,7 @@ pub fn update_work_experience_handler(
     hub: &State<Hub>,
     work_id: i32,
     payload: Json<UpdateWorkExperience>,
-) -> Result<Json<Response<WorkExperience>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<WorkExperience> {
     match work_experiences::update_work_experience(auth.user_id, work_id, payload.into_inner()) {
         Ok(item) => {
             hub.publish_resume_changed(
@@ -222,7 +223,7 @@ pub fn delete_work_experience_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     work_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match work_experiences::delete_work_experience(auth.user_id, work_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(
@@ -282,7 +283,7 @@ pub fn list_work_experience_key_points_handler(
     resume_id: i32,
     work_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<WorkExperienceKeyPoint>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<WorkExperienceKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match work_experiences::list_work_experience_key_points(resume_id, work_id, user_id_value) {
@@ -346,7 +347,7 @@ pub fn create_work_experience_key_point_handler(
     resume_id: i32,
     work_id: i32,
     payload: Json<NewWorkExperienceKeyPointRequest>,
-) -> Result<Custom<Json<Response<WorkExperienceKeyPoint>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<WorkExperienceKeyPoint> {
     match work_experiences::create_work_experience_key_point(
         auth.user_id,
         resume_id,
@@ -420,7 +421,7 @@ pub fn update_work_experience_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
     payload: Json<UpdateWorkExperienceKeyPoint>,
-) -> Result<Json<Response<WorkExperienceKeyPoint>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<WorkExperienceKeyPoint> {
     match work_experiences::update_work_experience_key_point(
         auth.user_id,
         key_point_id,
@@ -484,7 +485,7 @@ pub fn delete_work_experience_key_point_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     key_point_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match work_experiences::delete_work_experience_key_point(auth.user_id, key_point_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(

@@ -15,9 +15,7 @@ pub fn list_frameworks(
     use domain::schema::frameworks::dsl as frameworks_dsl;
     use domain::schema::languages::dsl as languages_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let language: Language = match languages_dsl::languages
         .filter(languages_dsl::id.eq(language_id_value))

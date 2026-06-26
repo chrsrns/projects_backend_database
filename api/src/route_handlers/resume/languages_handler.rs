@@ -7,6 +7,7 @@ use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
+use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -28,7 +29,7 @@ use crate::realtime::{Hub, ResumeChangedAction};
 pub fn list_languages_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<Language>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<Language>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match languages::list_languages(resume_id, user_id_value) {
@@ -90,7 +91,7 @@ pub fn create_language_handler(
     hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewLanguageRequest>,
-) -> Result<Custom<Json<Response<Language>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<Language> {
     match languages::create_language(auth.user_id, resume_id, payload.into_inner()) {
         Ok(language) => {
             hub.publish_resume_changed(
@@ -159,7 +160,7 @@ pub fn update_language_handler(
     hub: &State<Hub>,
     language_id: i32,
     payload: Json<UpdateLanguage>,
-) -> Result<Json<Response<Language>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Language> {
     match languages::update_language(auth.user_id, language_id, payload.into_inner()) {
         Ok(language) => {
             hub.publish_resume_changed(
@@ -219,7 +220,7 @@ pub fn delete_language_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     language_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match languages::delete_language(auth.user_id, language_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(

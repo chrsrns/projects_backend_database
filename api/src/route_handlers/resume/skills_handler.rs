@@ -7,6 +7,7 @@ use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
+use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -25,10 +26,7 @@ use crate::realtime::{Hub, ResumeChangedAction};
     )
 )]
 #[get("/resume/<resume_id>/skills")]
-pub fn list_skills_handler(
-    resume_id: i32,
-    maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<Skill>>>, Custom<Json<Response<String>>>> {
+pub fn list_skills_handler(resume_id: i32, maybe_auth: MaybeAuthSession) -> JsonResult<Vec<Skill>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match skills::list_skills(resume_id, user_id_value) {
@@ -90,7 +88,7 @@ pub fn create_skill_handler(
     hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewSkillRequest>,
-) -> Result<Custom<Json<Response<Skill>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<Skill> {
     match skills::create_skill(auth.user_id, resume_id, payload.into_inner()) {
         Ok(skill) => {
             hub.publish_resume_changed(
@@ -155,7 +153,7 @@ pub fn update_skill_handler(
     hub: &State<Hub>,
     skill_id: i32,
     payload: Json<UpdateSkill>,
-) -> Result<Json<Response<Skill>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Skill> {
     match skills::update_skill(auth.user_id, skill_id, payload.into_inner()) {
         Ok(skill) => {
             hub.publish_resume_changed(
@@ -211,11 +209,7 @@ pub fn update_skill_handler(
     )
 )]
 #[rocket_delete("/skills/<skill_id>")]
-pub fn delete_skill_handler(
-    auth: AuthSession,
-    hub: &State<Hub>,
-    skill_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+pub fn delete_skill_handler(auth: AuthSession, hub: &State<Hub>, skill_id: i32) -> NoContentResult {
     match skills::delete_skill(auth.user_id, skill_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(

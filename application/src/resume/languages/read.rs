@@ -13,9 +13,7 @@ pub fn list_languages(
 ) -> Result<Vec<Language>, ApplicationError> {
     use domain::schema::languages::dsl as languages_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let mut items: Vec<Language> = match languages_dsl::languages
         .filter(languages_dsl::resume_id.eq(resume_id_value))

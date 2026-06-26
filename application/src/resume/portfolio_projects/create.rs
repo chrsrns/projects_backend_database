@@ -18,10 +18,7 @@ pub fn create_portfolio_project(
 ) -> Result<PortfolioProject, ApplicationError> {
     use domain::schema::portfolio_projects;
 
-    let resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(resume_id_value)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
@@ -58,10 +55,7 @@ pub fn create_portfolio_key_point(
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects::dsl as projects_dsl;
 
-    let resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(resume_id_value)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
@@ -105,10 +99,7 @@ pub fn create_portfolio_technology(
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::portfolio_technologies;
 
-    let resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(resume_id_value)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}

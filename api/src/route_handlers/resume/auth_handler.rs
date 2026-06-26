@@ -1,3 +1,4 @@
+use super::{CustomJsonResult, UnauthorizedJsonResult};
 use application::auth::{login, logout, me, register};
 use application::error::ApplicationError;
 use domain::models::{AuthLoginRequest, AuthRegisterRequest, User};
@@ -17,9 +18,7 @@ use shared::response_models::{AuthTokenResponse, Response};
     )
 )]
 #[post("/auth/register", format = "application/json", data = "<payload>")]
-pub fn register_handler(
-    payload: Json<AuthRegisterRequest>,
-) -> Result<Custom<Json<Response<User>>>, Custom<Json<Response<String>>>> {
+pub fn register_handler(payload: Json<AuthRegisterRequest>) -> CustomJsonResult<User> {
     match register::register(payload.into_inner()) {
         Ok(user) => Ok(Custom(
             rocket::http::Status::Created,
@@ -67,9 +66,7 @@ pub fn register_handler(
     )
 )]
 #[post("/auth/login", format = "application/json", data = "<payload>")]
-pub fn login_handler(
-    payload: Json<AuthLoginRequest>,
-) -> Result<Json<Response<AuthTokenResponse>>, Unauthorized<Json<Response<String>>>> {
+pub fn login_handler(payload: Json<AuthLoginRequest>) -> UnauthorizedJsonResult<AuthTokenResponse> {
     match login::login(payload.into_inner()) {
         Ok(token) => Ok(Json(Response { body: token })),
         Err(_) => Err(Unauthorized(Json(Response {
@@ -89,9 +86,7 @@ pub fn login_handler(
     )
 )]
 #[get("/auth/me")]
-pub fn me_handler(
-    auth: crate::auth::AuthSession,
-) -> Result<Json<Response<User>>, Unauthorized<Json<Response<String>>>> {
+pub fn me_handler(auth: crate::auth::AuthSession) -> UnauthorizedJsonResult<User> {
     match me::me(auth.user_id) {
         Ok(user) => Ok(Json(Response { body: user })),
         Err(_) => Err(Unauthorized(Json(Response {
@@ -111,9 +106,7 @@ pub fn me_handler(
     )
 )]
 #[post("/auth/logout")]
-pub fn logout_handler(
-    auth: crate::auth::AuthSession,
-) -> Result<Json<Response<String>>, Unauthorized<Json<Response<String>>>> {
+pub fn logout_handler(auth: crate::auth::AuthSession) -> UnauthorizedJsonResult<String> {
     match logout::logout(auth.session_id) {
         Ok(()) => Ok(Json(Response {
             body: "Logged out".to_string(),

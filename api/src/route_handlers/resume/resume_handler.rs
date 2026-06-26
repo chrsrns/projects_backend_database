@@ -7,6 +7,7 @@ use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
+use super::{ConflictJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -19,9 +20,7 @@ use crate::realtime::{Hub, ResumeChangedAction};
     )
 )]
 #[get("/resumes")]
-pub fn list_resumes_handler(
-    maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<Resume>>>, Custom<Json<Response<String>>>> {
+pub fn list_resumes_handler(maybe_auth: MaybeAuthSession) -> JsonResult<Vec<Resume>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     let resumes: Vec<Resume> = read::list_resumes(user_id_value).map_err(|err| {
@@ -52,10 +51,7 @@ pub fn list_resumes_handler(
     )
 )]
 #[get("/resume/<resume_id>")]
-pub fn list_resume_handler(
-    resume_id: i32,
-    maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Resume>>, Custom<Json<Response<String>>>> {
+pub fn list_resume_handler(resume_id: i32, maybe_auth: MaybeAuthSession) -> JsonResult<Resume> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     let resume = read::list_resume(resume_id, user_id_value).map_err(|err| match err {
         ApplicationError::NotFound(msg) => {
@@ -106,7 +102,7 @@ pub fn create_resume_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     resume: Json<NewResumeRequest>,
-) -> Result<Custom<Json<Response<Resume>>>, Conflict<Json<Response<String>>>> {
+) -> ConflictJsonResult<Resume> {
     match create::create_resume(auth.user_id, resume.into_inner()) {
         Ok(resume) => {
             hub.publish_resume_changed(resume.id, ResumeChangedAction::Created);
@@ -144,7 +140,7 @@ pub fn update_resume_handler(
     hub: &State<Hub>,
     resume_id: i32,
     resume: Json<UpdateResume>,
-) -> Result<Json<Response<Resume>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Resume> {
     match update::update_resume(auth.user_id, resume_id, resume.into_inner()) {
         Ok(updated) => {
             hub.publish_resume_changed(
@@ -204,7 +200,7 @@ pub fn delete_resume_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     resume_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match delete::delete_resume(auth.user_id, resume_id) {
         Ok(()) => {
             hub.publish_resume_changed(resume_id, ResumeChangedAction::Deleted);

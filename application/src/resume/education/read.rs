@@ -13,9 +13,7 @@ pub fn list_educations(
 ) -> Result<Vec<Education>, ApplicationError> {
     use domain::schema::education::dsl as education_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let is_owner = match user_id_value {
         Some(uid) => match find_resume(resume_id_value) {
@@ -49,9 +47,7 @@ pub fn list_education_key_points(
     use domain::schema::education::dsl as education_dsl;
     use domain::schema::education_key_points::dsl as key_points_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let is_owner = match user_id_value {
         Some(uid) => match find_resume(resume_id_value) {

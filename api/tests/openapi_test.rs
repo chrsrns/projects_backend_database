@@ -15,4 +15,15 @@ fn test_openapi_json_is_served() {
 
     assert!(json.get("openapi").is_some());
     assert!(json.get("paths").is_some());
+
+    let import_responses = json
+        .get("paths")
+        .and_then(|p| p.get("/resume/import/markdown"))
+        .and_then(|m| m.get("post"))
+        .and_then(|op| op.get("responses"))
+        .expect("import markdown responses");
+    assert!(
+        import_responses.get("413").is_some(),
+        "expected 413 response documented for markdown import"
+    );
 }

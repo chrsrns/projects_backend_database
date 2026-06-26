@@ -168,10 +168,7 @@ async fn authorize_subscription(resume_id: i32, token: Option<String>) -> bool {
             None => None,
         };
 
-        match application::resume::read::list_resume(resume_id, user_id) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        application::resume::read::list_resume(resume_id, user_id).is_ok()
     })
     .await
     .unwrap_or(false)

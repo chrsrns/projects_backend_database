@@ -13,9 +13,7 @@ pub fn list_skills(
 ) -> Result<Vec<Skill>, ApplicationError> {
     use domain::schema::skills::dsl as skills_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let mut items: Vec<Skill> = match skills_dsl::skills
         .filter(skills_dsl::resume_id.eq(resume_id_value))

@@ -28,10 +28,7 @@ pub fn create_work_experience(
 ) -> Result<WorkExperience, ApplicationError> {
     use domain::schema::work_experiences;
 
-    let resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(resume_id_value)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
@@ -70,10 +67,7 @@ pub fn create_work_experience_key_point(
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences::dsl as work_dsl;
 
-    let resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(resume_id_value)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}

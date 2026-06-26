@@ -92,6 +92,12 @@ async fn main() -> Result<(), Error> {
 
     api::init_logging();
 
+    // Print version on startup
+    println!(
+        "Rust Profile Management Backend v{}",
+        env!("CARGO_PKG_VERSION")
+    );
+
     match cli.command {
         Commands::Serve {
             port,
@@ -139,14 +145,14 @@ async fn main() -> Result<(), Error> {
                         err
                     })?;
 
-                let node_stdout = node_child.stdout.ok_or_else(|| {
-                    Error::new(ErrorKind::Other, "Could not capture standard output.")
-                })?;
+                let node_stdout = node_child
+                    .stdout
+                    .ok_or_else(|| Error::other("Could not capture standard output."))?;
                 let mut stdout_reader = BufReader::new(node_stdout);
 
-                let node_stderr = node_child.stderr.ok_or_else(|| {
-                    Error::new(ErrorKind::Other, "Could not capture standard error.")
-                })?;
+                let node_stderr = node_child
+                    .stderr
+                    .ok_or_else(|| Error::other("Could not capture standard error."))?;
                 let mut stderr_reader = BufReader::new(node_stderr);
 
                 let (node_ready_sender, node_ready_receiver) = mpsc::channel();
@@ -181,9 +187,7 @@ async fn main() -> Result<(), Error> {
                             Ok(0) => break,
                             Ok(_) => {
                                 if line.contains("Listening on ") {
-                                    if let Some(sender) = node_ready_sender.take() {
-                                        let _ = sender.send(());
-                                    }
+                                    let _ = node_ready_sender.take().map(|sender| sender.send(()));
                                 }
                                 print!("[NODE SERVER STDOUT] {}", line);
                                 line.clear();
@@ -245,5 +249,27 @@ mod tests {
     #[test]
     fn verify_cli() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn test_version_from_cargo() {
+        let version = env!("CARGO_PKG_VERSION");
+        assert!(!version.is_empty());
+        assert_eq!(version, "0.5.0");
+    }
+
+    #[test]
+    fn test_cli_version_flag_exists() {
+        // This test verifies that the Cli struct has version enabled
+        // The actual --version functionality is handled by clap
+        use clap::error::ErrorKind;
+        let cli_result = Cli::try_parse_from(["test", "--version"]);
+        match cli_result {
+            Err(err) => {
+                // --version should cause clap to display version and exit
+                assert!(matches!(err.kind(), ErrorKind::DisplayVersion));
+            }
+            Ok(_) => panic!("--version should cause clap to exit with DisplayVersion error"),
+        }
     }
 }

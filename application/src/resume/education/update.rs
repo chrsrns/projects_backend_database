@@ -26,10 +26,7 @@ pub fn update_education(
         }
     };
 
-    let resume: Resume = match find_resume(existing.resume_id) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(existing.resume_id)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
@@ -75,10 +72,7 @@ pub fn update_education_key_point(
         }
     };
 
-    let resume: Resume = match find_resume(edu.resume_id) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(edu.resume_id)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}

@@ -152,6 +152,8 @@ pub fn build_rocket_with_hub(
                 resume_handler::create_resume_handler,
                 resume_handler::update_resume_handler,
                 resume_handler::delete_resume_handler,
+                markdown_handler::export_resume_markdown,
+                markdown_handler::import_resume_markdown,
                 skills_handler::list_skills_handler,
                 skills_handler::create_skill_handler,
                 skills_handler::update_skill_handler,

@@ -10,6 +10,7 @@ use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
 
+use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -31,7 +32,7 @@ use crate::realtime::{Hub, ResumeChangedAction};
 pub fn list_educations_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<Education>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<Education>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match education::list_educations(resume_id, user_id_value) {
@@ -93,7 +94,7 @@ pub fn create_education_handler(
     hub: &State<Hub>,
     resume_id: i32,
     payload: Json<NewEducationRequest>,
-) -> Result<Custom<Json<Response<Education>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<Education> {
     match education::create_education(auth.user_id, resume_id, payload.into_inner()) {
         Ok(item) => {
             hub.publish_resume_changed(
@@ -162,7 +163,7 @@ pub fn update_education_handler(
     hub: &State<Hub>,
     education_id: i32,
     payload: Json<UpdateEducation>,
-) -> Result<Json<Response<Education>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Education> {
     match education::update_education(auth.user_id, education_id, payload.into_inner()) {
         Ok(item) => {
             hub.publish_resume_changed(
@@ -222,7 +223,7 @@ pub fn delete_education_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     education_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match education::delete_education(auth.user_id, education_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(
@@ -282,7 +283,7 @@ pub fn list_education_key_points_handler(
     resume_id: i32,
     education_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> Result<Json<Response<Vec<EducationKeyPoint>>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<Vec<EducationKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
 
     match education::list_education_key_points(resume_id, education_id, user_id_value) {
@@ -346,7 +347,7 @@ pub fn create_education_key_point_handler(
     resume_id: i32,
     education_id: i32,
     payload: Json<NewEducationKeyPointRequest>,
-) -> Result<Custom<Json<Response<EducationKeyPoint>>>, Custom<Json<Response<String>>>> {
+) -> CustomJsonResult<EducationKeyPoint> {
     match education::create_education_key_point(
         auth.user_id,
         resume_id,
@@ -420,7 +421,7 @@ pub fn update_education_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
     payload: Json<UpdateEducationKeyPoint>,
-) -> Result<Json<Response<EducationKeyPoint>>, Custom<Json<Response<String>>>> {
+) -> JsonResult<EducationKeyPoint> {
     match education::update_education_key_point(auth.user_id, key_point_id, payload.into_inner()) {
         Ok((item, resume_id)) => {
             hub.publish_resume_changed(
@@ -480,7 +481,7 @@ pub fn delete_education_key_point_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     key_point_id: i32,
-) -> Result<NoContent, Custom<Json<Response<String>>>> {
+) -> NoContentResult {
     match education::delete_education_key_point(auth.user_id, key_point_id) {
         Ok(resume_id) => {
             hub.publish_resume_changed(

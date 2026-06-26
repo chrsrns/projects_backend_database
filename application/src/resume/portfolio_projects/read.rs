@@ -13,9 +13,7 @@ pub fn list_portfolio_projects(
 ) -> Result<Vec<PortfolioProject>, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let is_owner = match user_id_value {
         Some(uid) => match find_resume(resume_id_value) {
@@ -50,9 +48,7 @@ pub fn list_portfolio_key_points(
     use domain::schema::portfolio_key_points::dsl as kps_dsl;
     use domain::schema::portfolio_projects::dsl as projects_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let is_owner = match user_id_value {
         Some(uid) => match find_resume(resume_id_value) {
@@ -96,9 +92,7 @@ pub fn list_portfolio_technologies(
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::portfolio_technologies::dsl as tech_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let is_owner = match user_id_value {
         Some(uid) => match find_resume(resume_id_value) {

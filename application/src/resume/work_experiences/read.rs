@@ -13,9 +13,7 @@ pub fn list_work_experiences(
 ) -> Result<Vec<WorkExperience>, ApplicationError> {
     use domain::schema::work_experiences::dsl as work_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let is_owner = match user_id_value {
         Some(uid) => match find_resume(resume_id_value) {
@@ -50,9 +48,7 @@ pub fn list_work_experience_key_points(
     use domain::schema::work_experience_key_points::dsl as kps_dsl;
     use domain::schema::work_experiences::dsl as work_dsl;
 
-    if let Err(err) = find_accessible_resume(resume_id_value, user_id_value) {
-        return Err(err);
-    }
+    find_accessible_resume(resume_id_value, user_id_value)?;
 
     let is_owner = match user_id_value {
         Some(uid) => match find_resume(resume_id_value) {

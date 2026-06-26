@@ -17,10 +17,7 @@ pub fn create_education(
 ) -> Result<Education, ApplicationError> {
     use domain::schema::education;
 
-    let resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(resume_id_value)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}
@@ -58,10 +55,7 @@ pub fn create_education_key_point(
     use domain::schema::education::dsl as education_dsl;
     use domain::schema::education_key_points;
 
-    let resume: Resume = match find_resume(resume_id_value) {
-        Ok(r) => r,
-        Err(err) => return Err(err),
-    };
+    let resume: Resume = find_resume(resume_id_value)?;
 
     match resume.created_by {
         Some(owner) if owner == user_id_value => {}

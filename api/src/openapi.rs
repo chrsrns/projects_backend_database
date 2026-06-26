@@ -1,15 +1,15 @@
 use utoipa::{Modify, OpenApi};
 
 use domain::models::{
-    AuthLoginRequest, AuthRegisterRequest, Education, EducationKeyPoint, Framework, Language,
-    NewEducationKeyPointRequest, NewEducationRequest, NewFrameworkRequest, NewLanguageRequest,
-    NewPortfolioKeyPointRequest, NewPortfolioProjectRequest, NewPortfolioTechnologyRequest,
-    NewResumeRequest, NewSkillRequest, NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest,
-    PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume, Skill, UpdateEducation,
-    UpdateEducationKeyPoint, UpdateFramework, UpdateLanguage, UpdatePortfolioKeyPoint,
-    UpdatePortfolioProject, UpdatePortfolioTechnology, UpdateResume, UpdateSkill,
-    UpdateWorkExperience, UpdateWorkExperienceKeyPoint, User, WorkExperience,
-    WorkExperienceKeyPoint,
+    AuthLoginRequest, AuthRegisterRequest, Education, EducationKeyPoint, Framework, FullResume,
+    Language, NewEducationKeyPointRequest, NewEducationRequest, NewFrameworkRequest,
+    NewLanguageRequest, NewPortfolioKeyPointRequest, NewPortfolioProjectRequest,
+    NewPortfolioTechnologyRequest, NewResumeRequest, NewSkillRequest,
+    NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, PortfolioKeyPoint,
+    PortfolioProject, PortfolioTechnology, Resume, Skill, UpdateEducation, UpdateEducationKeyPoint,
+    UpdateFramework, UpdateLanguage, UpdatePortfolioKeyPoint, UpdatePortfolioProject,
+    UpdatePortfolioTechnology, UpdateResume, UpdateSkill, UpdateWorkExperience,
+    UpdateWorkExperienceKeyPoint, User, WorkExperience, WorkExperienceKeyPoint,
 };
 use shared::response_models::{AuthTokenResponse, Response};
 use utoipa::openapi::ComponentsBuilder;
@@ -59,6 +59,8 @@ impl Modify for ServerAddon {
         crate::resume_handler::create_resume_handler,
         crate::resume_handler::update_resume_handler,
         crate::resume_handler::delete_resume_handler,
+        crate::markdown_handler::export_resume_markdown,
+        crate::markdown_handler::import_resume_markdown,
         crate::skills_handler::list_skills_handler,
         crate::skills_handler::create_skill_handler,
         crate::skills_handler::update_skill_handler,
@@ -102,6 +104,7 @@ impl Modify for ServerAddon {
     ),
     components(schemas(
         AuthTokenResponse,
+        FullResume,
         Response::<User>,
         Response::<Resume>,
         Response::<Skill>,
