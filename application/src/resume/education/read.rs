@@ -72,15 +72,19 @@ pub fn list_education_key_points(
         }
     };
 
-    let mut items: Vec<EducationKeyPoint> = match key_points_dsl::education_key_points
-        .filter(key_points_dsl::education_id.eq(education_id_value))
-        .load::<EducationKeyPoint>(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
+    let mut kp_query = key_points_dsl::education_key_points.into_boxed();
+    kp_query = kp_query.filter(key_points_dsl::education_id.eq(education_id_value));
+    if !is_owner {
+        kp_query = kp_query.filter(key_points_dsl::active.eq(true));
+    }
+
+    let mut items: Vec<EducationKeyPoint> =
+        match kp_query.load::<EducationKeyPoint>(&mut establish_connection()) {
+            Ok(v) => v,
+            Err(err) => {
+                return Err(app_err_from_diesel_err(err));
+            }
+        };
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));
 

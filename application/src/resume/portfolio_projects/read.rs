@@ -71,13 +71,17 @@ pub fn list_portfolio_key_points(
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let mut items: Vec<PortfolioKeyPoint> = match kps_dsl::portfolio_key_points
-        .filter(kps_dsl::portfolio_project_id.eq(project_id_value))
-        .load::<PortfolioKeyPoint>(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let mut kp_query = kps_dsl::portfolio_key_points.into_boxed();
+    kp_query = kp_query.filter(kps_dsl::portfolio_project_id.eq(project_id_value));
+    if !is_owner {
+        kp_query = kp_query.filter(kps_dsl::active.eq(true));
+    }
+
+    let mut items: Vec<PortfolioKeyPoint> =
+        match kp_query.load::<PortfolioKeyPoint>(&mut establish_connection()) {
+            Ok(v) => v,
+            Err(err) => return Err(app_err_from_diesel_err(err)),
+        };
 
     items.sort_by_key(|kp| (kp.display_order.unwrap_or(0), kp.id));
 
@@ -115,13 +119,17 @@ pub fn list_portfolio_technologies(
         Err(err) => return Err(app_err_from_diesel_err(err)),
     };
 
-    let mut items: Vec<PortfolioTechnology> = match tech_dsl::portfolio_technologies
-        .filter(tech_dsl::portfolio_project_id.eq(project_id_value))
-        .load::<PortfolioTechnology>(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let mut tech_query = tech_dsl::portfolio_technologies.into_boxed();
+    tech_query = tech_query.filter(tech_dsl::portfolio_project_id.eq(project_id_value));
+    if !is_owner {
+        tech_query = tech_query.filter(tech_dsl::active.eq(true));
+    }
+
+    let mut items: Vec<PortfolioTechnology> =
+        match tech_query.load::<PortfolioTechnology>(&mut establish_connection()) {
+            Ok(v) => v,
+            Err(err) => return Err(app_err_from_diesel_err(err)),
+        };
 
     items.sort_by_key(|t| (t.display_order.unwrap_or(0), t.id));
 
