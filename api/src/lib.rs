@@ -7,13 +7,14 @@ use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
 
 pub mod auth;
+pub mod llm;
 pub mod openapi;
 pub mod realtime;
 pub mod route_handlers;
 pub mod ws_handler;
 
 use std::path::PathBuf;
-use std::sync::Once;
+use std::sync::{Arc, Once};
 use std::time::SystemTime;
 
 use route_handlers::resume::*;
@@ -115,6 +116,18 @@ pub fn build_rocket_with_hub(
     hub: realtime::Hub,
     node_cfg: NodeConfig,
 ) -> rocket::Rocket<rocket::Build> {
+    let api_key = std::env::var("GEMINI_API_KEY").ok();
+    let model = std::env::var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-3.5-flash".to_string());
+    let llm_client: Arc<dyn application::llm::LlmClient + Send + Sync> =
+        Arc::new(llm::GeminiClient::new(api_key, model));
+    build_rocket_with_llm_client(hub, node_cfg, llm_client)
+}
+
+pub fn build_rocket_with_llm_client(
+    hub: realtime::Hub,
+    node_cfg: NodeConfig,
+    llm_client: Arc<dyn application::llm::LlmClient + Send + Sync>,
+) -> rocket::Rocket<rocket::Build> {
     let allowed_origins = rocket_cors::AllowedOrigins::all();
 
     let cors = rocket_cors::CorsOptions {
@@ -139,6 +152,7 @@ pub fn build_rocket_with_hub(
         .attach(cors)
         .manage(hub)
         .manage(node_cfg)
+        .manage(llm_client)
         .mount(
             "/api",
             routes![
@@ -194,6 +208,7 @@ pub fn build_rocket_with_hub(
                 portfolio_projects_handler::create_portfolio_technology_handler,
                 portfolio_projects_handler::update_portfolio_technology_handler,
                 portfolio_projects_handler::delete_portfolio_technology_handler,
+                llm::generate_handler,
             ],
         )
         .mount(

@@ -9,13 +9,31 @@ pub fn SchemaForm(
     #[prop(into)] value: RwSignal<Value>,
     #[prop(default = 0)] depth: usize,
 ) -> impl IntoView {
-    let properties = schema
+    // If the schema has no direct `properties` but has `oneOf`/`anyOf`, use the
+    // first variant that has properties (e.g. `Part` is a union of object shapes).
+    let effective_schema = if schema.get("properties").is_none() {
+        schema
+            .get("oneOf")
+            .or_else(|| schema.get("anyOf"))
+            .and_then(|arr| arr.as_array())
+            .and_then(|variants| {
+                variants
+                    .iter()
+                    .find(|v| v.get("properties").is_some())
+                    .cloned()
+            })
+            .unwrap_or_else(|| schema.clone())
+    } else {
+        schema.clone()
+    };
+
+    let properties = effective_schema
         .get("properties")
         .and_then(|p| p.as_object())
         .cloned()
         .unwrap_or_default();
 
-    let required: Vec<String> = schema
+    let required: Vec<String> = effective_schema
         .get("required")
         .and_then(|r| r.as_array())
         .map(|arr| {
@@ -288,11 +306,18 @@ fn SchemaFieldInput(
         "object" => {
             let child_signal = RwSignal::new(get_value.get());
 
-            // Sync child signal back to parent
+            // Sync child signal back to parent, skipping the initial fire so
+            // mounting this component does not trigger a spurious on_change
+            // that cascades writes up the signal tree (V43).
             let parent_callback = on_change.clone();
+            let mounted = StoredValue::new(false);
             Effect::new(move |_| {
                 let val = child_signal.get();
-                parent_callback.run(val);
+                if mounted.get_value() {
+                    parent_callback.run(val);
+                } else {
+                    mounted.set_value(true);
+                }
             });
 
             view! {
@@ -334,34 +359,71 @@ fn SchemaFieldInput(
     }
 }
 
+/// ArrayField owns a stable keyed list (`Vec<(u64, Value)>`) so that Leptos
+/// `<For>` can diff by stable ID and never destroy/recreate item DOM nodes on
+/// unrelated mutations (V44).  A single skip-first-run Effect serializes back
+/// to `Value::Array` and propagates to the parent (V43).
 #[component]
 fn ArrayField(
     #[prop(into)] item_schema: Value,
     on_change: Callback<Value>,
     #[prop(into)] get_value: Signal<Value>,
 ) -> impl IntoView {
-    let items = move || get_value.get().as_array().cloned().unwrap_or_default();
+    // Convert the initial Value::Array into a stable keyed vec.
+    let initial_items: Vec<(u64, Value)> = get_value
+        .get()
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .enumerate()
+        .map(|(i, v)| (i as u64, v))
+        .collect();
+    let next_id = StoredValue::new(initial_items.len() as u64);
+    let local_items = RwSignal::new(initial_items);
+
+    // Propagate local → parent as Value::Array, skipping the mount-time fire (V43).
+    let mounted = StoredValue::new(false);
+    Effect::new(move |_| {
+        let arr = Value::Array(local_items.get().into_iter().map(|(_, v)| v).collect());
+        if mounted.get_value() {
+            on_change.run(arr);
+        } else {
+            mounted.set_value(true);
+        }
+    });
 
     let item_schema_clone = item_schema.clone();
     let add_item = move |_| {
         let default = default_value_for_schema(&item_schema_clone);
-        let mut current = get_value.get();
-        if let Value::Array(arr) = &mut current {
-            arr.push(default);
-        } else {
-            current = Value::Array(vec![default]);
-        }
-        on_change.run(current);
+        let id = next_id.get_value();
+        next_id.set_value(id + 1);
+        local_items.update(|items| items.push((id, default)));
     };
 
-    let remove_item = move |idx: usize| {
-        let mut current = get_value.get();
-        if let Value::Array(arr) = &mut current {
-            if idx < arr.len() {
-                arr.remove(idx);
-            }
+    let remove_item = move |id: u64| {
+        local_items.update(|items| items.retain(|(k, _)| *k != id));
+    };
+
+    // Treat oneOf/anyOf-only schemas (e.g. untagged enums) as "object" for
+    // dispatch purposes so they get StructuredArrayItem, not PrimitiveArrayItem.
+    let item_type = {
+        let t = item_schema
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string();
+        if t.is_empty()
+            && (item_schema.get("oneOf").is_some()
+                || item_schema.get("anyOf").is_some()
+                || item_schema.get("properties").is_some())
+        {
+            "object".to_string()
+        } else if t.is_empty() {
+            "string".to_string()
+        } else {
+            t
         }
-        on_change.run(current);
     };
 
     view! {
@@ -374,58 +436,59 @@ fn ArrayField(
             </button>
 
             <div class="array-items">
-                {move || {
-                    let arr = items();
-                    let item_schema_for_type = item_schema.clone();
-                    arr.into_iter().enumerate().map(|(idx, _item_val)| {
-                        let item_type = item_schema_for_type
-                            .get("type")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("string")
-                            .to_string();
+                <For
+                    each=move || local_items.get()
+                    key=|(id, _)| *id
+                    children=move |(id, _item_val)| {
+                        let item_type = item_type.clone();
 
-                        let on_remove = remove_item.clone();
-
+                        // Item signal reads this item's value by stable ID (V44).
                         let item_signal = Signal::derive(move || {
-                            get_value.get()
-                                .as_array()
-                                .and_then(|arr| arr.get(idx).cloned())
+                            local_items
+                                .get()
+                                .into_iter()
+                                .find(|(k, _)| *k == id)
+                                .map(|(_, v)| v)
                                 .unwrap_or(Value::Null)
                         });
 
+                        // Derive the display index reactively from position in list.
+                        let display_idx = Signal::derive(move || {
+                            local_items
+                                .get()
+                                .iter()
+                                .position(|(k, _)| *k == id)
+                                .unwrap_or(0)
+                                + 1
+                        });
+
+                        // Item change writes into local_items by stable ID (V44).
                         let on_item_change = Callback::new(move |new_val: Value| {
-                            let mut current = get_value.get();
-                            if let Value::Array(arr) = &mut current {
-                                if idx < arr.len() {
-                                    arr[idx] = new_val;
+                            local_items.update(|items| {
+                                if let Some(entry) = items.iter_mut().find(|(k, _)| *k == id) {
+                                    entry.1 = new_val;
                                 }
-                            }
-                            on_change.run(current);
+                            });
                         });
 
                         view! {
                             <div class="array-item">
                                 <div class="array-item-header">
-                                    <span class="array-item-index">{format!("Item {}", idx + 1)}</span>
+                                    <span class="array-item-index">{move || format!("Item {}", display_idx.get())}</span>
                                     <button
                                         class="array-remove-btn"
-                                        on:click=move |_| on_remove(idx)
+                                        on:click=move |_| remove_item(id)
                                     >
                                         "Remove"
                                     </button>
                                 </div>
                                 <div class="array-item-content">
                                     {if item_type == "object" || item_type == "array" {
-                                        let child_signal = RwSignal::new(item_signal.get());
-                                        let item_change_callback = on_item_change.clone();
-                                        Effect::new(move |_| {
-                                            let val = child_signal.get();
-                                            item_change_callback.run(val);
-                                        });
                                         view! {
-                                            <SchemaForm
+                                            <StructuredArrayItem
                                                 schema=item_schema.clone()
-                                                value=child_signal
+                                                get_value=item_signal
+                                                on_change=on_item_change
                                             />
                                         }.into_any()
                                     } else {
@@ -440,10 +503,47 @@ fn ArrayField(
                                 </div>
                             </div>
                         }
-                    }).collect::<Vec<_>>()
-                }}
+                    }
+                />
             </div>
         </div>
+    }
+}
+
+/// Wrapper component for object/array items inside an ArrayField.
+///
+/// Owns a stable `RwSignal` and a single `Effect` that syncs child edits back
+/// to the parent array.  By being a component, the signal and effect are
+/// created once at mount time — never inside the reactive `move ||` closure of
+/// `ArrayField`, which would recreate them on every array mutation and cause an
+/// infinite update loop (V43).
+#[component]
+fn StructuredArrayItem(
+    #[prop(into)] schema: Value,
+    #[prop(into)] get_value: Signal<Value>,
+    on_change: Callback<Value>,
+) -> impl IntoView {
+    // Stable signal — created once when this component mounts.
+    let child_signal = RwSignal::new(get_value.get());
+
+    // Propagate child edits up to the parent array. Skip the first (mount-time)
+    // fire so that adding an item does not immediately cascade writes up the
+    // signal tree and cause an infinite loop (V43).
+    let mounted = StoredValue::new(false);
+    Effect::new(move |_| {
+        let val = child_signal.get();
+        if mounted.get_value() {
+            on_change.run(val);
+        } else {
+            mounted.set_value(true);
+        }
+    });
+
+    view! {
+        <SchemaForm
+            schema=schema
+            value=child_signal
+        />
     }
 }
 
@@ -543,14 +643,32 @@ fn PrimitiveArrayItem(
 }
 
 pub fn default_value_for_schema(schema: &Value) -> Value {
-    let schema_type = schema
+    // For oneOf/anyOf schemas (e.g. untagged enums like Part), use the first
+    // variant that has properties to produce a meaningful default object.
+    let effective = if schema.get("type").is_none() && schema.get("properties").is_none() {
+        schema
+            .get("oneOf")
+            .or_else(|| schema.get("anyOf"))
+            .and_then(|arr| arr.as_array())
+            .and_then(|variants| {
+                variants
+                    .iter()
+                    .find(|v| v.get("properties").is_some() || v.get("type").is_some())
+                    .map(|v| std::borrow::Cow::Borrowed(v))
+            })
+            .unwrap_or_else(|| std::borrow::Cow::Borrowed(schema))
+    } else {
+        std::borrow::Cow::Borrowed(schema)
+    };
+
+    let schema_type = effective
         .get("type")
         .and_then(|t| t.as_str())
         .unwrap_or("string");
 
     match schema_type {
         "string" => {
-            if schema.get("format").and_then(|f| f.as_str()) == Some("uuid") {
+            if effective.get("format").and_then(|f| f.as_str()) == Some("uuid") {
                 Value::String("550e8400-e29b-41d4-a716-446655440000".to_string())
             } else {
                 Value::String("".to_string())
@@ -561,7 +679,7 @@ pub fn default_value_for_schema(schema: &Value) -> Value {
         "array" => Value::Array(vec![]),
         "object" => {
             let mut map = serde_json::Map::new();
-            if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
+            if let Some(props) = effective.get("properties").and_then(|p| p.as_object()) {
                 for (key, prop_schema) in props {
                     map.insert(key.clone(), default_value_for_schema(prop_schema));
                 }

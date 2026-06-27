@@ -4,7 +4,7 @@ use std::{
     io::{BufRead, BufReader, Error, ErrorKind},
     path::PathBuf,
     process::{Command, Stdio},
-    sync::mpsc,
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
@@ -223,10 +223,20 @@ async fn main() -> Result<(), Error> {
                 }
             }
 
-            let _ = api::build_rocket(NodeConfig { port: node_port })
-                .configure(rocket::Config::figment().merge(("port", server_port)))
-                .launch()
-                .await;
+            let api_key = std::env::var("GEMINI_API_KEY").ok();
+            let model =
+                std::env::var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-3.5-flash".to_string());
+            let llm_client: Arc<dyn api::llm::LlmClient + Send + Sync> =
+                Arc::new(api::llm::GeminiClient::new(api_key, model));
+
+            let _ = api::build_rocket_with_llm_client(
+                api::realtime::Hub::new(),
+                NodeConfig { port: node_port },
+                llm_client,
+            )
+            .configure(rocket::Config::figment().merge(("port", server_port)))
+            .launch()
+            .await;
 
             if let Some(stdout_thread) = stdout_thread {
                 stdout_thread.join().unwrap();

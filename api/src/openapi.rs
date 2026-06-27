@@ -101,6 +101,7 @@ impl Modify for ServerAddon {
         crate::portfolio_projects_handler::create_portfolio_technology_handler,
         crate::portfolio_projects_handler::update_portfolio_technology_handler,
         crate::portfolio_projects_handler::delete_portfolio_technology_handler,
+        crate::llm::handler::generate_handler,
     ),
     components(schemas(
         AuthTokenResponse,
@@ -141,6 +142,8 @@ impl Modify for ServerAddon {
         Response::<UpdatePortfolioKeyPoint>,
         Response::<NewPortfolioTechnologyRequest>,
         Response::<UpdatePortfolioTechnology>,
+        Response::<application::llm::GenerateContentResponse>,
+        application::llm::GenerateContentRequest,
     ))
 )]
 pub struct ApiDoc;

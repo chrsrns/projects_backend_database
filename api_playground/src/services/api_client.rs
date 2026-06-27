@@ -202,21 +202,180 @@ pub fn parse_endpoints_from_schema(schema: &serde_json::Value) -> Vec<EndpointIn
     endpoints
 }
 
-fn resolve_schema_ref(
+pub(crate) fn resolve_schema_ref(
     schema: &serde_json::Value,
     components: &serde_json::Map<String, serde_json::Value>,
 ) -> serde_json::Value {
+    resolve_schema_ref_inner(schema, components, &mut std::collections::HashSet::new())
+}
+
+/// Inner helper that carries a `visiting` set to break self-referential cycles
+/// (e.g. `Schema` references itself).  When a cycle is detected the $ref is
+/// left as-is so SchemaForm falls back gracefully rather than stack-overflowing.
+fn resolve_schema_ref_inner(
+    schema: &serde_json::Value,
+    components: &serde_json::Map<String, serde_json::Value>,
+    visiting: &mut std::collections::HashSet<String>,
+) -> serde_json::Value {
+    // Resolve $ref first, then recurse into the resolved value.
     if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
         // Parse "#/components/schemas/SchemaName"
         let parts: Vec<&str> = ref_path.split('/').collect();
         if parts.len() >= 4 && parts[1] == "components" && parts[2] == "schemas" {
-            let schema_name = parts[3];
-            if let Some(resolved) = components.get(schema_name) {
-                return resolve_schema_ref(resolved, components);
+            let schema_name = parts[3].to_string();
+            // Cycle guard: if we are already resolving this schema, return as-is.
+            if visiting.contains(&schema_name) {
+                return schema.clone();
+            }
+            if let Some(resolved) = components.get(&schema_name) {
+                visiting.insert(schema_name.clone());
+                let result = resolve_schema_ref_inner(resolved, components, visiting);
+                visiting.remove(&schema_name);
+                return result;
+            }
+        }
+        return schema.clone();
+    }
+
+    // Deep-recurse into properties and items so nested $refs are resolved
+    // before SchemaForm/ArrayField perform type dispatch (V42).
+    let mut result = schema.clone();
+
+    if let Some(obj) = result.as_object_mut() {
+        // Resolve each property schema
+        if let Some(properties) = obj.get("properties").cloned() {
+            if let Some(props_map) = properties.as_object() {
+                let resolved_props: serde_json::Map<String, serde_json::Value> = props_map
+                    .iter()
+                    .map(|(k, v)| (k.clone(), resolve_schema_ref_inner(v, components, visiting)))
+                    .collect();
+                obj.insert(
+                    "properties".to_string(),
+                    serde_json::Value::Object(resolved_props),
+                );
+            }
+        }
+
+        // Resolve array items schema
+        if let Some(items) = obj.get("items").cloned() {
+            obj.insert(
+                "items".to_string(),
+                resolve_schema_ref_inner(&items, components, visiting),
+            );
+        }
+
+        // Resolve anyOf / oneOf / allOf entries
+        for keyword in ["anyOf", "oneOf", "allOf"] {
+            if let Some(arr) = obj.get(keyword).cloned() {
+                if let Some(variants) = arr.as_array() {
+                    let resolved: Vec<serde_json::Value> = variants
+                        .iter()
+                        .map(|v| resolve_schema_ref_inner(v, components, visiting))
+                        .collect();
+                    obj.insert(keyword.to_string(), serde_json::Value::Array(resolved));
+                }
             }
         }
     }
-    schema.clone()
+
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_schema_ref;
+    use serde_json::json;
+
+    /// V42: $ref inside array items must be resolved to concrete object schema
+    /// so SchemaForm/ArrayField does not fall back to "string" type dispatch.
+    #[test]
+    fn test_v42_resolve_schema_ref_resolves_items_ref() {
+        let mut components = serde_json::Map::new();
+        components.insert(
+            "Content".to_string(),
+            json!({
+                "type": "object",
+                "properties": {
+                    "parts": { "type": "array", "items": { "type": "object" } }
+                }
+            }),
+        );
+
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "contents": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/Content" }
+                }
+            }
+        });
+
+        let resolved = resolve_schema_ref(&schema, &components);
+
+        let items = resolved
+            .get("properties")
+            .and_then(|p| p.get("contents"))
+            .and_then(|c| c.get("items"))
+            .expect("items should exist");
+
+        assert_eq!(
+            items.get("type").and_then(|t| t.as_str()),
+            Some("object"),
+            "items $ref must be resolved to concrete type before reaching SchemaForm (V42)"
+        );
+        assert!(
+            items.get("$ref").is_none(),
+            "$ref must not remain after resolution (V42)"
+        );
+    }
+
+    /// Shallow $ref at top level must still resolve correctly (regression guard).
+    #[test]
+    fn test_v42_top_level_ref_still_resolves() {
+        let mut components = serde_json::Map::new();
+        components.insert(
+            "Foo".to_string(),
+            json!({ "type": "object", "properties": { "x": { "type": "string" } } }),
+        );
+
+        let schema = json!({ "$ref": "#/components/schemas/Foo" });
+        let resolved = resolve_schema_ref(&schema, &components);
+
+        assert_eq!(
+            resolved.get("type").and_then(|t| t.as_str()),
+            Some("object")
+        );
+    }
+
+    /// V42 cycle guard: self-referential schema (e.g. Schema → Schema) must not
+    /// cause a stack overflow; the recursive $ref is left as-is.
+    #[test]
+    fn test_v42_self_referential_schema_does_not_overflow() {
+        let mut components = serde_json::Map::new();
+        // "Schema" has a property "items" whose items are also "Schema" (direct cycle)
+        components.insert(
+            "Schema".to_string(),
+            json!({
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Schema" }
+                    }
+                }
+            }),
+        );
+
+        let schema = json!({ "$ref": "#/components/schemas/Schema" });
+        // Must complete without stack overflow; top-level type resolves correctly.
+        let resolved = resolve_schema_ref(&schema, &components);
+        assert_eq!(
+            resolved.get("type").and_then(|t| t.as_str()),
+            Some("object"),
+            "top-level Schema type must resolve despite cycle"
+        );
+    }
 }
 
 fn parse_parameters(
