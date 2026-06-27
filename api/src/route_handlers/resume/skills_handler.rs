@@ -1,4 +1,3 @@
-use application::error::ApplicationError;
 use application::resume::skills;
 use domain::models::{NewSkillRequest, Skill, UpdateSkill};
 use rocket::State;
@@ -9,6 +8,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::error::map_application_error;
 use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
@@ -28,37 +28,9 @@ use crate::realtime::{Hub, ResumeChangedAction};
 #[get("/resume/<resume_id>/skills")]
 pub fn list_skills_handler(resume_id: i32, maybe_auth: MaybeAuthSession) -> JsonResult<Vec<Skill>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-
     match skills::list_skills(resume_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -100,34 +72,7 @@ pub fn create_skill_handler(
                 Json(Response { body: skill }),
             ))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -162,34 +107,7 @@ pub fn update_skill_handler(
             );
             Ok(Json(Response { body: skill }))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -218,33 +136,6 @@ pub fn delete_skill_handler(auth: AuthSession, hub: &State<Hub>, skill_id: i32) 
             );
             Ok(NoContent)
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }

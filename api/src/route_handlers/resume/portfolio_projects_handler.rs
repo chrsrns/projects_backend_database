@@ -1,4 +1,3 @@
-use application::error::ApplicationError;
 use application::resume::portfolio_projects;
 use domain::models::{
     NewPortfolioKeyPointRequest, NewPortfolioProjectRequest, NewPortfolioTechnologyRequest,
@@ -13,6 +12,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::error::map_application_error;
 use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
@@ -35,37 +35,9 @@ pub fn list_portfolio_projects_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioProject>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-
     match portfolio_projects::list_portfolio_projects(resume_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -111,34 +83,7 @@ pub fn create_portfolio_project_handler(
                 Json(Response { body: item }),
             ))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -181,34 +126,7 @@ pub fn update_portfolio_project_handler(
             );
             Ok(Json(Response { body: item }))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -241,34 +159,7 @@ pub fn delete_portfolio_project_handler(
             );
             Ok(NoContent)
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -294,37 +185,9 @@ pub fn list_portfolio_key_points_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-
     match portfolio_projects::list_portfolio_key_points(resume_id, project_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -373,34 +236,7 @@ pub fn create_portfolio_key_point_handler(
                 Json(Response { body: item }),
             ))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -443,34 +279,7 @@ pub fn update_portfolio_key_point_handler(
             );
             Ok(Json(Response { body: item }))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -503,34 +312,7 @@ pub fn delete_portfolio_key_point_handler(
             );
             Ok(NoContent)
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -556,37 +338,9 @@ pub fn list_portfolio_technologies_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioTechnology>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-
     match portfolio_projects::list_portfolio_technologies(resume_id, project_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -635,34 +389,7 @@ pub fn create_portfolio_technology_handler(
                 Json(Response { body: item }),
             ))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -705,34 +432,7 @@ pub fn update_portfolio_technology_handler(
             );
             Ok(Json(Response { body: item }))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -765,33 +465,6 @@ pub fn delete_portfolio_technology_handler(
             );
             Ok(NoContent)
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }

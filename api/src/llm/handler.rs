@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use application::error::ApplicationError;
 use application::llm::{
     GenerateContentRequest, GenerateContentResponse, LlmClient, generate_content,
 };
@@ -11,6 +10,7 @@ use rocket::{State, post};
 use shared::response_models::Response;
 
 use super::CustomJsonResult;
+use crate::error::map_application_error;
 
 #[utoipa::path(
     post,
@@ -55,18 +55,6 @@ pub async fn generate_handler(
     let client_ref: &dyn LlmClient = client.inner().as_ref();
     match generate_content(client_ref, request).await {
         Ok(response) => Ok(Custom(Status::Ok, Json(Response { body: response }))),
-        Err(ApplicationError::BadRequest(msg)) => {
-            Err(Custom(Status::BadRequest, Json(Response { body: msg })))
-        }
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
-        Err(_) => Err(Custom(
-            Status::InternalServerError,
-            Json(Response {
-                body: "Internal server error".to_string(),
-            }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }

@@ -1,4 +1,3 @@
-use application::error::ApplicationError;
 use application::resume::work_experiences;
 use domain::models::{
     NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, UpdateWorkExperience,
@@ -12,6 +11,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::error::map_application_error;
 use crate::realtime::{Hub, ResumeChangedAction};
 
 #[utoipa::path(
@@ -34,37 +34,9 @@ pub fn list_work_experiences_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<WorkExperience>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-
     match work_experiences::list_work_experiences(resume_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -106,34 +78,7 @@ pub fn create_work_experience_handler(
                 Json(Response { body: item }),
             ))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -172,34 +117,7 @@ pub fn update_work_experience_handler(
             );
             Ok(Json(Response { body: item }))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -232,34 +150,7 @@ pub fn delete_work_experience_handler(
             );
             Ok(NoContent)
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -285,37 +176,9 @@ pub fn list_work_experience_key_points_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<WorkExperienceKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-
     match work_experiences::list_work_experience_key_points(resume_id, work_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -364,34 +227,7 @@ pub fn create_work_experience_key_point_handler(
                 Json(Response { body: item }),
             ))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -434,34 +270,7 @@ pub fn update_work_experience_key_point_handler(
             );
             Ok(Json(Response { body: item }))
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 
@@ -494,33 +303,6 @@ pub fn delete_work_experience_key_point_handler(
             );
             Ok(NoContent)
         }
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }

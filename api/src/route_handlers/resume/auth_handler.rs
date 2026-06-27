@@ -1,11 +1,12 @@
 use super::{CustomJsonResult, UnauthorizedJsonResult};
 use application::auth::{login, logout, me, register};
-use application::error::ApplicationError;
 use domain::models::{AuthLoginRequest, AuthRegisterRequest, User};
-use rocket::response::status::{Custom, Unauthorized};
+use rocket::response::status::Unauthorized;
 use rocket::serde::json::Json;
 use rocket::{get, post};
 use shared::response_models::{AuthTokenResponse, Response};
+
+use crate::error::map_application_error;
 
 #[utoipa::path(
     post,
@@ -20,38 +21,11 @@ use shared::response_models::{AuthTokenResponse, Response};
 #[post("/auth/register", format = "application/json", data = "<payload>")]
 pub fn register_handler(payload: Json<AuthRegisterRequest>) -> CustomJsonResult<User> {
     match register::register(payload.into_inner()) {
-        Ok(user) => Ok(Custom(
+        Ok(user) => Ok(rocket::response::status::Custom(
             rocket::http::Status::Created,
             Json(Response { body: user }),
         )),
-        Err(ApplicationError::Conflict(msg)) => Err(Custom(
-            rocket::http::Status::Conflict,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::BadRequest(msg)) => Err(Custom(
-            rocket::http::Status::BadRequest,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Unauthorized) => Err(Custom(
-            rocket::http::Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        )),
-        Err(ApplicationError::Internal(msg)) => Err(Custom(
-            rocket::http::Status::InternalServerError,
-            Json(Response { body: msg }),
-        )),
-        Err(ApplicationError::Forbidden) => Err(Custom(
-            rocket::http::Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        )),
-        Err(ApplicationError::NotFound(msg)) => Err(Custom(
-            rocket::http::Status::NotFound,
-            Json(Response { body: msg }),
-        )),
+        Err(err) => Err(map_application_error(err)),
     }
 }
 

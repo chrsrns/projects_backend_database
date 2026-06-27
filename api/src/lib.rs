@@ -7,6 +7,7 @@ use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
 
 pub mod auth;
+pub mod error;
 pub mod llm;
 pub mod openapi;
 pub mod realtime;
