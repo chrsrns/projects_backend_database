@@ -943,3 +943,77 @@ fn test_import_payload_exceeds_1mb_returns_413() {
 
     assert_eq!(response.status(), Status::PayloadTooLarge);
 }
+
+#[test]
+fn test_import_child_key_points_are_not_silently_dropped() {
+    // V21 invariant: every child row with a valid parent index must be
+    // persisted — it must never be silently skipped.  We import a resume
+    // with an education entry that has a key point, then read the key points
+    // back and assert the count matches what was in the markdown.
+    let mut fixture = support::Fixture::new(9_228_001);
+
+    let markdown = "# V21 Test User\n\
+                    \n\
+                    - Location: Test City\n\
+                    - Email: v21.test.oob@example.com\n\
+                    \n\
+                    ## Education\n\
+                    \n\
+                    ### Bachelor of Science - State University (Sep 2018 - Jun 2022)\n\
+                    - Degree: B.Sc.\n\
+                    - Graduated with distinction\n\
+                    - Focused on distributed systems\n";
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    // Fetch education entries to get the education ID
+    let edu_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/education", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(edu_response.status(), Status::Ok);
+    let edu_body = edu_response.into_string().expect("edu body");
+    let edu_json: Value = serde_json::from_str(&edu_body).expect("valid json");
+    let edu_list = edu_json["body"].as_array().expect("edu array");
+    assert_eq!(edu_list.len(), 1, "should have 1 education entry");
+
+    let edu_id = edu_list[0]["id"].as_i64().expect("edu id") as i32;
+
+    // Fetch key points — must contain exactly the 2 non-metadata bullets
+    let kp_response = fixture
+        .client()
+        .get(format!(
+            "/api/resume/{}/education/{}/key_points",
+            resume_id, edu_id
+        ))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(kp_response.status(), Status::Ok);
+    let kp_body = kp_response.into_string().expect("kp body");
+    let kp_json: Value = serde_json::from_str(&kp_body).expect("valid json");
+    let kp_list = kp_json["body"].as_array().expect("kp array");
+
+    // The markdown has 2 key point bullets (the Degree and Description lines
+    // are parsed as metadata, not key points).
+    assert_eq!(
+        kp_list.len(),
+        2,
+        "education key points must not be silently dropped (V21)"
+    );
+}
