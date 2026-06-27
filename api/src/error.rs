@@ -11,9 +11,7 @@ use shared::response_models::Response;
 /// names, query text, etc.) are never exposed (V13).
 pub fn map_application_error(err: ApplicationError) -> Custom<Json<Response<String>>> {
     match err {
-        ApplicationError::NotFound(msg) => {
-            Custom(Status::NotFound, Json(Response { body: msg }))
-        }
+        ApplicationError::NotFound(msg) => Custom(Status::NotFound, Json(Response { body: msg })),
         ApplicationError::Forbidden => Custom(
             Status::Forbidden,
             Json(Response {
@@ -26,9 +24,7 @@ pub fn map_application_error(err: ApplicationError) -> Custom<Json<Response<Stri
                 body: "Unauthorized".to_string(),
             }),
         ),
-        ApplicationError::Conflict(msg) => {
-            Custom(Status::Conflict, Json(Response { body: msg }))
-        }
+        ApplicationError::Conflict(msg) => Custom(Status::Conflict, Json(Response { body: msg })),
         ApplicationError::BadRequest(msg) => {
             Custom(Status::BadRequest, Json(Response { body: msg }))
         }
@@ -67,9 +63,8 @@ mod tests {
 
     #[test]
     fn test_bad_request_returns_message() {
-        let response = map_application_error(ApplicationError::BadRequest(
-            "Invalid email".to_string(),
-        ));
+        let response =
+            map_application_error(ApplicationError::BadRequest("Invalid email".to_string()));
         assert_eq!(response.0, Status::BadRequest);
         assert_eq!(response.1.0.body, "Invalid email");
     }
