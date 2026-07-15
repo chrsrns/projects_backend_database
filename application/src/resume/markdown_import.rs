@@ -104,6 +104,7 @@ pub fn import_resume_markdown(
             email: full_resume.email,
             github_url: full_resume.github_url,
             mobile_number: full_resume.mobile_number,
+            executive_summary: None,
             created_by: Some(user_id_value),
             is_public: full_resume.is_public,
         };

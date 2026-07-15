@@ -8,6 +8,7 @@ pub struct ParsedResume {
     pub email: String,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
+    pub executive_summary: Option<String>,
     pub is_public: bool,
     pub education: Vec<ParsedEducation>,
     pub education_key_points: Vec<ParsedEducationKeyPoint>,

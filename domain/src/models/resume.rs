@@ -1,6 +1,8 @@
 use crate::schema::resumes;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use rocket::serde::de::{Deserializer, Error as DeError};
+use rocket::serde::json::Value as JsonValue;
 use rocket::serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
@@ -9,6 +11,23 @@ use super::{
     Education, EducationKeyPoint, Framework, Language, PortfolioKeyPoint, PortfolioProject,
     PortfolioTechnology, Skill, WorkExperience, WorkExperienceKeyPoint,
 };
+
+fn deserialize_optional_nullable_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = JsonValue::deserialize(deserializer)?;
+    match value {
+        JsonValue::Null => Ok(Some(None)),
+        JsonValue::String(value) => Ok(Some(Some(value))),
+        other => Err(DeError::custom(format!(
+            "expected string or null, got {}",
+            other
+        ))),
+    }
+}
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Resume {
@@ -19,6 +38,7 @@ pub struct Resume {
     pub email: String,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
+    pub executive_summary: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub created_by: Option<i32>,
@@ -35,6 +55,7 @@ pub struct NewResume {
     pub email: String,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
+    pub executive_summary: Option<String>,
     pub created_by: Option<i32>,
     pub is_public: bool,
 }
@@ -48,6 +69,7 @@ pub struct NewResumeRequest {
     pub email: String,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
+    pub executive_summary: Option<String>,
     pub is_public: Option<bool>,
 }
 
@@ -61,6 +83,8 @@ pub struct UpdateResume {
     pub email: Option<String>,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub executive_summary: Option<Option<String>>,
     pub is_public: Option<bool>,
 }
 

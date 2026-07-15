@@ -109,6 +109,7 @@ diesel::table! {
         github_url -> Nullable<Varchar>,
         #[max_length = 50]
         mobile_number -> Nullable<Varchar>,
+        executive_summary -> Nullable<Text>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
         created_by -> Nullable<Int4>,

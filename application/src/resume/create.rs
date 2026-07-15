@@ -17,6 +17,7 @@ pub fn create_resume(
         email: resume.email,
         github_url: resume.github_url,
         mobile_number: resume.mobile_number,
+        executive_summary: None,
         created_by: Some(user_id_value),
         is_public: resume.is_public.unwrap_or(false),
     };
