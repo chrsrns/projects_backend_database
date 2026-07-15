@@ -45,6 +45,19 @@ pub fn find_accessible_resume(
     }
 }
 
+pub fn validate_executive_summary(
+    summary: Option<String>,
+) -> Result<Option<String>, ApplicationError> {
+    match summary {
+        None => Ok(None),
+        Some(summary) if summary.trim().is_empty() => Ok(None),
+        Some(summary) if summary.chars().count() > 5000 => Err(ApplicationError::BadRequest(
+            "Executive summary must be at most 5000 characters".to_string(),
+        )),
+        Some(summary) => Ok(Some(summary)),
+    }
+}
+
 pub fn app_err_from_diesel_err(err: diesel::result::Error) -> ApplicationError {
     match err {
         diesel::result::Error::DatabaseError(

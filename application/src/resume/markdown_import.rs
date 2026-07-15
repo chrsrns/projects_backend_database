@@ -7,7 +7,10 @@ use domain::models::{
 use infrastructure::run_in_transaction;
 use shared::markdown;
 
-use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, validate_executive_summary},
+};
 
 /// Resolves an index into a parent ID map, returning `BadRequest` if the
 /// index is out of bounds (V21).
@@ -89,6 +92,8 @@ pub fn import_resume_markdown(
         }
     }
 
+    let executive_summary = validate_executive_summary(full_resume.executive_summary)?;
+
     let mut conn = infrastructure::establish_connection();
     run_in_transaction(&mut conn, |conn| {
         use domain::schema::{
@@ -104,7 +109,7 @@ pub fn import_resume_markdown(
             email: full_resume.email,
             github_url: full_resume.github_url,
             mobile_number: full_resume.mobile_number,
-            executive_summary: None,
+            executive_summary,
             created_by: Some(user_id_value),
             is_public: full_resume.is_public,
         };

@@ -2,7 +2,10 @@ use diesel::prelude::*;
 use domain::models::{NewResume, NewResumeRequest, Resume};
 use infrastructure::establish_connection;
 
-use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, validate_executive_summary},
+};
 
 pub fn create_resume(
     user_id_value: i32,
@@ -17,7 +20,7 @@ pub fn create_resume(
         email: resume.email,
         github_url: resume.github_url,
         mobile_number: resume.mobile_number,
-        executive_summary: None,
+        executive_summary: validate_executive_summary(resume.executive_summary)?,
         created_by: Some(user_id_value),
         is_public: resume.is_public.unwrap_or(false),
     };

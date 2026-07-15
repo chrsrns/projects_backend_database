@@ -4,12 +4,12 @@ use domain::schema::resumes;
 use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
-use crate::resume::common::{app_err_from_diesel_err, find_resume};
+use crate::resume::common::{app_err_from_diesel_err, find_resume, validate_executive_summary};
 
 pub fn update_resume(
     user_id_value: i32,
     resume_id: i32,
-    resume: UpdateResume,
+    mut resume: UpdateResume,
 ) -> Result<Resume, ApplicationError> {
     let existing = find_resume(resume_id)?;
 
@@ -19,6 +19,11 @@ pub fn update_resume(
             return Err(ApplicationError::Forbidden);
         }
     }
+
+    resume.executive_summary = resume
+        .executive_summary
+        .map(validate_executive_summary)
+        .transpose()?;
 
     match diesel::update(resumes::table.find(resume_id))
         .set(&resume)
