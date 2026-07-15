@@ -1017,3 +1017,80 @@ fn test_import_child_key_points_are_not_silently_dropped() {
         "education key points must not be silently dropped (V21)"
     );
 }
+
+#[test]
+fn test_executive_summary_markdown_round_trip() {
+    let mut fixture = support::Fixture::new(9_228_007);
+    let (resume_id, original_email) = create_full_resume(&mut fixture, 9_228_007);
+    let summary = "Systems engineer with distributed-systems experience.";
+
+    let update_response = fixture
+        .client()
+        .put(format!("/api/resume/{}", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(serde_json::json!({ "executive_summary": summary }).to_string())
+        .dispatch();
+    assert_eq!(update_response.status(), Status::Ok);
+    let _ = update_response.into_string();
+
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(export_response.status(), Status::Ok);
+    let markdown = export_response.into_string().expect("markdown body");
+    assert!(markdown.contains("## Summary"));
+    assert!(markdown.contains(summary));
+
+    let imported_email = support::unique_email("exec.summary.markdown");
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown.replace(
+            &format!("- Email: {}", original_email),
+            &format!("- Email: {}", imported_email),
+        ))
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid JSON");
+    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(imported_id);
+    assert_eq!(import_json["body"]["executive_summary"], summary);
+}
+
+#[test]
+fn test_executive_summary_markdown_omission() {
+    let mut fixture = support::Fixture::new(9_228_008);
+    let (resume_id, _email) = create_full_resume(&mut fixture, 9_228_008);
+
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(export_response.status(), Status::Ok);
+    let markdown = export_response.into_string().expect("markdown body");
+    assert!(!markdown.contains("## Summary"));
+
+    let email = support::unique_email("exec.summary.omission");
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(format!("# No Summary\n\n- Email: {}\n", email))
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid JSON");
+    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(imported_id);
+    assert!(import_json["body"]["executive_summary"].is_null());
+}
