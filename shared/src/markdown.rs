@@ -79,7 +79,7 @@ fn format_optional_date(date: Option<NaiveDate>) -> String {
 }
 
 fn try_parse_date_range(date_range: &str) -> Option<(NaiveDate, Option<NaiveDate>)> {
-    let (start_text, end_text) = date_range.split_once('-')?;
+    let (start_text, end_text) = date_range.split_once(" - ")?;
     let start_date = parse_markdown_date(start_text.trim()).ok()?;
     let trimmed_end = end_text.trim();
     let end_date = if trimmed_end.eq_ignore_ascii_case("present")
@@ -1066,5 +1066,25 @@ mod tests {
     fn test_work_experience_heading_without_valid_date_range() {
         let markdown = "# Resume\n\n- Email: test@example.com\n\n## Work Experience\n\n### Senior Engineer - Company (ABC)\n";
         assert!(markdown_to_resume(markdown).is_err());
+    }
+
+    #[test]
+    fn test_education_heading_with_iso_date() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (2020-09-01 - 2024-05-01)\n- Degree: Bachelor of Science\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        let edu = parsed.education.first().expect("one education");
+        assert_eq!(edu.start_date, NaiveDate::from_ymd_opt(2020, 9, 1).unwrap());
+        assert_eq!(edu.end_date, NaiveDate::from_ymd_opt(2024, 5, 1));
+    }
+
+    #[test]
+    fn test_work_experience_heading_with_iso_date() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Work Experience\n\n### Senior Engineer - Tech Corp (2020-01-15 - 2023-08-30)\n- Description: Backend development\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        let work = parsed.work_experiences.first().expect("one work");
+        assert_eq!(work.start_date, NaiveDate::from_ymd_opt(2020, 1, 15).unwrap());
+        assert_eq!(work.end_date, NaiveDate::from_ymd_opt(2023, 8, 30));
+        assert_eq!(work.job_title, "Senior Engineer");
+        assert_eq!(work.company_name.as_deref(), Some("Tech Corp"));
     }
 }
