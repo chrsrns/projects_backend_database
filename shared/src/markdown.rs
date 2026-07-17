@@ -145,6 +145,13 @@ pub fn resume_to_markdown(resume: &FullResume) -> String {
     writeln!(output, "- Public: {}", resume.resume.is_public).unwrap();
     writeln!(output).unwrap();
 
+    if let Some(summary) = &resume.resume.executive_summary {
+        writeln!(output, "## Summary").unwrap();
+        writeln!(output).unwrap();
+        writeln!(output, "{}", summary).unwrap();
+        writeln!(output).unwrap();
+    }
+
     if !resume.education.is_empty() {
         writeln!(output, "## Education").unwrap();
         writeln!(output).unwrap();
@@ -303,6 +310,8 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
     let mut github_url: Option<String> = None;
     let mut mobile_number: Option<String> = None;
     let mut is_public: bool = false;
+    let mut executive_summary: Option<String> = None;
+    let mut summary_text = String::new();
 
     // Section buffers
     let mut education: Vec<ParsedEducation> = Vec::new();
@@ -319,6 +328,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
     #[derive(Debug, PartialEq)]
     enum Section {
         Header,
+        Summary,
         Education,
         Skills,
         WorkExperience,
@@ -349,15 +359,23 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                 if heading_level == HeadingLevel::H1 {
                     resume_name = Some(heading_text.trim().to_string());
                 } else if heading_level == HeadingLevel::H2 {
+                    if current_section == Section::Summary {
+                        let s = summary_text.trim();
+                        if !s.is_empty() {
+                            executive_summary = Some(s.to_string());
+                        }
+                        summary_text.clear();
+                    }
                     current_section = match heading_text.trim() {
                         "Education" => Section::Education,
                         "Skills" => Section::Skills,
                         "Work Experience" => Section::WorkExperience,
                         "Portfolio Projects" => Section::Portfolio,
                         "Languages & Frameworks" => Section::Languages,
+                        "Summary" => Section::Summary,
                         other => {
                             return Err(MarkdownError::InvalidMarkdown(format!(
-                                "Unknown section '{}'. Expected one of: Education, Skills, Work Experience, Portfolio Projects, Languages & Frameworks",
+                                "Unknown section '{}'. Expected one of: Education, Skills, Work Experience, Portfolio Projects, Languages & Frameworks, Summary",
                                 other
                             )));
                         }
@@ -526,6 +544,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                             });
                         }
                     }
+                    Section::Summary => {}
                 }
             }
             Event::Start(Tag::Link { dest_url, .. }) => {
@@ -538,6 +557,9 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                     let formatted = format!("{} ({})", link_text.trim(), link_url);
                     heading_text.push_str(&formatted);
                     list_item_text.push_str(&formatted);
+                    if current_section == Section::Summary && heading_level == HeadingLevel::H1 {
+                        summary_text.push_str(&formatted);
+                    }
                     link_active = false;
                 }
             }
@@ -547,6 +569,9 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                 } else {
                     list_item_text.push_str(text);
                     heading_text.push_str(text);
+                    if current_section == Section::Summary && heading_level == HeadingLevel::H1 {
+                        summary_text.push_str(text);
+                    }
                 }
             }
             Event::Code(code) => {
@@ -556,6 +581,9 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                 } else {
                     list_item_text.push_str(&formatted);
                     heading_text.push_str(&formatted);
+                    if current_section == Section::Summary && heading_level == HeadingLevel::H1 {
+                        summary_text.push_str(&formatted);
+                    }
                 }
             }
             Event::SoftBreak | Event::HardBreak => {
@@ -564,9 +592,19 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                 } else {
                     list_item_text.push(' ');
                     heading_text.push(' ');
+                    if current_section == Section::Summary && heading_level == HeadingLevel::H1 {
+                        summary_text.push(' ');
+                    }
                 }
             }
             _ => {}
+        }
+    }
+
+    if current_section == Section::Summary {
+        let s = summary_text.trim();
+        if !s.is_empty() {
+            executive_summary = Some(s.to_string());
         }
     }
 
@@ -586,7 +624,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
         email,
         github_url,
         mobile_number,
-        executive_summary: None,
+        executive_summary,
         is_public,
         education,
         education_key_points,
