@@ -60,7 +60,7 @@ Systems engineer with distributed-systems experience.
 
 - H3 heading format: `### <Education Stage> - <Institution Name> (<Start Date> - <End Date>) [order: <number>]`
 - The ` - ` separator between stage and institution is required.
-- The final parenthesized segment must be a valid date range.
+- The final parenthesized segment must be a valid date range (see [Dates](#dates) for syntax).
 - If the institution name itself contains parentheses, the last parenthesized segment is still parsed as the date range (e.g. `University of (ABC) (Sep 2020 - May 2024)`).
 - `[order: <number>]` is optional and controls display order.
 - Bullets:
@@ -95,7 +95,7 @@ Systems engineer with distributed-systems experience.
 
 - H3 heading format: `### <Job Title> - <Company Name> (<Start Date> - <End Date>) [order: <number>]`
 - The company name and its ` - ` separator are optional.
-- The final parenthesized segment must be a valid date range.
+- The final parenthesized segment must be a valid date range (see [Dates](#dates) for syntax).
 - `[order: <number>]` is optional.
 - Bullets:
   - `Description:` sets the description field.
@@ -145,14 +145,29 @@ Systems engineer with distributed-systems experience.
 
 ## Dates
 
-Date ranges use the format `(<Start> - <End>)`.
+In `Education` and `Work Experience` headings, the **final parenthesized segment** is parsed as the date range. A date range must be written as `(<Start> - <End>)` and must contain at least one hyphen.
 
-- Start and end dates can be written as:
-  - `Sep 2020` (`%b %Y`)
-  - `2020-09-01` (`%Y-%m-%d`)
-  - `<Month Abbreviation> <Year>` such as `January 2020` or `Jan 2020`
-- The end date can be `Present`, `Current`, or `Ongoing`.
+- Start and end dates must use one of these formats:
+  - `Sep 2020` — three-letter English month abbreviation followed by a four-digit year (case-insensitive).
+  - `2020-09-01` — ISO `YYYY-MM-DD`.
+- The end date may be `Present`, `Current`, or `Ongoing` (case-insensitive) instead of a real date.
 - The start date must not be after the end date.
+- Text in parentheses without a hyphen is treated as part of the title, not a date range.
+
+Examples of valid date ranges:
+
+```markdown
+(Sep 2020 - May 2024)
+(2020-09-01 - 2024-05-01)
+(Jan 2020 - Present)
+```
+
+Invalid date ranges:
+
+- `(Sep 2020 to May 2024)` — missing hyphen.
+- `(September 2020 - May 2024)` — full month names are not supported.
+- `(2020 - 2024)` — missing month and day.
+- `(ABC)` — no hyphen, so it is treated as title text.
 
 ## Display order
 
