@@ -1094,3 +1094,24 @@ fn test_executive_summary_markdown_omission() {
     fixture.track_resume_id(imported_id);
     assert!(import_json["body"]["executive_summary"].is_null());
 }
+
+#[test]
+fn test_get_markdown_format() {
+    let fixture = support::Fixture::new(9_228_010);
+    let expected = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../MARKDOWN_FORMAT.md"
+    ));
+
+    let response = fixture
+        .client()
+        .get("/api/resume/markdown-format")
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok);
+    let content_type = response.content_type().expect("content type");
+    assert_eq!(content_type.top(), "text");
+    assert_eq!(content_type.sub(), "markdown");
+
+    let body = response.into_string().expect("markdown body");
+    assert_eq!(body, expected);
+}

@@ -160,3 +160,21 @@ pub fn import_resume_markdown(
         Err(err) => Err(map_markdown_error(err)),
     }
 }
+
+const MARKDOWN_FORMAT: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../MARKDOWN_FORMAT.md"
+));
+
+#[utoipa::path(
+    get,
+    path = "/resume/markdown-format",
+    tag = "Resumes",
+    responses(
+        (status = 200, description = "Markdown format specification", body = String, content_type = "text/markdown"),
+    )
+)]
+#[get("/resume/markdown-format")]
+pub fn get_markdown_format() -> MarkdownResult {
+    Ok(MarkdownResponse(MARKDOWN_FORMAT.to_string()))
+}
