@@ -120,13 +120,19 @@ pub fn import_resume_markdown(
 
         let mut education_id_map: Vec<i32> = Vec::new();
         for (idx, edu) in full_resume.education.iter().enumerate() {
+            let end_pair = edu
+                .end_date
+                .as_ref()
+                .map(|end| (end.canonical_end_date(), end.precision.to_string()));
             let new_edu = NewEducation {
                 resume_id: resume.id,
                 education_stage: edu.education_stage.clone(),
                 institution_name: edu.institution_name.clone(),
                 degree: edu.degree.clone(),
-                start_date: edu.start_date,
-                end_date: edu.end_date,
+                start_date: edu.start_date.canonical_start_date(),
+                start_date_precision: edu.start_date.precision.to_string(),
+                end_date: end_pair.as_ref().map(|(d, _)| *d),
+                end_date_precision: end_pair.map(|(_, p)| p),
                 description: edu.description.clone(),
                 display_order: edu.display_order.or(Some(idx as i32)),
             };
@@ -163,12 +169,18 @@ pub fn import_resume_markdown(
 
         let mut work_id_map: Vec<i32> = Vec::new();
         for (idx, work) in full_resume.work_experiences.iter().enumerate() {
+            let end_pair = work
+                .end_date
+                .as_ref()
+                .map(|end| (end.canonical_end_date(), end.precision.to_string()));
             let new_work = NewWorkExperience {
                 resume_id: resume.id,
                 job_title: work.job_title.clone(),
                 company_name: work.company_name.clone(),
-                start_date: work.start_date,
-                end_date: work.end_date,
+                start_date: work.start_date.canonical_start_date(),
+                start_date_precision: work.start_date.precision.to_string(),
+                end_date: end_pair.as_ref().map(|(d, _)| *d),
+                end_date_precision: end_pair.map(|(_, p)| p),
                 description: work.description.clone(),
                 display_order: work.display_order.or(Some(idx as i32)),
             };

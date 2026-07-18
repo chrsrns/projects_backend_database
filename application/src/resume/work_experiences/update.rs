@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use domain::models::{
-    Resume, UpdateWorkExperience, UpdateWorkExperienceKeyPoint, WorkExperience,
-    WorkExperienceKeyPoint,
+    Resume, UpdateWorkExperience, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest,
+    WorkExperience, WorkExperienceKeyPoint,
 };
 use infrastructure::establish_connection;
 
@@ -26,7 +26,7 @@ fn normalize_optional_string_change(value: Option<Option<String>>) -> Option<Opt
 pub fn update_work_experience(
     user_id_value: i32,
     work_id_value: i32,
-    payload: UpdateWorkExperience,
+    request: UpdateWorkExperienceRequest,
 ) -> Result<WorkExperience, ApplicationError> {
     use domain::schema::work_experiences;
 
@@ -47,14 +47,48 @@ pub fn update_work_experience(
         }
     }
 
+    let new_start = request
+        .start_date
+        .map(|pd| pd.canonical_start_date())
+        .unwrap_or(existing.start_date);
+    let new_end = match request.end_date {
+        None => existing.end_date,
+        Some(None) => None,
+        Some(Some(pd)) => Some(pd.canonical_end_date()),
+    };
+
+    if let Some(end) = new_end
+        && new_start > end
+    {
+        return Err(ApplicationError::BadRequest(
+            "start_date is after end_date".to_string(),
+        ));
+    }
+
     let payload = UpdateWorkExperience {
-        job_title: payload.job_title.map(|v| v.trim().to_string()),
-        company_name: normalize_optional_string_change(payload.company_name),
-        start_date: payload.start_date,
-        end_date: payload.end_date,
-        description: normalize_optional_string_change(payload.description),
-        display_order: payload.display_order,
-        active: payload.active,
+        job_title: request.job_title.map(|v| v.trim().to_string()),
+        company_name: normalize_optional_string_change(request.company_name),
+        start_date: request
+            .start_date
+            .as_ref()
+            .map(|pd| pd.canonical_start_date()),
+        start_date_precision: request
+            .start_date
+            .as_ref()
+            .map(|pd| pd.precision.to_string()),
+        end_date: match request.end_date {
+            None => None,
+            Some(None) => Some(None),
+            Some(Some(pd)) => Some(Some(pd.canonical_end_date())),
+        },
+        end_date_precision: match request.end_date {
+            None => None,
+            Some(None) => Some(None),
+            Some(Some(pd)) => Some(Some(pd.precision.to_string())),
+        },
+        description: normalize_optional_string_change(request.description),
+        display_order: request.display_order,
+        active: request.active,
     };
     match diesel::update(work_experiences::table.find(work_id_value))
         .set(&payload)

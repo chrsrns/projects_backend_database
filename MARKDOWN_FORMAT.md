@@ -147,7 +147,8 @@ Systems engineer with distributed-systems experience.
 
 In `Education` and `Work Experience` headings, the **final parenthesized segment** is parsed as the date range. A date range must be written as `(<Start> - <End>)` and must contain at least one hyphen.
 
-- Start and end dates must use one of these formats:
+- Start and end dates may use one of these formats:
+  - `2020` — four-digit year.
   - `Sep 2020` — three-letter English month abbreviation followed by a four-digit year (case-insensitive).
   - `September 2020` — full English month name followed by a four-digit year (case-insensitive).
   - `2020-09-01` — ISO `YYYY-MM-DD`.
@@ -158,6 +159,7 @@ In `Education` and `Work Experience` headings, the **final parenthesized segment
 Examples of valid date ranges:
 
 ```markdown
+(2020 - 2024)
 (Sep 2020 - May 2024)
 (September 2020 - May 2024)
 (2020-09-01 - 2024-05-01)
@@ -168,8 +170,7 @@ Examples of valid date ranges:
 Invalid date ranges:
 
 - `(Sep 2020 to May 2024)` — missing hyphen.
-- `(January 2020 - 2024)` — missing month and day in end date.
-- `(2020 - 2024)` — missing month and day.
+- `(2020-09 - 2024-05)` — ISO month-only `YYYY-MM` is not supported in Markdown.
 - `(ABC)` — no hyphen, so it is treated as title text.
 
 ## Display order

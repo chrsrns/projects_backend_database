@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 use domain::models::{
     Education, EducationKeyPoint, Resume, UpdateEducation, UpdateEducationKeyPoint,
+    UpdateEducationRequest,
 };
 use infrastructure::establish_connection;
 
@@ -12,7 +13,7 @@ use crate::{
 pub fn update_education(
     user_id_value: i32,
     education_id_value: i32,
-    payload: UpdateEducation,
+    request: UpdateEducationRequest,
 ) -> Result<Education, ApplicationError> {
     use domain::schema::education;
 
@@ -34,6 +35,51 @@ pub fn update_education(
             return Err(ApplicationError::Forbidden);
         }
     }
+
+    let new_start = request
+        .start_date
+        .map(|pd| pd.canonical_start_date())
+        .unwrap_or(existing.start_date);
+    let new_end = match request.end_date {
+        None => existing.end_date,
+        Some(None) => None,
+        Some(Some(pd)) => Some(pd.canonical_end_date()),
+    };
+
+    if let Some(end) = new_end
+        && new_start > end
+    {
+        return Err(ApplicationError::BadRequest(
+            "start_date is after end_date".to_string(),
+        ));
+    }
+
+    let payload = UpdateEducation {
+        education_stage: request.education_stage,
+        institution_name: request.institution_name,
+        degree: request.degree,
+        start_date: request
+            .start_date
+            .as_ref()
+            .map(|pd| pd.canonical_start_date()),
+        start_date_precision: request
+            .start_date
+            .as_ref()
+            .map(|pd| pd.precision.to_string()),
+        end_date: match request.end_date {
+            None => None,
+            Some(None) => Some(None),
+            Some(Some(pd)) => Some(Some(pd.canonical_end_date())),
+        },
+        end_date_precision: match request.end_date {
+            None => None,
+            Some(None) => Some(None),
+            Some(Some(pd)) => Some(Some(pd.precision.to_string())),
+        },
+        description: request.description,
+        display_order: request.display_order,
+        active: request.active,
+    };
 
     match diesel::update(education::table.find(education_id_value))
         .set(&payload)

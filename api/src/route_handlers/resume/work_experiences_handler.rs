@@ -1,7 +1,7 @@
 use application::resume::work_experiences;
 use domain::models::{
-    NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, UpdateWorkExperience,
-    UpdateWorkExperienceKeyPoint, WorkExperience, WorkExperienceKeyPoint,
+    NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, UpdateWorkExperienceKeyPoint,
+    UpdateWorkExperienceRequest, WorkExperience, WorkExperienceKeyPoint,
 };
 use rocket::State;
 use rocket::response::status::{Custom, NoContent};
@@ -90,7 +90,7 @@ pub fn create_work_experience_handler(
     params(
         ("work_id" = i32, Path, description = "Work experience id")
     ),
-    request_body(content = UpdateWorkExperience, content_type = "application/json"),
+    request_body(content = UpdateWorkExperienceRequest, content_type = "application/json"),
     responses(
         (status = 200, description = "OK", body = Response<WorkExperience>, content_type = "application/json"),
         (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
@@ -107,7 +107,7 @@ pub fn update_work_experience_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     work_id: i32,
-    payload: Json<UpdateWorkExperience>,
+    payload: Json<UpdateWorkExperienceRequest>,
 ) -> JsonResult<WorkExperience> {
     match work_experiences::update_work_experience(auth.user_id, work_id, payload.into_inner()) {
         Ok(item) => {

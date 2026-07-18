@@ -1,7 +1,7 @@
 use application::resume::education;
 use domain::models::{
     Education, EducationKeyPoint, NewEducationKeyPointRequest, NewEducationRequest,
-    UpdateEducation, UpdateEducationKeyPoint,
+    UpdateEducationKeyPoint, UpdateEducationRequest,
 };
 use rocket::State;
 use rocket::response::status::{Custom, NoContent};
@@ -90,7 +90,7 @@ pub fn create_education_handler(
     params(
         ("education_id" = i32, Path, description = "Education id")
     ),
-    request_body(content = UpdateEducation, content_type = "application/json"),
+    request_body(content = UpdateEducationRequest, content_type = "application/json"),
     responses(
         (status = 200, description = "OK", body = Response<Education>, content_type = "application/json"),
         (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
@@ -107,7 +107,7 @@ pub fn update_education_handler(
     auth: AuthSession,
     hub: &State<Hub>,
     education_id: i32,
-    payload: Json<UpdateEducation>,
+    payload: Json<UpdateEducationRequest>,
 ) -> JsonResult<Education> {
     match education::update_education(auth.user_id, education_id, payload.into_inner()) {
         Ok(item) => {

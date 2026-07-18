@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use super::PartialDate;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedResume {
@@ -27,8 +27,8 @@ pub struct ParsedEducation {
     pub education_stage: String,
     pub institution_name: String,
     pub degree: Option<String>,
-    pub start_date: NaiveDate,
-    pub end_date: Option<NaiveDate>,
+    pub start_date: PartialDate,
+    pub end_date: Option<PartialDate>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
 }
@@ -50,8 +50,8 @@ pub struct ParsedSkill {
 pub struct ParsedWorkExperience {
     pub job_title: String,
     pub company_name: Option<String>,
-    pub start_date: NaiveDate,
-    pub end_date: Option<NaiveDate>,
+    pub start_date: PartialDate,
+    pub end_date: Option<PartialDate>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
 }

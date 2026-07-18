@@ -16,6 +16,8 @@ diesel::table! {
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
         active -> Bool,
+        start_date_precision -> Varchar,
+        end_date_precision -> Nullable<Varchar>,
     }
 }
 
@@ -176,6 +178,8 @@ diesel::table! {
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
         active -> Bool,
+        start_date_precision -> Varchar,
+        end_date_precision -> Nullable<Varchar>,
     }
 }
 

@@ -1,15 +1,16 @@
 use utoipa::{Modify, OpenApi};
 
 use domain::models::{
-    AuthLoginRequest, AuthRegisterRequest, Education, EducationKeyPoint, Framework, FullResume,
-    Language, NewEducationKeyPointRequest, NewEducationRequest, NewFrameworkRequest,
+    AuthLoginRequest, AuthRegisterRequest, DatePrecision, Education, EducationKeyPoint, Framework,
+    FullResume, Language, NewEducationKeyPointRequest, NewEducationRequest, NewFrameworkRequest,
     NewLanguageRequest, NewPortfolioKeyPointRequest, NewPortfolioProjectRequest,
     NewPortfolioTechnologyRequest, NewResumeRequest, NewSkillRequest,
-    NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, PortfolioKeyPoint,
-    PortfolioProject, PortfolioTechnology, Resume, Skill, UpdateEducation, UpdateEducationKeyPoint,
-    UpdateFramework, UpdateLanguage, UpdatePortfolioKeyPoint, UpdatePortfolioProject,
-    UpdatePortfolioTechnology, UpdateResume, UpdateSkill, UpdateWorkExperience,
-    UpdateWorkExperienceKeyPoint, User, WorkExperience, WorkExperienceKeyPoint,
+    NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, PartialDate, PortfolioKeyPoint,
+    PortfolioProject, PortfolioTechnology, Resume, Skill, UpdateEducationKeyPoint,
+    UpdateEducationRequest, UpdateFramework, UpdateLanguage, UpdatePortfolioKeyPoint,
+    UpdatePortfolioProject, UpdatePortfolioTechnology, UpdateResume, UpdateSkill,
+    UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest, User, WorkExperience,
+    WorkExperienceKeyPoint,
 };
 use shared::response_models::{AuthTokenResponse, Response};
 use utoipa::openapi::ComponentsBuilder;
@@ -107,6 +108,8 @@ impl Modify for ServerAddon {
     components(schemas(
         AuthTokenResponse,
         FullResume,
+        PartialDate,
+        DatePrecision,
         Response::<User>,
         Response::<Resume>,
         Response::<Skill>,
@@ -130,11 +133,11 @@ impl Modify for ServerAddon {
         Response::<NewFrameworkRequest>,
         Response::<UpdateFramework>,
         Response::<NewEducationRequest>,
-        Response::<UpdateEducation>,
+        Response::<UpdateEducationRequest>,
         Response::<NewEducationKeyPointRequest>,
         Response::<UpdateEducationKeyPoint>,
         Response::<NewWorkExperienceRequest>,
-        Response::<UpdateWorkExperience>,
+        Response::<UpdateWorkExperienceRequest>,
         Response::<NewWorkExperienceKeyPointRequest>,
         Response::<UpdateWorkExperienceKeyPoint>,
         Response::<NewPortfolioProjectRequest>,

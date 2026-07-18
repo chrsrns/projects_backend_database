@@ -325,6 +325,10 @@ fn test_import_resume_markdown() {
     assert_eq!(education_items.len(), 1);
     assert_eq!(education_items[0]["institution_name"], "University of ABC");
     assert_eq!(education_items[0]["degree"], "Bachelor of Science");
+    assert_eq!(education_items[0]["start_date"], "2020-09");
+    assert_eq!(education_items[0]["end_date"], "2024-05");
+    assert!(education_items[0].get("start_date_precision").is_none());
+    assert!(education_items[0].get("end_date_precision").is_none());
 
     let skills_response = fixture
         .client()
@@ -354,7 +358,10 @@ fn test_import_resume_markdown() {
     assert_eq!(work_items.len(), 1);
     assert_eq!(work_items[0]["job_title"], "Senior Software Engineer");
     assert_eq!(work_items[0]["company_name"], "Tech Corp");
+    assert_eq!(work_items[0]["start_date"], "2020-01");
     assert!(work_items[0]["end_date"].is_null());
+    assert!(work_items[0].get("start_date_precision").is_none());
+    assert!(work_items[0].get("end_date_precision").is_none());
 
     let projects_response = fixture
         .client()
@@ -421,6 +428,8 @@ fn test_import_resume_markdown_with_iso_dates() {
     assert_eq!(education_items.len(), 1);
     assert_eq!(education_items[0]["start_date"], "2020-09-01");
     assert_eq!(education_items[0]["end_date"], "2024-05-01");
+    assert!(education_items[0].get("start_date_precision").is_none());
+    assert!(education_items[0].get("end_date_precision").is_none());
 
     let work_response = fixture
         .client()
@@ -434,6 +443,8 @@ fn test_import_resume_markdown_with_iso_dates() {
     assert_eq!(work_items.len(), 1);
     assert_eq!(work_items[0]["start_date"], "2020-01-15");
     assert_eq!(work_items[0]["end_date"], "2023-08-30");
+    assert!(work_items[0].get("start_date_precision").is_none());
+    assert!(work_items[0].get("end_date_precision").is_none());
 }
 
 #[test]
@@ -469,8 +480,12 @@ fn test_import_resume_markdown_with_full_month_names() {
     let education_json: Value = serde_json::from_str(&education_body).expect("valid json");
     let education_items = education_json["body"].as_array().expect("array");
     assert_eq!(education_items.len(), 1);
-    assert_eq!(education_items[0]["start_date"], "2020-09-01");
-    assert_eq!(education_items[0]["end_date"], "2024-05-01");
+    assert_eq!(education_items[0]["institution_name"], "University of ABC");
+    assert_eq!(education_items[0]["degree"], "Bachelor of Science");
+    assert_eq!(education_items[0]["start_date"], "2020-09");
+    assert_eq!(education_items[0]["end_date"], "2024-05");
+    assert!(education_items[0].get("start_date_precision").is_none());
+    assert!(education_items[0].get("end_date_precision").is_none());
 
     let work_response = fixture
         .client()
@@ -482,8 +497,12 @@ fn test_import_resume_markdown_with_full_month_names() {
     let work_json: Value = serde_json::from_str(&work_body).expect("valid json");
     let work_items = work_json["body"].as_array().expect("array");
     assert_eq!(work_items.len(), 1);
-    assert_eq!(work_items[0]["start_date"], "1919-01-01");
+    assert_eq!(work_items[0]["job_title"], "Senior Software Engineer");
+    assert_eq!(work_items[0]["company_name"], "Tech Corp");
+    assert_eq!(work_items[0]["start_date"], "1919-01");
     assert!(work_items[0]["end_date"].is_null());
+    assert!(work_items[0].get("start_date_precision").is_none());
+    assert!(work_items[0].get("end_date_precision").is_none());
 }
 
 #[test]
@@ -1193,6 +1212,255 @@ fn test_executive_summary_markdown_omission() {
     let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
     fixture.track_resume_id(imported_id);
     assert!(import_json["body"]["executive_summary"].is_null());
+}
+
+#[test]
+fn test_import_resume_markdown_with_year_only() {
+    let mut fixture = support::Fixture::new(9_227_020);
+    let unique_email = unique_markdown_email(9_227_020);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (2020 - 2024)\n- Degree: Bachelor of Science\n\n## Work Experience\n\n### Senior Software Engineer - Tech Corp (2020 - 2024)\n- Description: Backend development\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let education_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/education", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(education_response.status(), Status::Ok);
+    let education_body = education_response.into_string().expect("education body");
+    let education_json: Value = serde_json::from_str(&education_body).expect("valid json");
+    let education_items = education_json["body"].as_array().expect("array");
+    assert_eq!(education_items.len(), 1);
+    assert_eq!(education_items[0]["institution_name"], "University of ABC");
+    assert_eq!(education_items[0]["degree"], "Bachelor of Science");
+    assert_eq!(education_items[0]["start_date"], "2020");
+    assert_eq!(education_items[0]["end_date"], "2024");
+    assert!(education_items[0].get("start_date_precision").is_none());
+    assert!(education_items[0].get("end_date_precision").is_none());
+
+    let work_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/work_experiences", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(work_response.status(), Status::Ok);
+    let work_body = work_response.into_string().expect("work body");
+    let work_json: Value = serde_json::from_str(&work_body).expect("valid json");
+    let work_items = work_json["body"].as_array().expect("array");
+    assert_eq!(work_items.len(), 1);
+    assert_eq!(work_items[0]["job_title"], "Senior Software Engineer");
+    assert_eq!(work_items[0]["company_name"], "Tech Corp");
+    assert_eq!(work_items[0]["start_date"], "2020");
+    assert_eq!(work_items[0]["end_date"], "2024");
+    assert!(work_items[0].get("start_date_precision").is_none());
+    assert!(work_items[0].get("end_date_precision").is_none());
+}
+
+#[test]
+fn test_import_resume_markdown_with_invalid_date_range_returns_error() {
+    let fixture = support::Fixture::new(9_227_022);
+    let unique_email = unique_markdown_email(9_227_022);
+    let markdown = format!(
+        "# Test\n\n- Email: {}\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2024 - May 2020)",
+        unique_email
+    );
+
+    let response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::BadRequest);
+    let body = response.into_string().expect("body");
+    assert!(body.contains("date") || body.contains("range"));
+}
+
+#[test]
+fn test_export_resume_markdown_with_year_only_precision() {
+    let mut fixture = support::Fixture::new(9_227_021);
+    let unique_email = unique_markdown_email(9_227_021);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (2020 - 2024)\n- Degree: Bachelor of Science\n\n## Work Experience\n\n### Senior Software Engineer - Tech Corp (2020 - 2024)\n- Description: Backend development\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(export_response.status(), Status::Ok);
+    let exported = export_response.into_string().expect("markdown body");
+    assert!(exported.contains(
+        "### Bachelor's in Computer Science - University of ABC (2020 - 2024) [order: 0]"
+    ));
+    assert!(exported.contains("### Senior Software Engineer - Tech Corp (2020 - 2024) [order: 0]"));
+    assert!(!exported.contains("2020-01"));
+    assert!(!exported.contains("2024-01"));
+
+    let round_trip_email = unique_markdown_email(9_227_024);
+    let markdown_for_import = exported.replace(
+        &format!("- Email: {}", unique_email),
+        &format!("- Email: {}", round_trip_email),
+    );
+
+    let reimport_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown_for_import)
+        .dispatch();
+    assert_eq!(reimport_response.status(), Status::Created);
+    let reimport_body = reimport_response.into_string().expect("reimport body");
+    let reimport_json: Value = serde_json::from_str(&reimport_body).expect("valid json");
+    let reimported_id = reimport_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(reimported_id);
+
+    let education_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/education", reimported_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(education_response.status(), Status::Ok);
+    let education_body = education_response.into_string().expect("education body");
+    let education_json: Value = serde_json::from_str(&education_body).expect("valid json");
+    let education_items = education_json["body"].as_array().expect("array");
+    assert_eq!(education_items.len(), 1);
+    assert_eq!(education_items[0]["start_date"], "2020");
+    assert_eq!(education_items[0]["end_date"], "2024");
+
+    let work_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/work_experiences", reimported_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(work_response.status(), Status::Ok);
+    let work_body = work_response.into_string().expect("work body");
+    let work_json: Value = serde_json::from_str(&work_body).expect("valid json");
+    let work_items = work_json["body"].as_array().expect("array");
+    assert_eq!(work_items.len(), 1);
+    assert_eq!(work_items[0]["start_date"], "2020");
+    assert_eq!(work_items[0]["end_date"], "2024");
+}
+
+#[test]
+fn test_export_resume_markdown_with_month_year_round_trip() {
+    let mut fixture = support::Fixture::new(9_227_025);
+    let unique_email = unique_markdown_email(9_227_025);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (September 2020 - May 2024)\n- Degree: Bachelor of Science\n\n## Work Experience\n\n### Senior Software Engineer - Tech Corp (January 1919 - Present)\n- Description: Backend development\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(export_response.status(), Status::Ok);
+    let exported = export_response.into_string().expect("markdown body");
+    assert!(exported.contains(
+        "### Bachelor's in Computer Science - University of ABC (Sep 2020 - May 2024) [order: 0]"
+    ));
+    assert!(
+        exported
+            .contains("### Senior Software Engineer - Tech Corp (Jan 1919 - Present) [order: 0]")
+    );
+    assert!(!exported.contains("2020-09-01"));
+    assert!(!exported.contains("2024-05-01"));
+    assert!(!exported.contains("1919-01-01"));
+
+    let round_trip_email = unique_markdown_email(9_227_026);
+    let markdown_for_import = exported.replace(
+        &format!("- Email: {}", unique_email),
+        &format!("- Email: {}", round_trip_email),
+    );
+
+    let reimport_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown_for_import)
+        .dispatch();
+    assert_eq!(reimport_response.status(), Status::Created);
+    let reimport_body = reimport_response.into_string().expect("reimport body");
+    let reimport_json: Value = serde_json::from_str(&reimport_body).expect("valid json");
+    let reimported_id = reimport_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(reimported_id);
+
+    let education_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/education", reimported_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(education_response.status(), Status::Ok);
+    let education_body = education_response.into_string().expect("education body");
+    let education_json: Value = serde_json::from_str(&education_body).expect("valid json");
+    let education_items = education_json["body"].as_array().expect("array");
+    assert_eq!(education_items.len(), 1);
+    assert_eq!(education_items[0]["start_date"], "2020-09");
+    assert_eq!(education_items[0]["end_date"], "2024-05");
+
+    let work_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/work_experiences", reimported_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(work_response.status(), Status::Ok);
+    let work_body = work_response.into_string().expect("work body");
+    let work_json: Value = serde_json::from_str(&work_body).expect("valid json");
+    let work_items = work_json["body"].as_array().expect("array");
+    assert_eq!(work_items.len(), 1);
+    assert_eq!(work_items[0]["start_date"], "1919-01");
+    assert!(work_items[0]["end_date"].is_null());
 }
 
 #[test]

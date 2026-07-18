@@ -1,84 +1,39 @@
 use chrono::NaiveDate;
 use domain::models::{
-    FullResume, ParsedEducation, ParsedEducationKeyPoint, ParsedFramework, ParsedLanguage,
-    ParsedPortfolioKeyPoint, ParsedPortfolioProject, ParsedPortfolioTechnology, ParsedResume,
-    ParsedSkill, ParsedWorkExperience, ParsedWorkExperienceKeyPoint,
+    DatePrecision, FullResume, ParsedEducation, ParsedEducationKeyPoint, ParsedFramework,
+    ParsedLanguage, ParsedPortfolioKeyPoint, ParsedPortfolioProject, ParsedPortfolioTechnology,
+    ParsedResume, ParsedSkill, ParsedWorkExperience, ParsedWorkExperienceKeyPoint, PartialDate,
 };
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use std::fmt::Write;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkdownError {
     InvalidMarkdown(String),
 }
 
-const DATE_FORMAT: &str = "%b %Y";
-const DATE_FORMAT_FALLBACK: &str = "%Y-%m-%d";
-
-pub fn format_markdown_date(date: NaiveDate) -> String {
-    date.format(DATE_FORMAT).to_string()
+pub fn format_markdown_date(date: NaiveDate, precision: DatePrecision) -> String {
+    PartialDate {
+        canonical: date,
+        precision,
+    }
+    .to_markdown_string()
 }
 
-pub fn parse_markdown_date(s: &str) -> Result<NaiveDate, MarkdownError> {
-    let trimmed = s.trim();
-    if trimmed.is_empty() {
-        return Err(MarkdownError::InvalidMarkdown(
-            "Empty date string".to_string(),
-        ));
-    }
-
-    if let Ok(date) = NaiveDate::parse_from_str(trimmed, DATE_FORMAT) {
-        return Ok(date);
-    }
-
-    if let Ok(date) = NaiveDate::parse_from_str(trimmed, DATE_FORMAT_FALLBACK) {
-        return Ok(date);
-    }
-
-    if let Some(date) = parse_month_year_date(trimmed) {
-        return Ok(date);
-    }
-
-    Err(MarkdownError::InvalidMarkdown(format!(
-        "Unable to parse date '{}'",
-        trimmed
-    )))
+pub fn parse_markdown_date(s: &str) -> Result<PartialDate, MarkdownError> {
+    PartialDate::from_markdown_str(s).map_err(MarkdownError::InvalidMarkdown)
 }
 
-fn parse_month_year_date(s: &str) -> Option<NaiveDate> {
-    let parts: Vec<&str> = s.split_whitespace().collect();
-    if parts.len() != 2 {
-        return None;
-    }
-
-    let month_num = match parts[0].to_lowercase().as_str() {
-        "jan" | "january" => 1,
-        "feb" | "february" => 2,
-        "mar" | "march" => 3,
-        "apr" | "april" => 4,
-        "may" => 5,
-        "jun" | "june" => 6,
-        "jul" | "july" => 7,
-        "aug" | "august" => 8,
-        "sep" | "september" => 9,
-        "oct" | "october" => 10,
-        "nov" | "november" => 11,
-        "dec" | "december" => 12,
-        _ => return None,
-    };
-
-    let year: i32 = parts[1].parse().ok()?;
-    NaiveDate::from_ymd_opt(year, month_num, 1)
-}
-
-fn format_optional_date(date: Option<NaiveDate>) -> String {
-    match date {
-        Some(d) => format_markdown_date(d),
-        None => "Present".to_string(),
+fn format_optional_date(date: Option<NaiveDate>, precision: Option<DatePrecision>) -> String {
+    match (date, precision) {
+        (Some(d), Some(p)) => format_markdown_date(d, p),
+        (Some(d), None) => format_markdown_date(d, DatePrecision::Day),
+        (None, _) => "Present".to_string(),
     }
 }
 
-fn try_parse_date_range(date_range: &str) -> Option<(NaiveDate, Option<NaiveDate>)> {
+fn try_parse_date_range(date_range: &str) -> Option<(PartialDate, Option<PartialDate>)> {
     let (start_text, end_text) = date_range.split_once(" - ")?;
     let start_date = parse_markdown_date(start_text.trim()).ok()?;
     let trimmed_end = end_text.trim();
@@ -90,8 +45,8 @@ fn try_parse_date_range(date_range: &str) -> Option<(NaiveDate, Option<NaiveDate
     } else {
         Some(parse_markdown_date(trimmed_end).ok()?)
     };
-    if let Some(end) = end_date
-        && start_date > end
+    if let Some(ref end) = end_date
+        && start_date.canonical_start_date() > end.canonical_end_date()
     {
         return None;
     }
@@ -100,7 +55,7 @@ fn try_parse_date_range(date_range: &str) -> Option<(NaiveDate, Option<NaiveDate
 
 fn find_last_date_range(
     text: &str,
-) -> Result<(NaiveDate, Option<NaiveDate>, usize), MarkdownError> {
+) -> Result<(PartialDate, Option<PartialDate>, usize), MarkdownError> {
     let mut candidates = Vec::new();
     for (close_pos, c) in text.char_indices() {
         if c == ')'
@@ -161,8 +116,17 @@ pub fn resume_to_markdown(resume: &FullResume) -> String {
                 "### {} - {} ({} - {}) [order: {}]",
                 edu.education_stage,
                 edu.institution_name,
-                format_markdown_date(edu.start_date),
-                format_optional_date(edu.end_date),
+                format_markdown_date(
+                    edu.start_date,
+                    DatePrecision::from_str(&edu.start_date_precision)
+                        .unwrap_or(DatePrecision::Day),
+                ),
+                format_optional_date(
+                    edu.end_date,
+                    edu.end_date_precision
+                        .as_deref()
+                        .and_then(|s| DatePrecision::from_str(s).ok()),
+                ),
                 edu.display_order.unwrap_or(0)
             )
             .unwrap();
@@ -210,8 +174,17 @@ pub fn resume_to_markdown(resume: &FullResume) -> String {
             writeln!(
                 output,
                 " ({} - {}) [order: {}]",
-                format_markdown_date(work.start_date),
-                format_optional_date(work.end_date),
+                format_markdown_date(
+                    work.start_date,
+                    DatePrecision::from_str(&work.start_date_precision)
+                        .unwrap_or(DatePrecision::Day),
+                ),
+                format_optional_date(
+                    work.end_date,
+                    work.end_date_precision
+                        .as_deref()
+                        .and_then(|s| DatePrecision::from_str(s).ok()),
+                ),
                 work.display_order.unwrap_or(0)
             )
             .unwrap();
@@ -846,6 +819,8 @@ fn parse_skill_bullet(text: &str) -> Result<ParsedSkill, MarkdownError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDate;
+    use domain::models::{DatePrecision, PartialDate};
 
     #[test]
     fn test_heading_preserves_inline_code() {
@@ -1035,8 +1010,20 @@ mod tests {
         let edu = parsed.education.first().expect("one education");
         assert_eq!(edu.education_stage, "Bachelor's");
         assert_eq!(edu.institution_name, "University of (ABC)");
-        assert_eq!(edu.start_date, NaiveDate::from_ymd_opt(2020, 9, 1).unwrap());
-        assert_eq!(edu.end_date, NaiveDate::from_ymd_opt(2024, 5, 1));
+        assert_eq!(
+            edu.start_date,
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                precision: DatePrecision::Month,
+            }
+        );
+        assert_eq!(
+            edu.end_date,
+            Some(PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2024, 5, 1).unwrap(),
+                precision: DatePrecision::Month,
+            })
+        );
     }
 
     #[test]
@@ -1051,7 +1038,10 @@ mod tests {
         assert_eq!(work.company_name.as_deref(), Some("Acme (Global)"));
         assert_eq!(
             work.start_date,
-            NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+                precision: DatePrecision::Month,
+            }
         );
         assert_eq!(work.end_date, None);
     }
@@ -1073,8 +1063,20 @@ mod tests {
         let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (2020-09-01 - 2024-05-01)\n- Degree: Bachelor of Science\n";
         let parsed = markdown_to_resume(markdown).expect("parse ok");
         let edu = parsed.education.first().expect("one education");
-        assert_eq!(edu.start_date, NaiveDate::from_ymd_opt(2020, 9, 1).unwrap());
-        assert_eq!(edu.end_date, NaiveDate::from_ymd_opt(2024, 5, 1));
+        assert_eq!(
+            edu.start_date,
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                precision: DatePrecision::Day,
+            }
+        );
+        assert_eq!(
+            edu.end_date,
+            Some(PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2024, 5, 1).unwrap(),
+                precision: DatePrecision::Day,
+            })
+        );
     }
 
     #[test]
@@ -1084,9 +1086,18 @@ mod tests {
         let work = parsed.work_experiences.first().expect("one work");
         assert_eq!(
             work.start_date,
-            NaiveDate::from_ymd_opt(2020, 1, 15).unwrap()
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 1, 15).unwrap(),
+                precision: DatePrecision::Day,
+            }
         );
-        assert_eq!(work.end_date, NaiveDate::from_ymd_opt(2023, 8, 30));
+        assert_eq!(
+            work.end_date,
+            Some(PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2023, 8, 30).unwrap(),
+                precision: DatePrecision::Day,
+            })
+        );
         assert_eq!(work.job_title, "Senior Engineer");
         assert_eq!(work.company_name.as_deref(), Some("Tech Corp"));
     }
@@ -1096,8 +1107,20 @@ mod tests {
         let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (September 2020 - May 2024)\n- Degree: Bachelor of Science\n";
         let parsed = markdown_to_resume(markdown).expect("parse ok");
         let edu = parsed.education.first().expect("one education");
-        assert_eq!(edu.start_date, NaiveDate::from_ymd_opt(2020, 9, 1).unwrap());
-        assert_eq!(edu.end_date, NaiveDate::from_ymd_opt(2024, 5, 1));
+        assert_eq!(
+            edu.start_date,
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                precision: DatePrecision::Month,
+            }
+        );
+        assert_eq!(
+            edu.end_date,
+            Some(PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2024, 5, 1).unwrap(),
+                precision: DatePrecision::Month,
+            })
+        );
     }
 
     #[test]
@@ -1107,7 +1130,10 @@ mod tests {
         let work = parsed.work_experiences.first().expect("one work");
         assert_eq!(
             work.start_date,
-            NaiveDate::from_ymd_opt(1919, 1, 1).unwrap()
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(1919, 1, 1).unwrap(),
+                precision: DatePrecision::Month,
+            }
         );
         assert_eq!(work.end_date, None);
         assert_eq!(work.job_title, "Senior Engineer");
@@ -1118,11 +1144,87 @@ mod tests {
     fn test_parse_markdown_date_accepts_full_month_names() {
         assert_eq!(
             parse_markdown_date("January 1919").unwrap(),
-            NaiveDate::from_ymd_opt(1919, 1, 1).unwrap()
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(1919, 1, 1).unwrap(),
+                precision: DatePrecision::Month,
+            }
         );
         assert_eq!(
             parse_markdown_date("september 2020").unwrap(),
-            NaiveDate::from_ymd_opt(2020, 9, 1).unwrap()
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                precision: DatePrecision::Month,
+            }
         );
+    }
+
+    #[test]
+    fn test_parse_markdown_date_year_only() {
+        assert_eq!(
+            parse_markdown_date("2020").unwrap(),
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+                precision: DatePrecision::Year,
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_markdown_date_full_date() {
+        assert_eq!(
+            parse_markdown_date("2020-09-01").unwrap(),
+            PartialDate {
+                canonical: NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                precision: DatePrecision::Day,
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_markdown_date_rejects_iso_month() {
+        assert!(parse_markdown_date("2020-09").is_err());
+    }
+
+    #[test]
+    fn test_invalid_date_range_is_rejected() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2024 - May 2020)\n";
+        assert!(markdown_to_resume(markdown).is_err());
+    }
+
+    #[test]
+    fn test_format_markdown_date_outputs_by_precision() {
+        assert_eq!(
+            format_markdown_date(
+                NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                DatePrecision::Year
+            ),
+            "2020"
+        );
+        assert_eq!(
+            format_markdown_date(
+                NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                DatePrecision::Month
+            ),
+            "Sep 2020"
+        );
+        assert_eq!(
+            format_markdown_date(
+                NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+                DatePrecision::Day
+            ),
+            "2020-09-01"
+        );
+    }
+
+    #[test]
+    fn test_format_optional_date_outputs_present_or_formatted() {
+        assert_eq!(
+            format_optional_date(
+                Some(NaiveDate::from_ymd_opt(2020, 9, 1).unwrap()),
+                Some(DatePrecision::Month)
+            ),
+            "Sep 2020"
+        );
+        assert_eq!(format_optional_date(None, None), "Present");
     }
 }

@@ -26,13 +26,29 @@ pub fn create_education(
         }
     }
 
+    if let Some(ref end) = payload.end_date
+        && payload.start_date.canonical_start_date() > end.canonical_end_date()
+    {
+        return Err(ApplicationError::BadRequest(format!(
+            "start_date {} is after end_date {}",
+            payload.start_date.to_iso_string(),
+            end.to_iso_string()
+        )));
+    }
+
+    let end_pair = payload
+        .end_date
+        .map(|end| (end.canonical_end_date(), end.precision.to_string()));
+
     let new_education = NewEducation {
         resume_id: resume_id_value,
         education_stage: payload.education_stage,
         institution_name: payload.institution_name,
         degree: payload.degree,
-        start_date: payload.start_date,
-        end_date: payload.end_date,
+        start_date: payload.start_date.canonical_start_date(),
+        start_date_precision: payload.start_date.precision.to_string(),
+        end_date: end_pair.as_ref().map(|(d, _)| *d),
+        end_date_precision: end_pair.map(|(_, p)| p),
         description: payload.description,
         display_order: payload.display_order,
     };
