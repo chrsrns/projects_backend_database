@@ -52,18 +52,18 @@ fn parse_month_year_date(s: &str) -> Option<NaiveDate> {
     }
 
     let month_num = match parts[0].to_lowercase().as_str() {
-        "jan" => 1,
-        "feb" => 2,
-        "mar" => 3,
-        "apr" => 4,
+        "jan" | "january" => 1,
+        "feb" | "february" => 2,
+        "mar" | "march" => 3,
+        "apr" | "april" => 4,
         "may" => 5,
-        "jun" => 6,
-        "jul" => 7,
-        "aug" => 8,
-        "sep" => 9,
-        "oct" => 10,
-        "nov" => 11,
-        "dec" => 12,
+        "jun" | "june" => 6,
+        "jul" | "july" => 7,
+        "aug" | "august" => 8,
+        "sep" | "september" => 9,
+        "oct" | "october" => 10,
+        "nov" | "november" => 11,
+        "dec" | "december" => 12,
         _ => return None,
     };
 
@@ -1082,9 +1082,47 @@ mod tests {
         let markdown = "# Resume\n\n- Email: test@example.com\n\n## Work Experience\n\n### Senior Engineer - Tech Corp (2020-01-15 - 2023-08-30)\n- Description: Backend development\n";
         let parsed = markdown_to_resume(markdown).expect("parse ok");
         let work = parsed.work_experiences.first().expect("one work");
-        assert_eq!(work.start_date, NaiveDate::from_ymd_opt(2020, 1, 15).unwrap());
+        assert_eq!(
+            work.start_date,
+            NaiveDate::from_ymd_opt(2020, 1, 15).unwrap()
+        );
         assert_eq!(work.end_date, NaiveDate::from_ymd_opt(2023, 8, 30));
         assert_eq!(work.job_title, "Senior Engineer");
         assert_eq!(work.company_name.as_deref(), Some("Tech Corp"));
+    }
+
+    #[test]
+    fn test_education_heading_with_full_month_name() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (September 2020 - May 2024)\n- Degree: Bachelor of Science\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        let edu = parsed.education.first().expect("one education");
+        assert_eq!(edu.start_date, NaiveDate::from_ymd_opt(2020, 9, 1).unwrap());
+        assert_eq!(edu.end_date, NaiveDate::from_ymd_opt(2024, 5, 1));
+    }
+
+    #[test]
+    fn test_work_experience_heading_with_full_month_name() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Work Experience\n\n### Senior Engineer - Tech Corp (January 1919 - Present)\n- Description: Backend development\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        let work = parsed.work_experiences.first().expect("one work");
+        assert_eq!(
+            work.start_date,
+            NaiveDate::from_ymd_opt(1919, 1, 1).unwrap()
+        );
+        assert_eq!(work.end_date, None);
+        assert_eq!(work.job_title, "Senior Engineer");
+        assert_eq!(work.company_name.as_deref(), Some("Tech Corp"));
+    }
+
+    #[test]
+    fn test_parse_markdown_date_accepts_full_month_names() {
+        assert_eq!(
+            parse_markdown_date("January 1919").unwrap(),
+            NaiveDate::from_ymd_opt(1919, 1, 1).unwrap()
+        );
+        assert_eq!(
+            parse_markdown_date("september 2020").unwrap(),
+            NaiveDate::from_ymd_opt(2020, 9, 1).unwrap()
+        );
     }
 }

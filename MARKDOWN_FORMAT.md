@@ -149,6 +149,7 @@ In `Education` and `Work Experience` headings, the **final parenthesized segment
 
 - Start and end dates must use one of these formats:
   - `Sep 2020` — three-letter English month abbreviation followed by a four-digit year (case-insensitive).
+  - `September 2020` — full English month name followed by a four-digit year (case-insensitive).
   - `2020-09-01` — ISO `YYYY-MM-DD`.
 - The end date may be `Present`, `Current`, or `Ongoing` (case-insensitive) instead of a real date.
 - The start date must not be after the end date.
@@ -158,14 +159,16 @@ Examples of valid date ranges:
 
 ```markdown
 (Sep 2020 - May 2024)
+(September 2020 - May 2024)
 (2020-09-01 - 2024-05-01)
 (Jan 2020 - Present)
+(January 1919 - Present)
 ```
 
 Invalid date ranges:
 
 - `(Sep 2020 to May 2024)` — missing hyphen.
-- `(September 2020 - May 2024)` — full month names are not supported.
+- `(January 2020 - 2024)` — missing month and day in end date.
 - `(2020 - 2024)` — missing month and day.
 - `(ABC)` — no hyphen, so it is treated as title text.
 

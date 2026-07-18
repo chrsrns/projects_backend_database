@@ -437,6 +437,56 @@ fn test_import_resume_markdown_with_iso_dates() {
 }
 
 #[test]
+fn test_import_resume_markdown_with_full_month_names() {
+    let mut fixture = support::Fixture::new(9_227_019);
+    let unique_email = unique_markdown_email(9_227_019);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (September 2020 - May 2024)\n- Degree: Bachelor of Science\n\n## Work Experience\n\n### Senior Software Engineer - Tech Corp (January 1919 - Present)\n- Description: Backend development\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let education_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/education", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(education_response.status(), Status::Ok);
+    let education_body = education_response.into_string().expect("education body");
+    let education_json: Value = serde_json::from_str(&education_body).expect("valid json");
+    let education_items = education_json["body"].as_array().expect("array");
+    assert_eq!(education_items.len(), 1);
+    assert_eq!(education_items[0]["start_date"], "2020-09-01");
+    assert_eq!(education_items[0]["end_date"], "2024-05-01");
+
+    let work_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/work_experiences", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(work_response.status(), Status::Ok);
+    let work_body = work_response.into_string().expect("work body");
+    let work_json: Value = serde_json::from_str(&work_body).expect("valid json");
+    let work_items = work_json["body"].as_array().expect("array");
+    assert_eq!(work_items.len(), 1);
+    assert_eq!(work_items[0]["start_date"], "1919-01-01");
+    assert!(work_items[0]["end_date"].is_null());
+}
+
+#[test]
 fn test_export_resume_markdown_round_trip() {
     let mut fixture = support::Fixture::new(9_227_003);
     let (resume_id, original_email) = create_full_resume(&mut fixture, 9_227_003);
