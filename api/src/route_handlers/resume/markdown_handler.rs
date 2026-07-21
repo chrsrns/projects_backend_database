@@ -14,7 +14,7 @@ use shared::response_models::Response;
 
 use super::CustomJsonResult;
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::{Hub, ResumeChangedAction, SectionType};
 
 const MAX_MARKDOWN_SIZE: u64 = 1_048_576; // 1 MiB
 
@@ -136,9 +136,11 @@ pub fn export_resume_markdown(resume_id: i32, maybe_auth: MaybeAuthSession) -> M
     security(("bearerAuth" = [])),
     request_body = String,
     responses(
+        (status = 200, description = "Updated resume", body = Response<Resume>, content_type = "application/json"),
         (status = 201, description = "Created resume", body = Response<Resume>, content_type = "application/json"),
         (status = 400, description = "Invalid Markdown"),
         (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
         (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
     )
 )]
@@ -153,9 +155,16 @@ pub fn import_resume_markdown(
     hub: &State<Hub>,
 ) -> CustomJsonResult<Resume> {
     match markdown_import::import_resume_markdown(&markdown.0, auth.user_id) {
-        Ok(resume) => {
+        Ok((resume, true)) => {
             hub.publish_resume_changed(resume.id, ResumeChangedAction::Created);
             Ok(Custom(Status::Created, Json(Response { body: resume })))
+        }
+        Ok((resume, false)) => {
+            hub.publish_resume_changed(
+                resume.id,
+                ResumeChangedAction::Updated(SectionType::PersonalInfo),
+            );
+            Ok(Custom(Status::Ok, Json(Response { body: resume })))
         }
         Err(err) => Err(map_markdown_error(err)),
     }

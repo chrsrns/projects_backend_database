@@ -1483,3 +1483,56 @@ fn test_get_markdown_format() {
     let body = response.into_string().expect("markdown body");
     assert_eq!(body, expected);
 }
+
+#[test]
+fn test_import_resume_markdown_upserts_existing_by_email() {
+    let mut fixture = support::Fixture::new(9_227_030);
+    let email = unique_markdown_email(9_227_030);
+    let markdown = sample_markdown().replace("jane.doe@example.com", &email);
+
+    let first_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown.clone())
+        .dispatch();
+    assert_eq!(first_response.status(), Status::Created);
+    let first_body = first_response.into_string().expect("first body");
+    let first_json: Value = serde_json::from_str(&first_body).expect("valid json");
+    let resume_id = first_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let updated_markdown = markdown
+        .replace("# Jane Doe", "# Jane Updated")
+        .replace("- JavaScript - 60%", "- TypeScript - 70%");
+
+    let second_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(updated_markdown)
+        .dispatch();
+    assert_eq!(second_response.status(), Status::Ok);
+    let second_body = second_response.into_string().expect("second body");
+    let second_json: Value = serde_json::from_str(&second_body).expect("valid json");
+    assert_eq!(second_json["body"]["id"], resume_id);
+    assert_eq!(second_json["body"]["name"], "Jane Updated");
+
+    let skills_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/skills", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(skills_response.status(), Status::Ok);
+    let skills_body = skills_response.into_string().expect("skills body");
+    let skills_json: Value = serde_json::from_str(&skills_body).expect("valid json");
+    let skills = skills_json["body"].as_array().expect("array");
+    assert!(
+        skills
+            .iter()
+            .any(|s| s["skill_name"] == "TypeScript" && s["confidence_percentage"] == 70)
+    );
+    assert!(!skills.iter().any(|s| s["skill_name"] == "JavaScript"));
+}

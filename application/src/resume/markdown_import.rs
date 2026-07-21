@@ -38,7 +38,7 @@ pub fn resolve_parent_index(
 pub fn import_resume_markdown(
     markdown: &str,
     user_id_value: i32,
-) -> Result<Resume, ApplicationError> {
+) -> Result<(Resume, bool), ApplicationError> {
     let full_resume = markdown::markdown_to_resume(markdown).map_err(|err| match err {
         markdown::MarkdownError::InvalidMarkdown(msg) => ApplicationError::BadRequest(msg),
     })?;
@@ -92,31 +92,78 @@ pub fn import_resume_markdown(
         }
     }
 
-    let executive_summary = validate_executive_summary(full_resume.executive_summary)?;
+    let executive_summary = validate_executive_summary(full_resume.executive_summary.clone())?;
 
     let mut conn = infrastructure::establish_connection();
-    run_in_transaction(&mut conn, |conn| {
+
+    let existing_id = {
+        use domain::schema::resumes;
+        use domain::schema::resumes::dsl::*;
+        let existing = resumes::table
+            .filter(email.eq(&full_resume.email))
+            .first::<Resume>(&mut conn)
+            .optional()
+            .map_err(app_err_from_diesel_err)?;
+        match existing {
+            Some(r) if r.created_by == Some(user_id_value) => Some(r.id),
+            Some(_) => return Err(ApplicationError::Forbidden),
+            None => None,
+        }
+    };
+
+    let new_resume = NewResume {
+        name: full_resume.name.clone(),
+        profile_image_url: full_resume.profile_image_url.clone(),
+        location: full_resume.location.clone(),
+        email: full_resume.email.clone(),
+        github_url: full_resume.github_url.clone(),
+        mobile_number: full_resume.mobile_number.clone(),
+        executive_summary,
+        created_by: Some(user_id_value),
+        is_public: full_resume.is_public,
+    };
+
+    run_in_transaction(&mut conn, move |conn| {
+        use domain::schema::resumes::dsl as resumes_dsl;
         use domain::schema::{
             education, education_key_points, frameworks, languages, portfolio_key_points,
             portfolio_projects, portfolio_technologies, resumes, skills,
             work_experience_key_points, work_experiences,
         };
 
-        let new_resume = NewResume {
-            name: full_resume.name,
-            profile_image_url: full_resume.profile_image_url,
-            location: full_resume.location,
-            email: full_resume.email,
-            github_url: full_resume.github_url,
-            mobile_number: full_resume.mobile_number,
-            executive_summary,
-            created_by: Some(user_id_value),
-            is_public: full_resume.is_public,
-        };
+        let resume = if let Some(resume_id) = existing_id {
+            diesel::delete(skills::table.filter(skills::dsl::resume_id.eq(resume_id)))
+                .execute(conn)?;
+            diesel::delete(languages::table.filter(languages::dsl::resume_id.eq(resume_id)))
+                .execute(conn)?;
+            diesel::delete(education::table.filter(education::dsl::resume_id.eq(resume_id)))
+                .execute(conn)?;
+            diesel::delete(
+                work_experiences::table.filter(work_experiences::dsl::resume_id.eq(resume_id)),
+            )
+            .execute(conn)?;
+            diesel::delete(
+                portfolio_projects::table.filter(portfolio_projects::dsl::resume_id.eq(resume_id)),
+            )
+            .execute(conn)?;
 
-        let resume: Resume = diesel::insert_into(resumes::table)
-            .values(&new_resume)
-            .get_result::<Resume>(conn)?;
+            diesel::update(resumes::table.find(resume_id))
+                .set((
+                    resumes_dsl::name.eq(&new_resume.name),
+                    resumes_dsl::profile_image_url.eq(&new_resume.profile_image_url),
+                    resumes_dsl::location.eq(&new_resume.location),
+                    resumes_dsl::email.eq(&new_resume.email),
+                    resumes_dsl::github_url.eq(&new_resume.github_url),
+                    resumes_dsl::mobile_number.eq(&new_resume.mobile_number),
+                    resumes_dsl::executive_summary.eq(&new_resume.executive_summary),
+                    resumes_dsl::is_public.eq(new_resume.is_public),
+                ))
+                .get_result::<Resume>(conn)?
+        } else {
+            diesel::insert_into(resumes::table)
+                .values(&new_resume)
+                .get_result::<Resume>(conn)?
+        };
 
         let mut education_id_map: Vec<i32> = Vec::new();
         for (idx, edu) in full_resume.education.iter().enumerate() {
@@ -273,7 +320,7 @@ pub fn import_resume_markdown(
                 .execute(conn)?;
         }
 
-        Ok(resume)
+        Ok((resume, existing_id.is_none()))
     })
     .map_err(app_err_from_diesel_err)
 }
