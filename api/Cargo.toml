@@ -36,3 +36,9 @@ diesel_migrations = "2.3.0"
 infrastructure = { path = "../infrastructure" }
 futures-util = "0.3.31"
 tokio-tungstenite = "0.28.0"
+http = "1"
+
+[[test]]
+name = "frontend_resume_editor_svelte_proxy_test"
+path = "tests/frontend_resume_editor_svelte_proxy_test.rs"
+required-features = ["frontend_resume_editor_svelte"]

@@ -17,6 +17,8 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../infrastructure/
 static MIGRATIONS_RAN: OnceLock<()> = OnceLock::new();
 static UNIQUE_EMAIL_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+pub mod proxy_mock;
+
 pub fn run_migrations_once() {
     MIGRATIONS_RAN.get_or_init(|| {
         let lock_key: i64 = 9_225_300;
