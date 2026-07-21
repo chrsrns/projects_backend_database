@@ -263,12 +263,12 @@ pub async fn frontend_websocket_proxy_handler(
             };
 
             // Forward the Sec-WebSocket-Protocol header required by Vite HMR
-            if let Some(proto) = &subprotocol {
-                if let Ok(header_value) = proto.parse() {
-                    upstream_req
-                        .headers_mut()
-                        .insert("Sec-WebSocket-Protocol", header_value);
-                }
+            if let Some(proto) = &subprotocol
+                && let Ok(header_value) = proto.parse()
+            {
+                upstream_req
+                    .headers_mut()
+                    .insert("Sec-WebSocket-Protocol", header_value);
             }
 
             // Connect to upstream WebSocket server
