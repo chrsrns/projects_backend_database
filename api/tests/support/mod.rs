@@ -2,41 +2,15 @@
 use api::realtime::Hub;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use infrastructure::establish_connection;
 use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 use serde_json::Value;
-use std::sync::{
-    OnceLock,
-    atomic::{AtomicU64, Ordering},
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../infrastructure/migrations");
-
-static MIGRATIONS_RAN: OnceLock<()> = OnceLock::new();
 static UNIQUE_EMAIL_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub mod proxy_mock;
-
-pub fn run_migrations_once() {
-    MIGRATIONS_RAN.get_or_init(|| {
-        let lock_key: i64 = 9_225_300;
-        let mut connection = establish_connection();
-
-        diesel::sql_query(format!("SELECT pg_advisory_lock({})", lock_key))
-            .execute(&mut connection)
-            .expect("acquire migrations advisory lock");
-
-        connection
-            .run_pending_migrations(MIGRATIONS)
-            .expect("run pending migrations");
-
-        diesel::sql_query(format!("SELECT pg_advisory_unlock({})", lock_key))
-            .execute(&mut connection)
-            .expect("release migrations advisory lock");
-    });
-}
 
 pub fn unique_email(prefix: &str) -> String {
     let counter = UNIQUE_EMAIL_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -120,7 +94,7 @@ pub struct Fixture {
 
 impl Fixture {
     pub fn new(lock_key: i64) -> Self {
-        run_migrations_once();
+        infrastructure::run_migrations_once().expect("run pending migrations");
 
         let mut lock_connection = establish_connection();
         diesel::sql_query(format!("SELECT pg_advisory_lock({})", lock_key))
