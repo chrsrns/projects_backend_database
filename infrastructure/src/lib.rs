@@ -5,6 +5,8 @@ use std::env;
 
 pub mod migrations;
 
+pub use migrations::{MIGRATION_LOCK_KEY, MIGRATIONS, run_migrations_once};
+
 pub fn establish_connection() -> PgConnection {
     dotenv().ok();
 
