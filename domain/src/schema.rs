@@ -116,6 +116,8 @@ diesel::table! {
         updated_at -> Timestamp,
         created_by -> Nullable<Int4>,
         is_public -> Bool,
+        #[max_length = 500]
+        video -> Nullable<Varchar>,
     }
 }
 

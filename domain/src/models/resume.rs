@@ -43,6 +43,8 @@ pub struct Resume {
     pub updated_at: NaiveDateTime,
     pub created_by: Option<i32>,
     pub is_public: bool,
+    #[schema(max_length = 500)]
+    pub video: Option<String>,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
