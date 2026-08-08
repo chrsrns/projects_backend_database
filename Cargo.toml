@@ -9,6 +9,7 @@ frontend_resume_editor_svelte = ["api/frontend_resume_editor_svelte"]
 
 [dependencies]
 api = { path = "./api" }
+infrastructure = { path = "./infrastructure" }
 shared = { path = "./shared" }
 clap = { version = "4.5.23", features = ["derive", "cargo"] }
 rand = "0.10.0"
