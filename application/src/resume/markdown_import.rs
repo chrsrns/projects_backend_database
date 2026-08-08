@@ -119,6 +119,7 @@ pub fn import_resume_markdown(
         github_url: full_resume.github_url.clone(),
         mobile_number: full_resume.mobile_number.clone(),
         executive_summary,
+        video: None,
         created_by: Some(user_id_value),
         is_public: full_resume.is_public,
     };

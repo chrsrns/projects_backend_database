@@ -21,6 +21,7 @@ pub fn create_resume(
         github_url: resume.github_url,
         mobile_number: resume.mobile_number,
         executive_summary: validate_executive_summary(resume.executive_summary)?,
+        video: None,
         created_by: Some(user_id_value),
         is_public: resume.is_public.unwrap_or(false),
     };

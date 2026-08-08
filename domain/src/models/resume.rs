@@ -60,6 +60,8 @@ pub struct NewResume {
     pub executive_summary: Option<String>,
     pub created_by: Option<i32>,
     pub is_public: bool,
+    #[schema(max_length = 500)]
+    pub video: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -73,6 +75,8 @@ pub struct NewResumeRequest {
     pub mobile_number: Option<String>,
     pub executive_summary: Option<String>,
     pub is_public: Option<bool>,
+    #[schema(max_length = 500)]
+    pub video: Option<String>,
 }
 
 #[derive(AsChangeset, Deserialize, ToSchema)]
@@ -87,6 +91,9 @@ pub struct UpdateResume {
     pub mobile_number: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub executive_summary: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    #[schema(value_type = Option<String>, max_length = 500)]
+    pub video: Option<Option<String>>,
     pub is_public: Option<bool>,
 }
 
