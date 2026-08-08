@@ -13,9 +13,9 @@ static MIGRATIONS_RESULT: OnceLock<Result<(), String>> = OnceLock::new();
 
 pub fn run_migrations_once() -> Result<(), io::Error> {
     MIGRATIONS_RESULT
-        .get_or_init(|| run_migrations_inner())
+        .get_or_init(run_migrations_inner)
         .clone()
-        .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
+        .map_err(io::Error::other)
 }
 
 fn run_migrations_inner() -> Result<(), String> {
