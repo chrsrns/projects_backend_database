@@ -26,4 +26,29 @@ fn test_openapi_json_is_served() {
         import_responses.get("413").is_some(),
         "expected 413 response documented for markdown import"
     );
+
+    let schemas = json
+        .get("components")
+        .and_then(|c| c.get("schemas"))
+        .expect("schemas");
+
+    for schema_name in ["Resume", "NewResumeRequest", "UpdateResume"] {
+        let video = schemas
+            .get(schema_name)
+            .and_then(|s| s.get("properties"))
+            .and_then(|p| p.get("video"))
+            .expect(&format!("video property in {}", schema_name));
+
+        let types = video
+            .get("type")
+            .and_then(|t| t.as_array())
+            .expect("video type array");
+        assert!(types.iter().any(|t| t == "string"), "video is a string");
+
+        let max_length = video
+            .get("maxLength")
+            .and_then(|m| m.as_u64())
+            .expect("video maxLength");
+        assert_eq!(max_length, 500, "video maxLength is 500");
+    }
 }
