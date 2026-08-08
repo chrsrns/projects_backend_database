@@ -1536,3 +1536,89 @@ fn test_import_resume_markdown_upserts_existing_by_email() {
     );
     assert!(!skills.iter().any(|s| s["skill_name"] == "JavaScript"));
 }
+
+#[test]
+fn test_video_markdown_round_trip() {
+    let mut fixture = support::Fixture::new(9_227_030);
+    let video_url = "https://example.com/video.mp4";
+    let unique_email = unique_markdown_email(9_227_030);
+
+    let create_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Jane Doe",
+                "email": unique_email,
+                "is_public": true,
+                "video": video_url
+            })
+            .to_string(),
+        )
+        .dispatch();
+
+    assert_eq!(create_response.status(), Status::Created);
+    let create_body = create_response.into_string().expect("create body");
+    let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
+    let resume_id = create_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(export_response.status(), Status::Ok);
+    let markdown = export_response.into_string().expect("markdown body");
+    assert!(markdown.contains("- Video: "));
+    assert!(markdown.contains(video_url));
+
+    let imported_email = unique_markdown_email(9_227_031);
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown.replace(
+            &format!("- Email: {}", unique_email),
+            &format!("- Email: {}", imported_email),
+        ))
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(imported_id);
+    assert_eq!(import_json["body"]["video"], video_url);
+}
+
+#[test]
+fn test_video_markdown_link_ignored() {
+    let mut fixture = support::Fixture::new(9_227_032);
+    let unique_email = unique_markdown_email(9_227_032);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n- Video: [My Video](https://example.com/video.mp4)\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+    assert!(import_json["body"]["video"].is_null());
+}
