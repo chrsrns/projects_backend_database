@@ -92,6 +92,9 @@ async fn main() -> Result<(), Error> {
 
     api::init_logging();
 
+    infrastructure::run_migrations_once()
+        .inspect_err(|e| log::error!("Failed to run database migrations: {}", e))?;
+
     // Print version on startup
     println!(
         "Rust Profile Management Backend v{}",
