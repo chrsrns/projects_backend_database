@@ -20,6 +20,7 @@ Immediately after the H1, write a list of header fields. `Email` is required. Al
 - Profile Image: https://example.com/photo.jpg
 - GitHub: https://github.com/janedoe
 - Mobile: +1987654321
+- Video: https://example.com/video.mp4
 - Public: true
 ```
 
@@ -28,9 +29,10 @@ Immediately after the H1, write a list of header fields. `Email` is required. Al
 - `Profile Image`: URL.
 - `GitHub`: URL.
 - `Mobile`: free text.
+- `Video`: URL or free text. Limited to 500 characters. Markdown link form is not supported and is ignored.
 - `Public`: `true`, `yes`, or `1` for public; anything else is private.
 
-URLs may be written as plain text or as Markdown links. They are stored and exported as plain text.
+URLs in header bullets may be written as plain text or as Markdown links. They are stored and exported as plain text. The `Video` bullet only accepts plain text; a Markdown link in a `Video` bullet is ignored and the video is stored as `NULL`.
 
 ## Summary (optional)
 
@@ -184,6 +186,7 @@ Append `[order: <integer>]` to any H3 heading or skill bullet to override displa
 - Unknown H2 section names are rejected. Valid names are: `Summary`, `Education`, `Skills`, `Work Experience`, `Portfolio Projects`, `Languages & Frameworks`.
 - Skill percentages must be in the range `[0, 100]`.
 - Executive summary is limited to 5,000 characters.
+- Video is limited to 500 characters.
 
 ## Full example
 
@@ -194,6 +197,7 @@ Append `[order: <integer>]` to any H3 heading or skill bullet to override displa
 - Email: jane.doe@example.com
 - GitHub: https://github.com/janedoe
 - Mobile: +1987654321
+- Video: https://example.com/video.mp4
 - Public: true
 
 ## Summary
