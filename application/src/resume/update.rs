@@ -34,6 +34,19 @@ pub fn update_resume(
         Some(Some(v)) => Some(validate_video(Some(v))?),
     };
 
+    if resume.name.is_none()
+        && resume.profile_image_url.is_none()
+        && resume.location.is_none()
+        && resume.email.is_none()
+        && resume.github_url.is_none()
+        && resume.mobile_number.is_none()
+        && resume.executive_summary.is_none()
+        && resume.video.is_none()
+        && resume.is_public.is_none()
+    {
+        return Ok(existing);
+    }
+
     match diesel::update(resumes::table.find(resume_id))
         .set(&resume)
         .get_result::<Resume>(&mut establish_connection())
