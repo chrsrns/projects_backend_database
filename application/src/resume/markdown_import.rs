@@ -9,7 +9,7 @@ use shared::markdown;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, validate_executive_summary},
+    resume::common::{app_err_from_diesel_err, validate_executive_summary, validate_video},
 };
 
 /// Resolves an index into a parent ID map, returning `BadRequest` if the
@@ -93,6 +93,7 @@ pub fn import_resume_markdown(
     }
 
     let executive_summary = validate_executive_summary(full_resume.executive_summary.clone())?;
+    let video = validate_video(full_resume.video.clone())?;
 
     let mut conn = infrastructure::establish_connection();
 
@@ -119,7 +120,7 @@ pub fn import_resume_markdown(
         github_url: full_resume.github_url.clone(),
         mobile_number: full_resume.mobile_number.clone(),
         executive_summary,
-        video: None,
+        video,
         created_by: Some(user_id_value),
         is_public: full_resume.is_public,
     };
@@ -157,6 +158,7 @@ pub fn import_resume_markdown(
                     resumes_dsl::github_url.eq(&new_resume.github_url),
                     resumes_dsl::mobile_number.eq(&new_resume.mobile_number),
                     resumes_dsl::executive_summary.eq(&new_resume.executive_summary),
+                    resumes_dsl::video.eq(&new_resume.video),
                     resumes_dsl::is_public.eq(new_resume.is_public),
                 ))
                 .get_result::<Resume>(conn)?

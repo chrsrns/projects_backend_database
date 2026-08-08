@@ -58,6 +58,17 @@ pub fn validate_executive_summary(
     }
 }
 
+pub fn validate_video(video: Option<String>) -> Result<Option<String>, ApplicationError> {
+    match video {
+        None => Ok(None),
+        Some(video) if video.trim().is_empty() => Ok(None),
+        Some(video) if video.chars().count() > 500 => Err(ApplicationError::BadRequest(
+            "Video must be at most 500 characters".to_string(),
+        )),
+        Some(video) => Ok(Some(video)),
+    }
+}
+
 pub fn app_err_from_diesel_err(err: diesel::result::Error) -> ApplicationError {
     match err {
         diesel::result::Error::DatabaseError(
