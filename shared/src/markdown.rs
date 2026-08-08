@@ -97,6 +97,9 @@ pub fn resume_to_markdown(resume: &FullResume) -> String {
     if let Some(mobile) = &resume.resume.mobile_number {
         writeln!(output, "- Mobile: {}", mobile).unwrap();
     }
+    if let Some(video) = &resume.resume.video {
+        writeln!(output, "- Video: {}", video).unwrap();
+    }
     writeln!(output, "- Public: {}", resume.resume.is_public).unwrap();
     writeln!(output).unwrap();
 
@@ -284,6 +287,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
     let mut mobile_number: Option<String> = None;
     let mut is_public: bool = false;
     let mut executive_summary: Option<String> = None;
+    let mut video: Option<String> = None;
     let mut summary_text = String::new();
 
     // Section buffers
@@ -319,6 +323,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
     let mut heading_text = String::new();
     let mut list_item_text = String::new();
     let mut link_active = false;
+    let mut item_had_link = false;
     let mut link_url = String::new();
     let mut link_text = String::new();
 
@@ -416,6 +421,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
             Event::Start(Tag::List(_)) => {}
             Event::Start(Tag::Item) => {
                 list_item_text.clear();
+                item_had_link = false;
             }
             Event::End(TagEnd::Item) => {
                 let bullet = list_item_text.trim().to_string();
@@ -434,6 +440,13 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                                 "Profile Image" => profile_image_url = Some(value),
                                 "GitHub" => github_url = Some(value),
                                 "Mobile" => mobile_number = Some(value),
+                                "Video" => {
+                                    if item_had_link {
+                                        video = None;
+                                    } else {
+                                        video = Some(value);
+                                    }
+                                }
                                 "Public" => {
                                     is_public = value.eq_ignore_ascii_case("true")
                                         || value.eq_ignore_ascii_case("yes")
@@ -522,6 +535,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
             }
             Event::Start(Tag::Link { dest_url, .. }) => {
                 link_active = true;
+                item_had_link = true;
                 link_url = dest_url.to_string();
                 link_text.clear();
             }
@@ -598,7 +612,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
         github_url,
         mobile_number,
         executive_summary,
-        video: None,
+        video,
         is_public,
         education,
         education_key_points,
