@@ -226,6 +226,9 @@ pub fn resume_to_markdown(resume: &FullResume) -> String {
             if let Some(image_url) = &project.image_url {
                 writeln!(output, "- Image: {}", image_url).unwrap();
             }
+            if let Some(video_url) = &project.video_url {
+                writeln!(output, "- Video: {}", video_url).unwrap();
+            }
 
             if let Some(technologies) = resume.portfolio_technologies.get(&project.id)
                 && !technologies.is_empty()
@@ -499,6 +502,12 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                                 project.source_code_link = Some(source_text.trim().to_string());
                             } else if let Some(image_text) = bullet.strip_prefix("Image:") {
                                 project.image_url = Some(image_text.trim().to_string());
+                            } else if let Some(video_text) = bullet.strip_prefix("Video:") {
+                                if item_had_link {
+                                    project.video_url = None;
+                                } else {
+                                    project.video_url = Some(video_text.trim().to_string());
+                                }
                             } else if let Some(tech_text) = bullet.strip_prefix("Technologies:") {
                                 let tech_names: Vec<String> = tech_text
                                     .split(',')
@@ -1263,5 +1272,24 @@ mod tests {
             project.video_url.as_deref(),
             Some("https://example.com/video.mp4")
         );
+    }
+
+    #[test]
+    fn test_markdown_parses_portfolio_video_url() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Portfolio\n- Image: https://example.com/image.png\n- Video: https://example.com/video.mp4\n- Technologies: Rust\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        let project = parsed.portfolio_projects.first().expect("one project");
+        assert_eq!(
+            project.video_url.as_deref(),
+            Some("https://example.com/video.mp4")
+        );
+    }
+
+    #[test]
+    fn test_markdown_ignores_portfolio_video_url_markdown_link() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Portfolio\n- Video: [Watch](https://example.com/video.mp4)\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        let project = parsed.portfolio_projects.first().expect("one project");
+        assert_eq!(project.video_url, None);
     }
 }
