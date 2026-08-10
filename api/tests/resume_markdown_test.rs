@@ -1622,3 +1622,135 @@ fn test_video_markdown_link_ignored() {
     fixture.track_resume_id(resume_id);
     assert!(import_json["body"]["video"].is_null());
 }
+
+#[test]
+fn test_portfolio_video_url_markdown_round_trip() {
+    let mut fixture = support::Fixture::new(9_227_033);
+    let unique_email = unique_markdown_email(9_227_033);
+    let video_url = "https://example.com/video.mp4";
+
+    let create_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Jane Doe",
+                "email": unique_email,
+                "is_public": true
+            })
+            .to_string(),
+        )
+        .dispatch();
+
+    assert_eq!(create_response.status(), Status::Created);
+    let create_body = create_response.into_string().expect("create body");
+    let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
+    let resume_id = create_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let project_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/portfolio_projects", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "project_name": "My Portfolio",
+                "image_url": null,
+                "project_link": null,
+                "source_code_link": null,
+                "video_url": video_url,
+                "description": null,
+                "display_order": 0
+            })
+            .to_string(),
+        )
+        .dispatch();
+
+    assert_eq!(project_response.status(), Status::Created);
+    drop(project_response);
+
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(export_response.status(), Status::Ok);
+    let markdown = export_response.into_string().expect("markdown body");
+    assert!(markdown.contains("## Portfolio Projects"));
+    assert!(markdown.contains("- Video: "));
+    assert!(markdown.contains(video_url));
+
+    let imported_email = unique_markdown_email(9_227_034);
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown.replace(
+            &format!("- Email: {}", unique_email),
+            &format!("- Email: {}", imported_email),
+        ))
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(imported_id);
+
+    let projects_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/portfolio_projects", imported_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(projects_response.status(), Status::Ok);
+    let projects_body = projects_response.into_string().expect("projects body");
+    let projects_json: Value = serde_json::from_str(&projects_body).expect("valid json");
+    let projects = projects_json["body"].as_array().expect("array");
+    assert_eq!(projects.len(), 1);
+    assert_eq!(projects[0]["video_url"], video_url);
+}
+
+#[test]
+fn test_portfolio_video_url_markdown_link_ignored() {
+    let mut fixture = support::Fixture::new(9_227_035);
+    let unique_email = unique_markdown_email(9_227_035);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Portfolio Projects\n\n### My Portfolio\n- Video: [My Video](https://example.com/video.mp4)\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(import_response.status(), Status::Created);
+
+    let import_body = import_response.into_string().expect("import body");
+    let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    fixture.track_resume_id(resume_id);
+
+    let projects_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/portfolio_projects", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+
+    assert_eq!(projects_response.status(), Status::Ok);
+    let projects_body = projects_response.into_string().expect("projects body");
+    let projects_json: Value = serde_json::from_str(&projects_body).expect("valid json");
+    let projects = projects_json["body"].as_array().expect("array");
+    assert_eq!(projects.len(), 1);
+    assert!(projects[0]["video_url"].is_null());
+}
