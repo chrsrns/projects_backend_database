@@ -58,15 +58,23 @@ pub fn validate_executive_summary(
     }
 }
 
-pub fn validate_video(video: Option<String>) -> Result<Option<String>, ApplicationError> {
-    match video {
+pub fn validate_optional_url(
+    value: Option<String>,
+    field_name: &str,
+) -> Result<Option<String>, ApplicationError> {
+    match value {
         None => Ok(None),
-        Some(video) if video.trim().is_empty() => Ok(None),
-        Some(video) if video.chars().count() > 500 => Err(ApplicationError::BadRequest(
-            "Video must be at most 500 characters".to_string(),
-        )),
-        Some(video) => Ok(Some(video)),
+        Some(value) if value.trim().is_empty() => Ok(None),
+        Some(value) if value.chars().count() > 500 => Err(ApplicationError::BadRequest(format!(
+            "{} must be at most 500 characters",
+            field_name
+        ))),
+        Some(value) => Ok(Some(value)),
     }
+}
+
+pub fn validate_video(video: Option<String>) -> Result<Option<String>, ApplicationError> {
+    validate_optional_url(video, "Video")
 }
 
 pub fn app_err_from_diesel_err(err: diesel::result::Error) -> ApplicationError {
@@ -77,5 +85,43 @@ pub fn app_err_from_diesel_err(err: diesel::result::Error) -> ApplicationError {
         ) => ApplicationError::Conflict("Unique violation".to_string()),
         diesel::result::Error::NotFound => ApplicationError::NotFound("Not found".to_string()),
         _ => ApplicationError::Internal(format!("Database error - {}", err)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_optional_url_accepts_valid_url() {
+        let url = "https://example.com/video.mp4".to_string();
+        assert_eq!(
+            validate_optional_url(Some(url.clone()), "Video URL").unwrap(),
+            Some(url)
+        );
+    }
+
+    #[test]
+    fn test_validate_optional_url_normalizes_blank_to_none() {
+        assert_eq!(
+            validate_optional_url(Some("   \t\n  ".to_string()), "Video URL").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_validate_optional_url_rejects_too_long() {
+        let long = "x".repeat(501);
+        match validate_optional_url(Some(long), "Video URL") {
+            Err(ApplicationError::BadRequest(msg)) => {
+                assert!(msg.contains("Video URL must be at most 500 characters"));
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_optional_url_passes_none() {
+        assert_eq!(validate_optional_url(None, "Video URL").unwrap(), None);
     }
 }

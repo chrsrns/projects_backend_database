@@ -7,13 +7,13 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume},
+    resume::common::{app_err_from_diesel_err, find_resume, validate_optional_url},
 };
 
 pub fn update_portfolio_project(
     user_id_value: i32,
     project_id_value: i32,
-    payload: UpdatePortfolioProject,
+    mut payload: UpdatePortfolioProject,
 ) -> Result<PortfolioProject, ApplicationError> {
     use domain::schema::portfolio_projects;
 
@@ -33,6 +33,13 @@ pub fn update_portfolio_project(
             return Err(ApplicationError::Forbidden);
         }
     }
+
+    payload.video_url = match payload.video_url {
+        None => None,
+        Some(None) => Some(None),
+        Some(Some(ref v)) if v.is_empty() => None,
+        Some(Some(v)) => Some(validate_optional_url(Some(v), "Video URL")?),
+    };
 
     match diesel::update(portfolio_projects::table.find(project_id_value))
         .set(&payload)
