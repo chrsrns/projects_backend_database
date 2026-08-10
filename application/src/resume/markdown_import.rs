@@ -9,7 +9,9 @@ use shared::markdown;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, validate_executive_summary, validate_video},
+    resume::common::{
+        app_err_from_diesel_err, validate_executive_summary, validate_optional_url, validate_video,
+    },
 };
 
 /// Resolves an index into a parent ID map, returning `BadRequest` if the
@@ -94,6 +96,11 @@ pub fn import_resume_markdown(
 
     let executive_summary = validate_executive_summary(full_resume.executive_summary.clone())?;
     let video = validate_video(full_resume.video.clone())?;
+    let portfolio_video_urls: Vec<Option<String>> = full_resume
+        .portfolio_projects
+        .iter()
+        .map(|p| validate_optional_url(p.video_url.clone(), "Video URL"))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut conn = infrastructure::establish_connection();
 
@@ -262,7 +269,7 @@ pub fn import_resume_markdown(
                 image_url: project.image_url.clone(),
                 project_link: project.project_link.clone(),
                 source_code_link: project.source_code_link.clone(),
-                video_url: project.video_url.clone(),
+                video_url: portfolio_video_urls[idx].clone(),
                 description: project.description.clone(),
                 display_order: project.display_order.or(Some(idx as i32)),
             };
