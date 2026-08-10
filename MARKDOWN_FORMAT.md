@@ -120,9 +120,9 @@ Systems engineer with distributed-systems experience.
 - H3 heading format: `### <Project Name> [order: <number>]`
 - `[order: <number>]` is optional.
 - Bullets:
-  - `Live:` project link URL.
-  - `Source:` source-code link URL.
-  - `Image:` image URL.
+  - `Live:` project link URL. Limited to 500 characters. An empty or whitespace-only value is stored as `NULL`. A Markdown link is flattened to `text (url)` and stored as plain text.
+  - `Source:` source-code link URL. Limited to 500 characters. An empty or whitespace-only value is stored as `NULL`. A Markdown link is flattened to `text (url)` and stored as plain text.
+  - `Image:` image URL. Limited to 500 characters. An empty or whitespace-only value is stored as `NULL`. A Markdown link is flattened to `text (url)` and stored as plain text.
   - `Video:` video URL or free text. Limited to 500 characters. Markdown link form is not supported and is ignored.
   - `Technologies:` comma-separated list of technology names.
   - `Description:` sets the description field.
@@ -188,7 +188,8 @@ Append `[order: <integer>]` to any H3 heading or skill bullet to override displa
 - Skill percentages must be in the range `[0, 100]`.
 - Executive summary is limited to 5,000 characters.
 - Video is limited to 500 characters.
-- Portfolio project `Video:` is limited to 500 characters.
+- Portfolio project `Live:`, `Source:`, `Image:`, and `Video:` are limited to 500 characters.
+- Empty or whitespace-only `Live:`, `Source:`, and `Image:` bullets are stored as `NULL`.
 
 ## Full example
 
