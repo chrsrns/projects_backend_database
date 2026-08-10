@@ -123,6 +123,7 @@ Systems engineer with distributed-systems experience.
   - `Live:` project link URL.
   - `Source:` source-code link URL.
   - `Image:` image URL.
+  - `Video:` video URL or free text. Limited to 500 characters. Markdown link form is not supported and is ignored.
   - `Technologies:` comma-separated list of technology names.
   - `Description:` sets the description field.
   - All other bullets are project key points.
@@ -187,6 +188,7 @@ Append `[order: <integer>]` to any H3 heading or skill bullet to override displa
 - Skill percentages must be in the range `[0, 100]`.
 - Executive summary is limited to 5,000 characters.
 - Video is limited to 500 characters.
+- Portfolio project `Video:` is limited to 500 characters.
 
 ## Full example
 

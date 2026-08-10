@@ -51,4 +51,31 @@ fn test_openapi_json_is_served() {
             .expect("video maxLength");
         assert_eq!(max_length, 500, "video maxLength is 500");
     }
+
+    for schema_name in [
+        "PortfolioProject",
+        "NewPortfolioProjectRequest",
+        "UpdatePortfolioProject",
+    ] {
+        let video_url = schemas
+            .get(schema_name)
+            .and_then(|s| s.get("properties"))
+            .and_then(|p| p.get("video_url"))
+            .expect(&format!("video_url property in {}", schema_name));
+
+        let types = video_url
+            .get("type")
+            .and_then(|t| t.as_array())
+            .expect("video_url type array");
+        assert!(
+            types.iter().any(|t| t == "string"),
+            "video_url is a string"
+        );
+
+        let max_length = video_url
+            .get("maxLength")
+            .and_then(|m| m.as_u64())
+            .expect("video_url maxLength");
+        assert_eq!(max_length, 500, "video_url maxLength is 500");
+    }
 }
