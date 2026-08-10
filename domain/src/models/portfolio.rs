@@ -28,9 +28,13 @@ pub struct PortfolioProject {
     pub id: i32,
     pub resume_id: i32,
     pub project_name: String,
+    #[schema(max_length = 500)]
     pub image_url: Option<String>,
+    #[schema(max_length = 500)]
     pub project_link: Option<String>,
+    #[schema(max_length = 500)]
     pub source_code_link: Option<String>,
+    #[schema(max_length = 500)]
     pub description: Option<String>,
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
@@ -45,11 +49,15 @@ pub struct PortfolioProject {
 pub struct NewPortfolioProject {
     pub resume_id: i32,
     pub project_name: String,
+    #[schema(max_length = 500)]
     pub image_url: Option<String>,
+    #[schema(max_length = 500)]
     pub project_link: Option<String>,
+    #[schema(max_length = 500)]
     pub source_code_link: Option<String>,
     #[schema(max_length = 500)]
     pub video_url: Option<String>,
+    #[schema(max_length = 500)]
     pub description: Option<String>,
     pub display_order: Option<i32>,
 }
@@ -58,11 +66,15 @@ pub struct NewPortfolioProject {
 #[serde(crate = "rocket::serde")]
 pub struct NewPortfolioProjectRequest {
     pub project_name: String,
+    #[schema(max_length = 500)]
     pub image_url: Option<String>,
+    #[schema(max_length = 500)]
     pub project_link: Option<String>,
+    #[schema(max_length = 500)]
     pub source_code_link: Option<String>,
     #[schema(max_length = 500)]
     pub video_url: Option<String>,
+    #[schema(max_length = 500)]
     pub description: Option<String>,
     pub display_order: Option<i32>,
 }
@@ -73,15 +85,19 @@ pub struct NewPortfolioProjectRequest {
 pub struct UpdatePortfolioProject {
     pub project_name: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    #[schema(value_type = Option<String>, max_length = 500)]
     pub image_url: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    #[schema(value_type = Option<String>, max_length = 500)]
     pub project_link: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    #[schema(value_type = Option<String>, max_length = 500)]
     pub source_code_link: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     #[schema(value_type = Option<String>, max_length = 500)]
     pub video_url: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    #[schema(value_type = Option<String>, max_length = 500)]
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,
     pub active: Option<bool>,
