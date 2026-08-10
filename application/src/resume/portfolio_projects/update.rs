@@ -41,6 +41,18 @@ pub fn update_portfolio_project(
         Some(Some(v)) => Some(validate_optional_url(Some(v), "Video URL")?),
     };
 
+    if payload.project_name.is_none()
+        && payload.image_url.is_none()
+        && payload.project_link.is_none()
+        && payload.source_code_link.is_none()
+        && payload.video_url.is_none()
+        && payload.description.is_none()
+        && payload.display_order.is_none()
+        && payload.active.is_none()
+    {
+        return Ok(existing);
+    }
+
     match diesel::update(portfolio_projects::table.find(project_id_value))
         .set(&payload)
         .get_result::<PortfolioProject>(&mut establish_connection())
