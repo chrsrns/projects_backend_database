@@ -81,6 +81,8 @@ diesel::table! {
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
         active -> Bool,
+        #[max_length = 500]
+        video_url -> Nullable<Varchar>,
     }
 }
 

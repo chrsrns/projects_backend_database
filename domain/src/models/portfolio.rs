@@ -35,6 +35,8 @@ pub struct PortfolioProject {
     pub display_order: Option<i32>,
     pub created_at: NaiveDateTime,
     pub active: bool,
+    #[schema(max_length = 500)]
+    pub video_url: Option<String>,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
