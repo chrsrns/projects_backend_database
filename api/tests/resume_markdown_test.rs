@@ -1754,3 +1754,203 @@ fn test_portfolio_video_url_markdown_link_ignored() {
     assert_eq!(projects.len(), 1);
     assert!(projects[0]["video_url"].is_null());
 }
+
+const PORTFOLIO_URL_BULLETS: &[(&str, &str)] = &[
+    ("Live:", "project_link"),
+    ("Source:", "source_code_link"),
+    ("Image:", "image_url"),
+];
+
+#[test]
+fn test_portfolio_url_bullets_500_round_trip() {
+    for (i, (bullet, field)) in PORTFOLIO_URL_BULLETS.iter().enumerate() {
+        let mut fixture = support::Fixture::new(9_227_040 + i as i64);
+        let unique_email = unique_markdown_email(9_227_040 + i as i64);
+        let url = "x".repeat(500);
+        let markdown = format!(
+            "# Jane Doe\n\n- Email: {}\n\n## Portfolio Projects\n\n### My Portfolio\n- {} {}\n",
+            unique_email, bullet, url
+        );
+
+        let import_response = fixture
+            .client()
+            .post("/api/resume/import/markdown")
+            .header(fixture.auth_header())
+            .header(markdown_content_type())
+            .body(markdown.clone())
+            .dispatch();
+
+        assert_eq!(
+            import_response.status(),
+            Status::Created,
+            "import {} 500 exact: 201",
+            field
+        );
+
+        let import_body = import_response.into_string().expect("import body");
+        let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+        let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+        fixture.track_resume_id(resume_id);
+
+        let projects_response = fixture
+            .client()
+            .get(format!("/api/resume/{}/portfolio_projects", resume_id))
+            .header(fixture.auth_header())
+            .dispatch();
+
+        assert_eq!(projects_response.status(), Status::Ok);
+        let projects_body = projects_response.into_string().expect("projects body");
+        let projects_json: Value = serde_json::from_str(&projects_body).expect("valid json");
+        let projects = projects_json["body"].as_array().expect("array");
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0][field].as_str().expect("string"), url, "{} 500 exact", field);
+
+        let export_response = fixture
+            .client()
+            .get(format!("/api/resume/{}/export/markdown", resume_id))
+            .header(fixture.auth_header())
+            .dispatch();
+
+        assert_eq!(export_response.status(), Status::Ok);
+        let exported = export_response.into_string().expect("export body");
+        assert!(exported.contains(&format!("- {} {}", bullet, url)), "{} re-export", field);
+    }
+}
+
+#[test]
+fn test_portfolio_url_bullets_blank_normalized() {
+    for (i, (bullet, field)) in PORTFOLIO_URL_BULLETS.iter().enumerate() {
+        let mut fixture = support::Fixture::new(9_227_050 + i as i64);
+        let unique_email = unique_markdown_email(9_227_050 + i as i64);
+        let markdown = format!(
+            "# Jane Doe\n\n- Email: {}\n\n## Portfolio Projects\n\n### My Portfolio\n- {}    \t\n  \n",
+            unique_email, bullet
+        );
+
+        let import_response = fixture
+            .client()
+            .post("/api/resume/import/markdown")
+            .header(fixture.auth_header())
+            .header(markdown_content_type())
+            .body(markdown)
+            .dispatch();
+
+        assert_eq!(
+            import_response.status(),
+            Status::Created,
+            "import {} blank: 201",
+            field
+        );
+
+        let import_body = import_response.into_string().expect("import body");
+        let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+        let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+        fixture.track_resume_id(resume_id);
+
+        let projects_response = fixture
+            .client()
+            .get(format!("/api/resume/{}/portfolio_projects", resume_id))
+            .header(fixture.auth_header())
+            .dispatch();
+
+        assert_eq!(projects_response.status(), Status::Ok);
+        let projects_body = projects_response.into_string().expect("projects body");
+        let projects_json: Value = serde_json::from_str(&projects_body).expect("valid json");
+        let projects = projects_json["body"].as_array().expect("array");
+        assert_eq!(projects.len(), 1);
+        assert!(projects[0][field].is_null(), "{} blank null", field);
+    }
+}
+
+#[test]
+fn test_portfolio_url_bullets_markdown_link_flattened() {
+    for (i, (bullet, field)) in PORTFOLIO_URL_BULLETS.iter().enumerate() {
+        let mut fixture = support::Fixture::new(9_227_060 + i as i64);
+        let unique_email = unique_markdown_email(9_227_060 + i as i64);
+        let markdown = format!(
+            "# Jane Doe\n\n- Email: {}\n\n## Portfolio Projects\n\n### My Portfolio\n- {} [My Link](https://example.com)\n",
+            unique_email, bullet
+        );
+
+        let import_response = fixture
+            .client()
+            .post("/api/resume/import/markdown")
+            .header(fixture.auth_header())
+            .header(markdown_content_type())
+            .body(markdown)
+            .dispatch();
+
+        assert_eq!(
+            import_response.status(),
+            Status::Created,
+            "import {} link: 201",
+            field
+        );
+
+        let import_body = import_response.into_string().expect("import body");
+        let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
+        let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+        fixture.track_resume_id(resume_id);
+
+        let projects_response = fixture
+            .client()
+            .get(format!("/api/resume/{}/portfolio_projects", resume_id))
+            .header(fixture.auth_header())
+            .dispatch();
+
+        assert_eq!(projects_response.status(), Status::Ok);
+        let projects_body = projects_response.into_string().expect("projects body");
+        let projects_json: Value = serde_json::from_str(&projects_body).expect("valid json");
+        let projects = projects_json["body"].as_array().expect("array");
+        assert_eq!(projects.len(), 1);
+        let expected = "My Link (https://example.com)";
+        assert_eq!(
+            projects[0][field].as_str().expect("string"),
+            expected,
+            "{} link flattened",
+            field
+        );
+
+        let export_response = fixture
+            .client()
+            .get(format!("/api/resume/{}/export/markdown", resume_id))
+            .header(fixture.auth_header())
+            .dispatch();
+
+        assert_eq!(export_response.status(), Status::Ok);
+        let exported = export_response.into_string().expect("export body");
+        assert!(
+            exported.contains(&format!("- {} {}", bullet, expected)),
+            "{} re-export flattened",
+            field
+        );
+    }
+}
+
+#[test]
+fn test_portfolio_url_bullets_too_long_rejected() {
+    for (i, (bullet, _field)) in PORTFOLIO_URL_BULLETS.iter().enumerate() {
+        let fixture = support::Fixture::new(9_227_070 + i as i64);
+        let unique_email = unique_markdown_email(9_227_070 + i as i64);
+        let url = "x".repeat(501);
+        let markdown = format!(
+            "# Jane Doe\n\n- Email: {}\n\n## Portfolio Projects\n\n### My Portfolio\n- {} {}\n",
+            unique_email, bullet, url
+        );
+
+        let import_response = fixture
+            .client()
+            .post("/api/resume/import/markdown")
+            .header(fixture.auth_header())
+            .header(markdown_content_type())
+            .body(markdown)
+            .dispatch();
+
+        assert_eq!(
+            import_response.status(),
+            Status::BadRequest,
+            "import {} >500: 400",
+            _field
+        );
+    }
+}
