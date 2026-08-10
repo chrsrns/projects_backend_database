@@ -99,11 +99,8 @@ fn test_create_and_read_portfolio_video_url() {
 fn test_update_portfolio_video_url() {
     let mut fixture = support::Fixture::new(9_230_002);
     let resume_id = create_resume(&mut fixture);
-    let (project_id, _) = create_project(
-        &mut fixture,
-        resume_id,
-        Some("https://example.com/old.mp4"),
-    );
+    let (project_id, _) =
+        create_project(&mut fixture, resume_id, Some("https://example.com/old.mp4"));
 
     let updated_video = "https://example.com/new.mp4";
     let update_json = serde_json::json!({

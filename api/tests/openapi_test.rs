@@ -67,10 +67,7 @@ fn test_openapi_json_is_served() {
             .get("type")
             .and_then(|t| t.as_array())
             .expect("video_url type array");
-        assert!(
-            types.iter().any(|t| t == "string"),
-            "video_url is a string"
-        );
+        assert!(types.iter().any(|t| t == "string"), "video_url is a string");
 
         let max_length = video_url
             .get("maxLength")
