@@ -30,9 +30,9 @@ pub fn create_portfolio_project(
     let new_item = NewPortfolioProject {
         resume_id: resume_id_value,
         project_name: payload.project_name,
-        image_url: payload.image_url,
-        project_link: payload.project_link,
-        source_code_link: payload.source_code_link,
+        image_url: validate_optional_url(payload.image_url, "Image URL")?,
+        project_link: validate_optional_url(payload.project_link, "Project Link")?,
+        source_code_link: validate_optional_url(payload.source_code_link, "Source Code Link")?,
         video_url: validate_optional_url(payload.video_url, "Video URL")?,
         description: payload.description,
         display_order: payload.display_order,

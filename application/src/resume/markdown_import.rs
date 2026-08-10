@@ -101,6 +101,21 @@ pub fn import_resume_markdown(
         .iter()
         .map(|p| validate_optional_url(p.video_url.clone(), "Video URL"))
         .collect::<Result<Vec<_>, _>>()?;
+    let portfolio_image_urls: Vec<Option<String>> = full_resume
+        .portfolio_projects
+        .iter()
+        .map(|p| validate_optional_url(p.image_url.clone(), "Image URL"))
+        .collect::<Result<Vec<_>, _>>()?;
+    let portfolio_project_links: Vec<Option<String>> = full_resume
+        .portfolio_projects
+        .iter()
+        .map(|p| validate_optional_url(p.project_link.clone(), "Project Link"))
+        .collect::<Result<Vec<_>, _>>()?;
+    let portfolio_source_code_links: Vec<Option<String>> = full_resume
+        .portfolio_projects
+        .iter()
+        .map(|p| validate_optional_url(p.source_code_link.clone(), "Source Code Link"))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut conn = infrastructure::establish_connection();
 
@@ -266,9 +281,9 @@ pub fn import_resume_markdown(
             let new_project = NewPortfolioProject {
                 resume_id: resume.id,
                 project_name: project.project_name.clone(),
-                image_url: project.image_url.clone(),
-                project_link: project.project_link.clone(),
-                source_code_link: project.source_code_link.clone(),
+                image_url: portfolio_image_urls[idx].clone(),
+                project_link: portfolio_project_links[idx].clone(),
+                source_code_link: portfolio_source_code_links[idx].clone(),
                 video_url: portfolio_video_urls[idx].clone(),
                 description: project.description.clone(),
                 display_order: project.display_order.or(Some(idx as i32)),

@@ -41,6 +41,24 @@ pub fn update_portfolio_project(
         Some(Some(v)) => Some(validate_optional_url(Some(v), "Video URL")?),
     };
 
+    payload.image_url = match payload.image_url {
+        None => None,
+        Some(None) => Some(None),
+        Some(Some(v)) => Some(validate_optional_url(Some(v), "Image URL")?),
+    };
+
+    payload.project_link = match payload.project_link {
+        None => None,
+        Some(None) => Some(None),
+        Some(Some(v)) => Some(validate_optional_url(Some(v), "Project Link")?),
+    };
+
+    payload.source_code_link = match payload.source_code_link {
+        None => None,
+        Some(None) => Some(None),
+        Some(Some(v)) => Some(validate_optional_url(Some(v), "Source Code Link")?),
+    };
+
     if payload.project_name.is_none()
         && payload.image_url.is_none()
         && payload.project_link.is_none()
