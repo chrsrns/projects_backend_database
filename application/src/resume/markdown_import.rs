@@ -262,6 +262,7 @@ pub fn import_resume_markdown(
                 image_url: project.image_url.clone(),
                 project_link: project.project_link.clone(),
                 source_code_link: project.source_code_link.clone(),
+                video_url: project.video_url.clone(),
                 description: project.description.clone(),
                 display_order: project.display_order.or(Some(idx as i32)),
             };

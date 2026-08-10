@@ -33,6 +33,7 @@ pub fn create_portfolio_project(
         image_url: payload.image_url,
         project_link: payload.project_link,
         source_code_link: payload.source_code_link,
+        video_url: payload.video_url,
         description: payload.description,
         display_order: payload.display_order,
     };

@@ -69,6 +69,7 @@ pub struct ParsedPortfolioProject {
     pub image_url: Option<String>,
     pub project_link: Option<String>,
     pub source_code_link: Option<String>,
+    pub video_url: Option<String>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
 }

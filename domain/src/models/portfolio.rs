@@ -48,6 +48,8 @@ pub struct NewPortfolioProject {
     pub image_url: Option<String>,
     pub project_link: Option<String>,
     pub source_code_link: Option<String>,
+    #[schema(max_length = 500)]
+    pub video_url: Option<String>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
 }
@@ -59,6 +61,8 @@ pub struct NewPortfolioProjectRequest {
     pub image_url: Option<String>,
     pub project_link: Option<String>,
     pub source_code_link: Option<String>,
+    #[schema(max_length = 500)]
+    pub video_url: Option<String>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
 }
@@ -74,6 +78,9 @@ pub struct UpdatePortfolioProject {
     pub project_link: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub source_code_link: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    #[schema(value_type = Option<String>, max_length = 500)]
+    pub video_url: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,

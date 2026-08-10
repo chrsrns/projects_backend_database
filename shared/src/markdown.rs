@@ -400,6 +400,7 @@ pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError>
                                 image_url: None,
                                 project_link: None,
                                 source_code_link: None,
+                                video_url: None,
                                 description: None,
                                 display_order,
                             });
@@ -1245,5 +1246,22 @@ mod tests {
             "Sep 2020"
         );
         assert_eq!(format_optional_date(None, None), "Present");
+    }
+
+    #[test]
+    fn test_parsed_portfolio_project_has_video_url() {
+        let project = ParsedPortfolioProject {
+            project_name: "Demo".to_string(),
+            image_url: None,
+            project_link: None,
+            source_code_link: None,
+            video_url: Some("https://example.com/video.mp4".to_string()),
+            description: None,
+            display_order: None,
+        };
+        assert_eq!(
+            project.video_url.as_deref(),
+            Some("https://example.com/video.mp4")
+        );
     }
 }
