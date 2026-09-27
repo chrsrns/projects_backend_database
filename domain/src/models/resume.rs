@@ -38,11 +38,11 @@ pub struct Resume {
     pub email: String,
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
-    pub executive_summary: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub created_by: Option<i32>,
     pub is_public: bool,
+    pub executive_summary: Option<String>,
     #[schema(max_length = 500)]
     pub video: Option<String>,
 }
