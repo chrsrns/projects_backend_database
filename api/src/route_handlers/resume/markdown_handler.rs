@@ -10,7 +10,9 @@ use rocket::response::status::Custom;
 use rocket::response::{Responder, Response as RocketResponse};
 use rocket::serde::json::Json;
 use rocket::{State, get, post};
+use shared::markdown::{MarkdownError, markdown_to_resume};
 use shared::response_models::Response;
+use shared::resume_document::{MarkdownValidationError, MarkdownValidationReport};
 
 use super::CustomJsonResult;
 use crate::auth::{AuthSession, MaybeAuthSession};
@@ -168,6 +170,41 @@ pub fn import_resume_markdown(
         }
         Err(err) => Err(map_markdown_error(err)),
     }
+}
+
+#[utoipa::path(
+    post,
+    path = "/resume/validate/markdown",
+    tag = "Resumes",
+    request_body(content = String, content_type = "text/markdown"),
+    responses(
+        (status = 200, description = "Markdown validation report", body = Response<MarkdownValidationReport>, content_type = "application/json"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[post(
+    "/resume/validate/markdown",
+    format = "text/markdown",
+    data = "<markdown>"
+)]
+pub fn validate_resume_markdown(
+    markdown: LimitedMarkdown,
+) -> Json<Response<MarkdownValidationReport>> {
+    let report = match markdown_to_resume(&markdown.0) {
+        Ok(_) => MarkdownValidationReport {
+            valid: true,
+            errors: Vec::new(),
+        },
+        Err(MarkdownError::InvalidMarkdown(message)) => MarkdownValidationReport {
+            valid: false,
+            errors: vec![MarkdownValidationError {
+                section: None,
+                message,
+            }],
+        },
+    };
+    Json(Response { body: report })
 }
 
 const MARKDOWN_FORMAT: &str = include_str!(concat!(
