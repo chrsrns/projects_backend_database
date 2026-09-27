@@ -262,3 +262,16 @@ const MARKDOWN_FORMAT: &str = include_str!(concat!(
 pub fn get_markdown_format() -> MarkdownResult {
     Ok(MarkdownResponse(MARKDOWN_FORMAT.to_string()))
 }
+
+#[utoipa::path(
+    get,
+    path = "/resume/document-schema",
+    tag = "Resumes",
+    responses(
+        (status = 200, description = "OpenAPI 3.0 schema object for ResumeDocument", content_type = "application/json"),
+    )
+)]
+#[get("/resume/document-schema")]
+pub fn resume_document_schema() -> Json<serde_json::Value> {
+    Json(crate::openapi::resume_document_schema_json())
+}

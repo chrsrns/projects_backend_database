@@ -195,3 +195,78 @@ fn test_convert_oversized_markdown_is_413() {
 
     assert_eq!(response.status(), Status::PayloadTooLarge);
 }
+
+#[test]
+fn test_document_schema_endpoint() {
+    let client = client();
+    let response = client.get("/api/resume/document-schema").dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    assert_eq!(
+        response.content_type().expect("content type"),
+        ContentType::JSON
+    );
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("schema body")).expect("valid json");
+
+    let schemas = &json["components"]["schemas"];
+    let resume_document = schemas
+        .get("ResumeDocument")
+        .expect("ResumeDocument schema present");
+    let properties = resume_document["properties"]
+        .as_object()
+        .expect("ResumeDocument properties");
+    for field in [
+        "resume",
+        "education",
+        "education_key_points",
+        "skills",
+        "work_experiences",
+        "work_experience_key_points",
+        "portfolio_projects",
+        "portfolio_key_points",
+        "portfolio_technologies",
+        "languages",
+        "frameworks",
+    ] {
+        assert!(
+            properties.contains_key(field),
+            "ResumeDocument property {} missing",
+            field
+        );
+    }
+
+    // Every $ref inside the emitted schemas resolves within the same
+    // components.schemas map — the response is self-contained.
+    let schema_map = schemas.as_object().expect("schemas object");
+    fn collect_refs(value: &Value, refs: &mut Vec<String>) {
+        match value {
+            Value::Object(map) => {
+                for (key, v) in map {
+                    if key == "$ref" {
+                        if let Some(r) = v.as_str() {
+                            refs.push(r.to_string());
+                        }
+                    } else {
+                        collect_refs(v, refs);
+                    }
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|v| collect_refs(v, refs)),
+            _ => {}
+        }
+    }
+    let mut refs = Vec::new();
+    collect_refs(schemas, &mut refs);
+    for r in &refs {
+        let name = r
+            .strip_prefix("#/components/schemas/")
+            .expect("component-local ref");
+        assert!(
+            schema_map.contains_key(name),
+            "unresolved $ref {} in document-schema",
+            r
+        );
+    }
+    assert!(!refs.is_empty(), "expected nested $refs in schema");
+}

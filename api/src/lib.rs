@@ -172,6 +172,7 @@ pub fn build_rocket_with_llm_client(
                 markdown_handler::validate_resume_markdown,
                 markdown_handler::convert_resume_markdown,
                 markdown_handler::get_markdown_format,
+                markdown_handler::resume_document_schema,
                 skills_handler::list_skills_handler,
                 skills_handler::create_skill_handler,
                 skills_handler::update_skill_handler,

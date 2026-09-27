@@ -13,6 +13,12 @@ use domain::models::{
     WorkExperienceKeyPoint,
 };
 use shared::response_models::{AuthTokenResponse, Response};
+use shared::resume_document::{
+    DocumentEducation, DocumentEducationKeyPoint, DocumentFramework, DocumentLanguage,
+    DocumentPortfolioKeyPoint, DocumentPortfolioProject, DocumentPortfolioTechnology,
+    DocumentResume, DocumentSkill, DocumentWorkExperience, DocumentWorkExperienceKeyPoint,
+    MarkdownValidationError, MarkdownValidationReport, ResumeDocument, ResumeDocumentEnvelope,
+};
 use utoipa::openapi::ComponentsBuilder;
 use utoipa::openapi::Server;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
@@ -62,7 +68,10 @@ impl Modify for ServerAddon {
         crate::resume_handler::delete_resume_handler,
         crate::markdown_handler::export_resume_markdown,
         crate::markdown_handler::import_resume_markdown,
+        crate::markdown_handler::validate_resume_markdown,
+        crate::markdown_handler::convert_resume_markdown,
         crate::markdown_handler::get_markdown_format,
+        crate::markdown_handler::resume_document_schema,
         crate::skills_handler::list_skills_handler,
         crate::skills_handler::create_skill_handler,
         crate::skills_handler::update_skill_handler,
@@ -148,6 +157,34 @@ impl Modify for ServerAddon {
         Response::<UpdatePortfolioTechnology>,
         Response::<application::llm::GenerateContentResponse>,
         application::llm::GenerateContentRequest,
+        ResumeDocument,
+        ResumeDocumentEnvelope,
+        DocumentResume,
+        DocumentEducation,
+        DocumentEducationKeyPoint,
+        DocumentSkill,
+        DocumentWorkExperience,
+        DocumentWorkExperienceKeyPoint,
+        DocumentPortfolioProject,
+        DocumentPortfolioKeyPoint,
+        DocumentPortfolioTechnology,
+        DocumentLanguage,
+        DocumentFramework,
+        MarkdownValidationReport,
+        MarkdownValidationError,
+        Response::<MarkdownValidationReport>,
+        Response::<ResumeDocumentEnvelope>,
     ))
 )]
 pub struct ApiDoc;
+
+#[derive(OpenApi)]
+#[openapi(components(schemas(ResumeDocument)))]
+struct ResumeDocumentComponents;
+
+pub fn resume_document_schema_json() -> serde_json::Value {
+    let components = ResumeDocumentComponents::openapi()
+        .components
+        .unwrap_or_default();
+    serde_json::json!({ "components": components })
+}
