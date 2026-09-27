@@ -1803,7 +1803,12 @@ fn test_portfolio_url_bullets_500_round_trip() {
         let projects_json: Value = serde_json::from_str(&projects_body).expect("valid json");
         let projects = projects_json["body"].as_array().expect("array");
         assert_eq!(projects.len(), 1);
-        assert_eq!(projects[0][field].as_str().expect("string"), url, "{} 500 exact", field);
+        assert_eq!(
+            projects[0][field].as_str().expect("string"),
+            url,
+            "{} 500 exact",
+            field
+        );
 
         let export_response = fixture
             .client()
@@ -1813,7 +1818,11 @@ fn test_portfolio_url_bullets_500_round_trip() {
 
         assert_eq!(export_response.status(), Status::Ok);
         let exported = export_response.into_string().expect("export body");
-        assert!(exported.contains(&format!("- {} {}", bullet, url)), "{} re-export", field);
+        assert!(
+            exported.contains(&format!("- {} {}", bullet, url)),
+            "{} re-export",
+            field
+        );
     }
 }
 
