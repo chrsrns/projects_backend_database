@@ -395,3 +395,33 @@ fn test_handlers_take_only_markdown_argument() {
         }
     }
 }
+
+// Golden cross-repository contract fixture.
+// `fixtures/resume_document.golden.json` is the full HTTP response body:
+// the `body` wrapper holds the ResumeDocumentEnvelope. Child collections
+// are JSON objects whose keys are strings ("1", "2", …) — Rust BTreeMap
+// keeps them in numeric ascending order, but object key order is not
+// significant to JSON consumers. Comparison is semantic via
+// serde_json::Value, not textual.
+#[test]
+fn test_convert_matches_golden_fixture() {
+    let client = client();
+    let markdown = include_str!("fixtures/resume_document.golden.md");
+    let expected: Value =
+        serde_json::from_str(include_str!("fixtures/resume_document.golden.json"))
+            .expect("valid golden json");
+
+    let body = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch()
+        .into_string()
+        .expect("convert body");
+    let actual: Value = serde_json::from_str(&body).expect("valid json");
+
+    assert_eq!(
+        actual, expected,
+        "convert output drifted from golden fixture"
+    );
+}

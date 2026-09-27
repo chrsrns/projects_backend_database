@@ -1,0 +1,187 @@
+{
+  "body": {
+    "document": {
+      "education": [
+        {
+          "active": true,
+          "degree": "Bachelor of Science",
+          "description": "Focused on software engineering",
+          "display_order": null,
+          "education_stage": "Bachelor's in Computer Science",
+          "end_date": "2024-05",
+          "id": 1,
+          "institution_name": "University of ABC",
+          "resume_id": 0,
+          "start_date": "2020-09"
+        }
+      ],
+      "education_key_points": {
+        "1": [
+          {
+            "active": true,
+            "display_order": null,
+            "education_id": 1,
+            "id": 1,
+            "key_point": "Graduated with honors"
+          },
+          {
+            "active": true,
+            "display_order": null,
+            "education_id": 1,
+            "id": 2,
+            "key_point": "Specialized in distributed systems"
+          }
+        ]
+      },
+      "frameworks": {
+        "1": [
+          {
+            "display_order": null,
+            "framework_name": "Rocket",
+            "id": 1,
+            "language_id": 1
+          },
+          {
+            "display_order": null,
+            "framework_name": "Actix",
+            "id": 2,
+            "language_id": 1
+          }
+        ],
+        "2": [
+          {
+            "display_order": null,
+            "framework_name": "Django",
+            "id": 3,
+            "language_id": 2
+          }
+        ]
+      },
+      "languages": [
+        {
+          "display_order": null,
+          "id": 1,
+          "language_name": "Rust",
+          "resume_id": 0
+        },
+        {
+          "display_order": null,
+          "id": 2,
+          "language_name": "Python",
+          "resume_id": 0
+        }
+      ],
+      "portfolio_key_points": {
+        "1": [
+          {
+            "active": true,
+            "display_order": null,
+            "id": 1,
+            "key_point": "Built a scalable resume API",
+            "portfolio_project_id": 1
+          }
+        ]
+      },
+      "portfolio_projects": [
+        {
+          "active": true,
+          "description": "Resume rendering engine",
+          "display_order": null,
+          "id": 1,
+          "image_url": "https://example.com/image.png",
+          "project_link": "https://example.com",
+          "project_name": "My Portfolio",
+          "resume_id": 0,
+          "source_code_link": "https://github.com/janedoe/project",
+          "video_url": "https://example.com/demo.mp4"
+        }
+      ],
+      "portfolio_technologies": {
+        "1": [
+          {
+            "active": true,
+            "display_order": null,
+            "id": 1,
+            "portfolio_project_id": 1,
+            "technology_name": "Rust"
+          },
+          {
+            "active": true,
+            "display_order": null,
+            "id": 2,
+            "portfolio_project_id": 1,
+            "technology_name": "Rocket"
+          },
+          {
+            "active": true,
+            "display_order": null,
+            "id": 3,
+            "portfolio_project_id": 1,
+            "technology_name": "Diesel"
+          }
+        ]
+      },
+      "resume": {
+        "email": "jane.doe@example.com",
+        "executive_summary": "Experienced backend developer.",
+        "github_url": "https://github.com/janedoe",
+        "id": 0,
+        "is_public": true,
+        "location": "New York, NY",
+        "mobile_number": "+1987654321",
+        "name": "Jane Doe",
+        "profile_image_url": "https://example.com/profile.jpg",
+        "video": "https://example.com/intro.mp4"
+      },
+      "skills": [
+        {
+          "confidence_percentage": 90,
+          "display_order": null,
+          "id": 1,
+          "resume_id": 0,
+          "skill_name": "Rust"
+        },
+        {
+          "confidence_percentage": 75,
+          "display_order": null,
+          "id": 2,
+          "resume_id": 0,
+          "skill_name": "Python"
+        }
+      ],
+      "work_experience_key_points": {
+        "1": [
+          {
+            "active": true,
+            "display_order": null,
+            "id": 1,
+            "key_point": "Led team of 5 developers",
+            "work_experience_id": 1
+          },
+          {
+            "active": true,
+            "display_order": null,
+            "id": 2,
+            "key_point": "Improved system performance by 40%",
+            "work_experience_id": 1
+          }
+        ]
+      },
+      "work_experiences": [
+        {
+          "active": true,
+          "company_name": "Tech Corp",
+          "description": "Backend development",
+          "display_order": null,
+          "end_date": null,
+          "id": 1,
+          "job_title": "Senior Software Engineer",
+          "resume_id": 0,
+          "start_date": "2020-01"
+        }
+      ]
+    },
+    "generator": "projects_backend_database",
+    "schema_version": 1
+  }
+}
