@@ -16,7 +16,9 @@ diesel::table! {
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
         active -> Bool,
+        #[max_length = 10]
         start_date_precision -> Varchar,
+        #[max_length = 10]
         end_date_precision -> Nullable<Varchar>,
     }
 }
@@ -113,11 +115,11 @@ diesel::table! {
         github_url -> Nullable<Varchar>,
         #[max_length = 50]
         mobile_number -> Nullable<Varchar>,
-        executive_summary -> Nullable<Text>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
         created_by -> Nullable<Int4>,
         is_public -> Bool,
+        executive_summary -> Nullable<Text>,
         #[max_length = 500]
         video -> Nullable<Varchar>,
     }
@@ -182,7 +184,9 @@ diesel::table! {
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
         active -> Bool,
+        #[max_length = 10]
         start_date_precision -> Varchar,
+        #[max_length = 10]
         end_date_precision -> Nullable<Varchar>,
     }
 }
