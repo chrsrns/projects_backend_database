@@ -12,9 +12,12 @@ use rocket::serde::json::Json;
 use rocket::{State, get, post};
 use shared::markdown::{MarkdownError, markdown_to_resume};
 use shared::response_models::Response;
-use shared::resume_document::{MarkdownValidationError, MarkdownValidationReport};
+use shared::resume_document::{
+    MarkdownValidationError, MarkdownValidationReport, RESUME_DOCUMENT_GENERATOR,
+    RESUME_DOCUMENT_SCHEMA_VERSION, ResumeDocument, ResumeDocumentEnvelope,
+};
 
-use super::CustomJsonResult;
+use super::{CustomJsonResult, JsonResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction, SectionType};
 
@@ -205,6 +208,41 @@ pub fn validate_resume_markdown(
         },
     };
     Json(Response { body: report })
+}
+
+#[utoipa::path(
+    post,
+    path = "/resume/convert/markdown",
+    tag = "Resumes",
+    request_body(content = String, content_type = "text/markdown"),
+    responses(
+        (status = 200, description = "Resume document envelope", body = Response<ResumeDocumentEnvelope>, content_type = "application/json"),
+        (status = 400, description = "Invalid Markdown"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[post(
+    "/resume/convert/markdown",
+    format = "text/markdown",
+    data = "<markdown>"
+)]
+pub fn convert_resume_markdown(markdown: LimitedMarkdown) -> JsonResult<ResumeDocumentEnvelope> {
+    match markdown_to_resume(&markdown.0) {
+        Ok(parsed) => {
+            let document: ResumeDocument = parsed.into();
+            Ok(Json(Response {
+                body: ResumeDocumentEnvelope {
+                    schema_version: RESUME_DOCUMENT_SCHEMA_VERSION,
+                    generator: RESUME_DOCUMENT_GENERATOR.to_string(),
+                    document,
+                },
+            }))
+        }
+        Err(MarkdownError::InvalidMarkdown(message)) => {
+            Err(Custom(Status::BadRequest, Json(Response { body: message })))
+        }
+    }
 }
 
 const MARKDOWN_FORMAT: &str = include_str!(concat!(

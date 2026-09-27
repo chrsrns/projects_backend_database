@@ -76,3 +76,122 @@ fn test_validate_oversized_markdown_is_413() {
 
     assert_eq!(response.status(), Status::PayloadTooLarge);
 }
+
+#[test]
+fn test_convert_valid_markdown_returns_document() {
+    let client = client();
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(sample_markdown())
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("convert body")).expect("valid json");
+
+    let envelope = &json["body"];
+    assert_eq!(envelope["schema_version"], 1);
+    assert_eq!(envelope["generator"], "projects_backend_database");
+
+    let document = &envelope["document"];
+    assert_eq!(document["resume"]["id"], 0);
+    assert_eq!(document["resume"]["name"], "Jane Doe");
+    assert_eq!(document["resume"]["is_public"], true);
+    assert_eq!(
+        document["resume"]["executive_summary"],
+        "Experienced backend developer."
+    );
+    assert!(document["resume"].get("created_at").is_none());
+    assert!(document["resume"].get("updated_at").is_none());
+    assert!(document["resume"].get("created_by").is_none());
+
+    let education = &document["education"];
+    assert_eq!(education.as_array().expect("education array").len(), 1);
+    assert_eq!(education[0]["id"], 1);
+    assert_eq!(education[0]["resume_id"], 0);
+    assert_eq!(education[0]["active"], true);
+    assert_eq!(education[0]["start_date"], "2020-09");
+    assert_eq!(education[0]["end_date"], "2024-05");
+    assert_eq!(education[0]["degree"], "Bachelor of Science");
+    assert_eq!(education[0]["institution_name"], "University of ABC");
+
+    // Child maps are JSON objects keyed by the minted parent id as a string.
+    let edu_kps = &document["education_key_points"];
+    let first_parent = edu_kps["1"].as_array().expect("key points for parent 1");
+    assert_eq!(first_parent.len(), 2);
+    assert_eq!(first_parent[0]["education_id"], 1);
+    assert_eq!(first_parent[0]["key_point"], "Graduated with honors");
+    assert_eq!(first_parent[0]["active"], true);
+    assert_eq!(first_parent[0]["id"], 1);
+    assert_eq!(first_parent[1]["id"], 2);
+
+    let skills = document["skills"].as_array().expect("skills array");
+    assert_eq!(skills.len(), 2);
+    assert_eq!(skills[0]["id"], 1);
+    assert_eq!(skills[0]["resume_id"], 0);
+    assert_eq!(skills[0]["skill_name"], "Rust");
+    assert_eq!(skills[0]["confidence_percentage"], 90);
+    assert!(skills[0].get("active").is_none());
+
+    let work = &document["work_experiences"][0];
+    assert_eq!(work["id"], 1);
+    assert_eq!(work["job_title"], "Senior Software Engineer");
+    assert_eq!(work["start_date"], "2020-01");
+    assert_eq!(work["end_date"], Value::Null);
+    let work_kps = &document["work_experience_key_points"]["1"];
+    assert_eq!(work_kps.as_array().expect("work key points").len(), 2);
+
+    let projects = &document["portfolio_projects"][0];
+    assert_eq!(projects["id"], 1);
+    assert_eq!(projects["project_name"], "My Portfolio");
+    let techs = &document["portfolio_technologies"]["1"];
+    assert_eq!(techs.as_array().expect("technologies").len(), 3);
+    assert_eq!(techs[0]["technology_name"], "Rust");
+    assert_eq!(techs[0]["portfolio_project_id"], 1);
+    assert_eq!(techs[0]["id"], 1);
+    assert_eq!(techs[1]["id"], 2);
+    assert_eq!(techs[2]["id"], 3);
+
+    let languages = document["languages"].as_array().expect("languages");
+    assert_eq!(languages.len(), 2);
+    assert_eq!(languages[0]["id"], 1);
+    assert_eq!(languages[0]["language_name"], "Rust");
+    let frameworks = &document["frameworks"]["1"];
+    assert_eq!(frameworks.as_array().expect("frameworks").len(), 2);
+    assert_eq!(frameworks[0]["language_id"], 1);
+    assert_eq!(frameworks[0]["framework_name"], "Rocket");
+    let second_frameworks = &document["frameworks"]["2"];
+    assert_eq!(second_frameworks[0]["language_id"], 2);
+    assert_eq!(second_frameworks[0]["framework_name"], "Django");
+    assert_eq!(second_frameworks[0]["id"], 3);
+}
+
+#[test]
+fn test_convert_invalid_markdown_is_400() {
+    let client = client();
+    let markdown = "# Jane Doe\n\n## Skills\n\n- Rust - 90%\n";
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::BadRequest);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("error body")).expect("valid json");
+    assert_eq!(json["body"], "Missing required field: Email");
+}
+
+#[test]
+fn test_convert_oversized_markdown_is_413() {
+    let client = client();
+    let big = "a".repeat(1_048_577);
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(big)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::PayloadTooLarge);
+}
