@@ -270,3 +270,128 @@ fn test_document_schema_endpoint() {
     }
     assert!(!refs.is_empty(), "expected nested $refs in schema");
 }
+
+#[test]
+fn test_convert_is_deterministic() {
+    let client = client();
+    let markdown = sample_markdown();
+
+    let first = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown.clone())
+        .dispatch()
+        .into_string()
+        .expect("first body");
+    let second = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch()
+        .into_string()
+        .expect("second body");
+
+    assert_eq!(first, second, "convert output must be byte-identical");
+}
+
+#[test]
+fn test_convert_date_encoding() {
+    let client = client();
+    // Year-only start, month-year end, and `Present` end date.
+    let markdown = "# Jane Doe\n\n- Email: jane.doe@example.com\n\n## Education\n\n### Bachelor - Uni (2019 - May 2023)\n\n## Work Experience\n\n### Dev - Corp (2020 - Present)\n";
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("convert body")).expect("valid json");
+    let document = &json["body"]["document"];
+
+    assert_eq!(document["education"][0]["start_date"], "2019");
+    assert_eq!(document["education"][0]["end_date"], "2023-05");
+    assert_eq!(document["work_experiences"][0]["start_date"], "2020");
+    assert_eq!(document["work_experiences"][0]["end_date"], Value::Null);
+}
+
+#[test]
+fn test_convert_child_maps_across_multiple_parents() {
+    let client = client();
+    let markdown = "# Jane Doe\n\n- Email: jane.doe@example.com\n\n## Education\n\n### Bachelor - Uni A (2016 - 2020)\n- first edu kp\n\n### Master - Uni B (2020 - 2022)\n- second edu kp\n- another kp\n\n## Languages & Frameworks\n\n### Rust\n- Rocket\n\n### Go\n- Gin\n- Echo\n";
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("convert body")).expect("valid json");
+    let document = &json["body"]["document"];
+
+    let edu_kps = document["education_key_points"].as_object().expect("map");
+    // Ascending numeric key order via BTreeMap.
+    let keys: Vec<&String> = edu_kps.keys().collect();
+    assert_eq!(keys, ["1", "2"]);
+    assert_eq!(edu_kps["1"][0]["key_point"], "first edu kp");
+    assert_eq!(edu_kps["1"][0]["education_id"], 1);
+    assert_eq!(edu_kps["2"][0]["key_point"], "second edu kp");
+    assert_eq!(edu_kps["2"][0]["education_id"], 2);
+    // Global 1-based child ids across the whole map in document order.
+    assert_eq!(edu_kps["1"][0]["id"], 1);
+    assert_eq!(edu_kps["2"][0]["id"], 2);
+    assert_eq!(edu_kps["2"][1]["id"], 3);
+
+    let frameworks = document["frameworks"].as_object().expect("framework map");
+    let fw_keys: Vec<&String> = frameworks.keys().collect();
+    assert_eq!(fw_keys, ["1", "2"]);
+    assert_eq!(frameworks["2"][0]["language_id"], 2);
+    assert_eq!(frameworks["2"][1]["language_id"], 2);
+    assert_eq!(frameworks["1"][0]["id"], 1);
+    assert_eq!(frameworks["2"][0]["id"], 2);
+    assert_eq!(frameworks["2"][1]["id"], 3);
+}
+
+#[test]
+fn test_handlers_take_only_markdown_argument() {
+    // Direct calls compile only because the handler signatures take a single
+    // LimitedMarkdown — no database, Hub, or auth session parameters.
+    use api::route_handlers::resume::markdown_handler::{
+        LimitedMarkdown, convert_resume_markdown, validate_resume_markdown,
+    };
+
+    let report = validate_resume_markdown(LimitedMarkdown(sample_markdown()));
+    assert!(report.0.body.valid);
+    assert!(report.0.body.errors.is_empty());
+
+    let invalid = validate_resume_markdown(LimitedMarkdown("## Nope".to_string()));
+    assert!(!invalid.0.body.valid);
+    assert_eq!(invalid.0.body.errors.len(), 1);
+    assert_eq!(invalid.0.body.errors[0].section, None);
+
+    let envelope = match convert_resume_markdown(LimitedMarkdown(sample_markdown())) {
+        Ok(json) => json.0.body,
+        Err(_) => panic!("convert should succeed"),
+    };
+    assert_eq!(envelope.schema_version, 1);
+    assert_eq!(envelope.generator, "projects_backend_database");
+    assert_eq!(envelope.document.resume.id, 0);
+    assert_eq!(envelope.document.education[0].id, 1);
+    assert_eq!(
+        envelope.document.education_key_points[&1][0].education_id,
+        1
+    );
+
+    match convert_resume_markdown(LimitedMarkdown("## Nope".to_string())) {
+        Ok(_) => panic!("convert should fail"),
+        Err(err) => {
+            assert_eq!(err.0, Status::BadRequest);
+            assert_eq!(
+                err.1.0.body,
+                "Unknown section 'Nope'. Expected one of: Education, Skills, Work Experience, Portfolio Projects, Languages & Frameworks, Summary"
+            );
+        }
+    }
+}
