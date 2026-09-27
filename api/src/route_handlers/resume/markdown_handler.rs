@@ -10,9 +10,14 @@ use rocket::response::status::Custom;
 use rocket::response::{Responder, Response as RocketResponse};
 use rocket::serde::json::Json;
 use rocket::{State, get, post};
+use shared::markdown::{MarkdownError, markdown_to_resume};
 use shared::response_models::Response;
+use shared::resume_document::{
+    MarkdownValidationError, MarkdownValidationReport, RESUME_DOCUMENT_GENERATOR,
+    RESUME_DOCUMENT_SCHEMA_VERSION, ResumeDocument, ResumeDocumentEnvelope,
+};
 
-use super::CustomJsonResult;
+use super::{CustomJsonResult, JsonResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::{Hub, ResumeChangedAction, SectionType};
 
@@ -170,6 +175,76 @@ pub fn import_resume_markdown(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/resume/validate/markdown",
+    tag = "Resumes",
+    request_body(content = String, content_type = "text/markdown"),
+    responses(
+        (status = 200, description = "Markdown validation report", body = Response<MarkdownValidationReport>, content_type = "application/json"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[post(
+    "/resume/validate/markdown",
+    format = "text/markdown",
+    data = "<markdown>"
+)]
+pub fn validate_resume_markdown(
+    markdown: LimitedMarkdown,
+) -> Json<Response<MarkdownValidationReport>> {
+    let report = match markdown_to_resume(&markdown.0) {
+        Ok(_) => MarkdownValidationReport {
+            valid: true,
+            errors: Vec::new(),
+        },
+        Err(MarkdownError::InvalidMarkdown(message)) => MarkdownValidationReport {
+            valid: false,
+            errors: vec![MarkdownValidationError {
+                section: None,
+                message,
+            }],
+        },
+    };
+    Json(Response { body: report })
+}
+
+#[utoipa::path(
+    post,
+    path = "/resume/convert/markdown",
+    tag = "Resumes",
+    request_body(content = String, content_type = "text/markdown"),
+    responses(
+        (status = 200, description = "Resume document envelope", body = Response<ResumeDocumentEnvelope>, content_type = "application/json"),
+        (status = 400, description = "Invalid Markdown"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[post(
+    "/resume/convert/markdown",
+    format = "text/markdown",
+    data = "<markdown>"
+)]
+pub fn convert_resume_markdown(markdown: LimitedMarkdown) -> JsonResult<ResumeDocumentEnvelope> {
+    match markdown_to_resume(&markdown.0) {
+        Ok(parsed) => {
+            let document: ResumeDocument = parsed.into();
+            Ok(Json(Response {
+                body: ResumeDocumentEnvelope {
+                    schema_version: RESUME_DOCUMENT_SCHEMA_VERSION,
+                    generator: RESUME_DOCUMENT_GENERATOR.to_string(),
+                    document,
+                },
+            }))
+        }
+        Err(MarkdownError::InvalidMarkdown(message)) => {
+            Err(Custom(Status::BadRequest, Json(Response { body: message })))
+        }
+    }
+}
+
 const MARKDOWN_FORMAT: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../MARKDOWN_FORMAT.md"
@@ -186,4 +261,17 @@ const MARKDOWN_FORMAT: &str = include_str!(concat!(
 #[get("/resume/markdown-format")]
 pub fn get_markdown_format() -> MarkdownResult {
     Ok(MarkdownResponse(MARKDOWN_FORMAT.to_string()))
+}
+
+#[utoipa::path(
+    get,
+    path = "/resume/document-schema",
+    tag = "Resumes",
+    responses(
+        (status = 200, description = "OpenAPI 3.0 schema object for ResumeDocument", content_type = "application/json"),
+    )
+)]
+#[get("/resume/document-schema")]
+pub fn resume_document_schema() -> Json<serde_json::Value> {
+    Json(crate::openapi::resume_document_schema_json())
 }

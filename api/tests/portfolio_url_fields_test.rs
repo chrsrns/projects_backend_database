@@ -86,11 +86,7 @@ fn post_update_project<'a>(
         .dispatch()
 }
 
-fn get_project(
-    fixture: &mut support::Fixture,
-    resume_id: i32,
-    project_id: i32,
-) -> Value {
+fn get_project(fixture: &mut support::Fixture, resume_id: i32, project_id: i32) -> Value {
     let get_response = fixture
         .client()
         .get(format!("/api/resume/{}/portfolio_projects", resume_id))
@@ -119,13 +115,22 @@ fn test_url_fields_create_and_read() {
         let url = "https://example.com/value";
 
         let create_response = post_create_project(&mut fixture, resume_id, field, Some(url));
-        assert_eq!(create_response.status(), Status::Created, "create {}: 201", field);
+        assert_eq!(
+            create_response.status(),
+            Status::Created,
+            "create {}: 201",
+            field
+        );
 
         let create_body = create_response.into_string().expect("create body");
         let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
         let project_id = create_json["body"]["id"].as_i64().expect("Project ID") as i32;
 
-        assert_eq!(create_json["body"][field], url, "create response {} preserved", field);
+        assert_eq!(
+            create_json["body"][field], url,
+            "create response {} preserved",
+            field
+        );
 
         let project = get_project(&mut fixture, resume_id, project_id);
         assert_eq!(project[field], url, "read {} preserved", field);
@@ -151,7 +156,11 @@ fn test_url_fields_create_blank_normalized() {
         let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
         let project_id = create_json["body"]["id"].as_i64().expect("Project ID") as i32;
 
-        assert!(create_json["body"][field].is_null(), "create response {} blank null", field);
+        assert!(
+            create_json["body"][field].is_null(),
+            "create response {} blank null",
+            field
+        );
 
         let project = get_project(&mut fixture, resume_id, project_id);
         assert!(project[field].is_null(), "read {} blank null", field);
@@ -202,7 +211,12 @@ fn test_url_fields_create_500_exact() {
         );
 
         let project = get_project(&mut fixture, resume_id, project_id);
-        assert_eq!(project[field].as_str().expect("string"), url, "read {} 500 exact", field);
+        assert_eq!(
+            project[field].as_str().expect("string"),
+            url,
+            "read {} 500 exact",
+            field
+        );
     }
 }
 
@@ -241,8 +255,12 @@ fn test_url_fields_update_null_clears() {
         let mut fixture = support::Fixture::new(9_240_050 + i as i64);
         let resume_id = create_resume(&mut fixture);
 
-        let create_response =
-            post_create_project(&mut fixture, resume_id, field, Some("https://example.com/old"));
+        let create_response = post_create_project(
+            &mut fixture,
+            resume_id,
+            field,
+            Some("https://example.com/old"),
+        );
         assert_eq!(create_response.status(), Status::Created);
 
         let create_body = create_response.into_string().expect("create body");
@@ -297,8 +315,12 @@ fn test_url_fields_update_blank_normalized() {
         let mut fixture = support::Fixture::new(9_240_070 + i as i64);
         let resume_id = create_resume(&mut fixture);
 
-        let create_response =
-            post_create_project(&mut fixture, resume_id, field, Some("https://example.com/old"));
+        let create_response = post_create_project(
+            &mut fixture,
+            resume_id,
+            field,
+            Some("https://example.com/old"),
+        );
         assert_eq!(create_response.status(), Status::Created);
 
         let create_body = create_response.into_string().expect("create body");
@@ -326,8 +348,12 @@ fn test_url_fields_update_500_limit() {
         let mut fixture = support::Fixture::new(9_240_080 + i as i64);
         let resume_id = create_resume(&mut fixture);
 
-        let create_response =
-            post_create_project(&mut fixture, resume_id, field, Some("https://example.com/old"));
+        let create_response = post_create_project(
+            &mut fixture,
+            resume_id,
+            field,
+            Some("https://example.com/old"),
+        );
         assert_eq!(create_response.status(), Status::Created);
 
         let create_body = create_response.into_string().expect("create body");

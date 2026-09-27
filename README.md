@@ -37,6 +37,19 @@ The API is documented using OpenAPI 3.0 and served via Swagger UI.
 
 Handlers wrap results using `shared::response_models::Response<T>` and serialize the wrapper to JSON.
 
+### Markdown resume endpoints
+
+Markdown bodies are accepted as `text/markdown` up to 1 MiB (larger payloads get a `413`).
+
+- **GET** `/api/resume/{id}/export/markdown` — export a resume as Markdown (public resumes are anonymous, private need owner auth)
+- **POST** `/api/resume/import/markdown` — import Markdown into a resume (Bearer auth)
+- **GET** `/api/resume/markdown-format` — the Markdown format specification (anonymous)
+- **POST** `/api/resume/validate/markdown` — validate Markdown against the parser (anonymous, no database access). Always `200` with `Response<MarkdownValidationReport>`: `{body: {valid, errors: [{section, message}]}}` (`section` may be `null`).
+- **POST** `/api/resume/convert/markdown` — convert Markdown to a resume document (anonymous, no database access). `200` with `Response<ResumeDocumentEnvelope>`: `{body: {schema_version, generator, document}}`; `400` on invalid Markdown.
+- **GET** `/api/resume/document-schema` — OpenAPI 3.0 components fragment for `ResumeDocument` (anonymous), used by external consumers such as renderers.
+
+The resume document contract lives in `shared::resume_document`. `schema_version` is `1`; it is bumped only on breaking shape changes.
+
 ## Development
 
 ### Prerequisites
