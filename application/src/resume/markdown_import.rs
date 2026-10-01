@@ -122,8 +122,12 @@ pub fn import_resume_markdown(
     let existing_id = {
         use domain::schema::resumes;
         use domain::schema::resumes::dsl::*;
+        // A variant carries its base's email, so the match must ignore
+        // variant rows or an import would silently rewrite a tailored copy
+        // instead of the base resume it belongs to.
         let existing = resumes::table
             .filter(email.eq(&full_resume.email))
+            .filter(base_resume_id.is_null())
             .first::<Resume>(&mut conn)
             .optional()
             .map_err(app_err_from_diesel_err)?;
