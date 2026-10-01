@@ -37,6 +37,25 @@ The API is documented using OpenAPI 3.0 and served via Swagger UI.
 
 Handlers wrap results using `shared::response_models::Response<T>` and serialize the wrapper to JSON.
 
+### Resume endpoints
+
+Resume bodies are returned as a flat, viewer-aware payload: every stored resume column plus `is_variant`, `base_resume_id`, `show_variant_tag` and the variant targeting fields. Whether a variant advertises itself depends on whether the caller may read its base resume, and `show_variant_tag` is only returned to the owner.
+
+- **GET** `/api/resumes` — public resumes plus the caller's own private ones, variants included
+- **GET** `/api/resume/{id}` — a single resume
+- **POST** `/api/new_resume` — create a base resume (Bearer auth)
+- **PUT** `/api/resume/{id}` — update a resume; variant targeting fields are only accepted on variants (Bearer auth)
+- **DELETE** `/api/resume/{id}` — delete a resume, `409` while variants still exist (Bearer auth)
+
+### Targeted variants
+
+A variant is a full deep copy of a base resume, tagged with the company, role, target date and job description it was tailored for. A variant is an ordinary resume: it owns its content and its children, it is edited and deleted on its own, and it is never nested inside another variant.
+
+- **POST** `/api/resume/{id}/variants` — clone a base resume into a variant (Bearer auth, owner only)
+- **GET** `/api/resume/{id}/variants` — list a base resume's variants, newest target first, undated last
+
+Variant targeting metadata is deliberately excluded from Markdown export/import and from `ResumeDocument`.
+
 ### Markdown resume endpoints
 
 Markdown bodies are accepted as `text/markdown` up to 1 MiB (larger payloads get a `413`).

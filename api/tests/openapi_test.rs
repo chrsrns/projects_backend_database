@@ -104,4 +104,61 @@ fn test_openapi_json_is_served() {
             );
         }
     }
+
+    let variants_path = json
+        .get("paths")
+        .and_then(|paths| paths.get("/resume/{resume_id}/variants"))
+        .expect("variant endpoints are documented");
+    assert!(
+        variants_path.get("post").is_some(),
+        "variant clone is documented"
+    );
+    assert!(
+        variants_path.get("get").is_some(),
+        "variant listing is documented"
+    );
+
+    let resume_view = schemas
+        .get("ResumeView")
+        .and_then(|schema| schema.get("properties"))
+        .expect("ResumeView schema");
+
+    for field in [
+        "is_variant",
+        "base_resume_id",
+        "show_variant_tag",
+        "company_name",
+        "role_title",
+        "target_date",
+        "target_date_precision",
+        "job_description",
+        "variant_label",
+    ] {
+        assert!(
+            resume_view.get(field).is_some(),
+            "ResumeView documents {}",
+            field
+        );
+    }
+
+    let variant_request = schemas
+        .get("NewVariantRequest")
+        .and_then(|schema| schema.get("properties"))
+        .expect("NewVariantRequest schema");
+
+    for field in [
+        "company_name",
+        "role_title",
+        "target_date",
+        "job_description",
+        "variant_label",
+        "is_public",
+        "show_variant_tag",
+    ] {
+        assert!(
+            variant_request.get(field).is_some(),
+            "NewVariantRequest documents {}",
+            field
+        );
+    }
 }
