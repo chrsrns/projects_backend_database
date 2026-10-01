@@ -700,6 +700,51 @@ fn variant_update_target_date_precision_moves_together() {
 }
 
 #[test]
+fn variant_email_put_rejected_even_same_value() {
+    let mut fixture = support::Fixture::new(9_241_021);
+    let base_id = import_base(&mut fixture, 9_241_021);
+
+    let (status, json) = post_variant_json(&fixture, base_id, variant_body());
+    assert_eq!(status, Status::Created);
+    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+    let variant_email = json["body"]["email"].as_str().unwrap().to_string();
+
+    let (status, _) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "email": "somebody.else@example.com" }),
+    );
+    assert_eq!(status, Status::BadRequest, "a variant email cannot change");
+
+    let (status, _) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "email": variant_email }),
+    );
+    assert_eq!(
+        status,
+        Status::BadRequest,
+        "sending the stored email is still a write to an immutable field"
+    );
+
+    // The base keeps its own email writable, and the change does not
+    // propagate to the variant.
+    let (status, json) = put_resume(
+        &fixture,
+        base_id,
+        serde_json::json!({ "email": format!("moved.{}.@example.com", unique_suffix()) }),
+    );
+    assert_eq!(status, Status::Ok, "the base email stays editable");
+
+    let variant_after = get_json(&fixture, &format!("/api/resume/{}", variant_id));
+    assert_eq!(
+        variant_after["body"]["email"], variant_email,
+        "the variant keeps the email it was cloned with"
+    );
+}
+
+#[test]
 fn base_metadata_put_returns_400_and_show_variant_tag_null_is_a_noop() {
     let mut fixture = support::Fixture::new(9_241_019);
     let base_id = import_base(&mut fixture, 9_241_019);

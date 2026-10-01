@@ -23,6 +23,12 @@ pub fn update_resume(
         }
     }
 
+    if existing.base_resume_id.is_some() && resume.email.is_some() {
+        return Err(ApplicationError::BadRequest(
+            "A variant's email cannot be changed".to_string(),
+        ));
+    }
+
     let writes_variant_metadata = resume.company_name.is_some()
         || resume.role_title.is_some()
         || resume.variant_label.is_some()
