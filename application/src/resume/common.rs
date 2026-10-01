@@ -139,6 +139,10 @@ pub fn app_err_from_diesel_err(err: diesel::result::Error) -> ApplicationError {
             diesel::result::DatabaseErrorKind::UniqueViolation,
             _,
         ) => ApplicationError::Conflict("Unique violation".to_string()),
+        diesel::result::Error::DatabaseError(
+            diesel::result::DatabaseErrorKind::ForeignKeyViolation,
+            _,
+        ) => ApplicationError::Conflict("Foreign key violation".to_string()),
         diesel::result::Error::NotFound => ApplicationError::NotFound("Not found".to_string()),
         _ => ApplicationError::Internal(format!("Database error - {}", err)),
     }
@@ -179,6 +183,19 @@ mod tests {
     #[test]
     fn test_validate_optional_url_passes_none() {
         assert_eq!(validate_optional_url(None, "Video URL").unwrap(), None);
+    }
+
+    #[test]
+    fn test_foreign_key_violation_maps_to_conflict() {
+        let error = diesel::result::Error::DatabaseError(
+            diesel::result::DatabaseErrorKind::ForeignKeyViolation,
+            Box::new("foreign key violation".to_string()),
+        );
+
+        assert_eq!(
+            app_err_from_diesel_err(error),
+            ApplicationError::Conflict("Foreign key violation".to_string())
+        );
     }
 
     #[test]
