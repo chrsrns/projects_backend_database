@@ -122,6 +122,18 @@ diesel::table! {
         executive_summary -> Nullable<Text>,
         #[max_length = 500]
         video -> Nullable<Varchar>,
+        base_resume_id -> Nullable<Int4>,
+        #[max_length = 255]
+        company_name -> Nullable<Varchar>,
+        #[max_length = 255]
+        role_title -> Nullable<Varchar>,
+        target_date -> Nullable<Date>,
+        #[max_length = 10]
+        target_date_precision -> Nullable<Varchar>,
+        job_description -> Nullable<Text>,
+        #[max_length = 255]
+        variant_label -> Nullable<Varchar>,
+        show_variant_tag -> Bool,
     }
 }
 

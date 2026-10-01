@@ -1,5 +1,5 @@
 use crate::schema::resumes;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use rocket::serde::de::{Deserializer, Error as DeError};
 use rocket::serde::json::Value as JsonValue;
@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use utoipa::ToSchema;
 
 use super::{
-    Education, EducationKeyPoint, Framework, Language, PortfolioKeyPoint, PortfolioProject,
-    PortfolioTechnology, Skill, WorkExperience, WorkExperienceKeyPoint,
+    Education, EducationKeyPoint, Framework, Language, PartialDate, PortfolioKeyPoint,
+    PortfolioProject, PortfolioTechnology, Skill, WorkExperience, WorkExperienceKeyPoint,
 };
 
 fn deserialize_optional_nullable_string<'de, D>(
@@ -45,6 +45,16 @@ pub struct Resume {
     pub executive_summary: Option<String>,
     #[schema(max_length = 500)]
     pub video: Option<String>,
+    pub base_resume_id: Option<i32>,
+    pub company_name: Option<String>,
+    pub role_title: Option<String>,
+    #[schema(value_type = Option<PartialDate>)]
+    pub target_date: Option<NaiveDate>,
+    #[schema(ignore)]
+    pub target_date_precision: Option<String>,
+    pub job_description: Option<String>,
+    pub variant_label: Option<String>,
+    pub show_variant_tag: bool,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
