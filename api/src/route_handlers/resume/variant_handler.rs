@@ -2,13 +2,13 @@ use application::resume::variant;
 use domain::models::{NewVariantRequest, Resume};
 use rocket::State;
 use rocket::http::Status;
-use rocket::post;
 use rocket::response::status::Custom;
 use rocket::serde::json::Json;
+use rocket::{get, post};
 use shared::response_models::Response;
 
-use super::CustomJsonResult;
-use crate::auth::AuthSession;
+use super::{CustomJsonResult, JsonResult};
+use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
 use crate::realtime::{Hub, ResumeChangedAction};
 
@@ -45,6 +45,30 @@ pub fn create_variant_handler(
             hub.publish_resume_changed(created.id, ResumeChangedAction::Created);
             Ok(Custom(Status::Created, Json(Response { body: created })))
         }
+        Err(err) => Err(map_application_error(err)),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/resume/{resume_id}/variants",
+    tag = "Resumes",
+    params(
+        ("resume_id" = i32, Path, description = "Base resume id")
+    ),
+    responses(
+        (status = 200, description = "OK", body = Response<Vec<Resume>>, content_type = "application/json"),
+        (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
+    )
+)]
+#[get("/resume/<resume_id>/variants")]
+pub fn list_variants_handler(
+    resume_id: i32,
+    maybe_auth: MaybeAuthSession,
+) -> JsonResult<Vec<Resume>> {
+    let user_id_value = maybe_auth.0.map(|auth| auth.user_id);
+    match variant::list_variants(resume_id, user_id_value) {
+        Ok(variants) => Ok(Json(Response { body: variants })),
         Err(err) => Err(map_application_error(err)),
     }
 }

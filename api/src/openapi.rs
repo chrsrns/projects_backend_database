@@ -67,6 +67,7 @@ impl Modify for ServerAddon {
         crate::resume_handler::update_resume_handler,
         crate::resume_handler::delete_resume_handler,
         crate::variant_handler::create_variant_handler,
+        crate::variant_handler::list_variants_handler,
         crate::markdown_handler::export_resume_markdown,
         crate::markdown_handler::import_resume_markdown,
         crate::markdown_handler::validate_resume_markdown,

@@ -168,6 +168,7 @@ pub fn build_rocket_with_llm_client(
                 resume_handler::update_resume_handler,
                 resume_handler::delete_resume_handler,
                 variant_handler::create_variant_handler,
+                variant_handler::list_variants_handler,
                 markdown_handler::export_resume_markdown,
                 markdown_handler::import_resume_markdown,
                 markdown_handler::validate_resume_markdown,

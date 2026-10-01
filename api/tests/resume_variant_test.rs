@@ -422,6 +422,31 @@ fn post_variant(
         .dispatch()
 }
 
+fn post_variant_json(fixture: &support::Fixture, base_id: i32, body: Value) -> (Status, Value) {
+    let response = post_variant(fixture, base_id, body);
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
+fn get_variants_json(
+    fixture: &support::Fixture,
+    base_id: i32,
+    token: Option<&str>,
+) -> (Status, Value) {
+    let request = fixture
+        .client()
+        .get(format!("/api/resume/{}/variants", base_id));
+    let request = match token {
+        Some(token) => request.header(support::auth_header(token)),
+        None => request,
+    };
+    let response = request.dispatch();
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
 fn variant_body() -> Value {
     serde_json::json!({
         "company_name": "Acme Corp",
@@ -430,6 +455,65 @@ fn variant_body() -> Value {
         "job_description": "Build the thing",
         "variant_label": "Acme 2026"
     })
+}
+
+#[test]
+fn variant_list_endpoint_visibility_and_empty_on_variant() {
+    let mut fixture = support::Fixture::new(9_241_014);
+    let base_id = import_base(&mut fixture, 9_241_014);
+
+    let (public_status, public_json) = post_variant_json(&fixture, base_id, variant_body());
+    assert_eq!(public_status, Status::Created);
+    let public_id = public_json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(public_id);
+
+    let mut hidden_body = variant_body();
+    hidden_body["is_public"] = serde_json::json!(false);
+    let (hidden_status, hidden_json) = post_variant_json(&fixture, base_id, hidden_body);
+    assert_eq!(hidden_status, Status::Created);
+    let hidden_id = hidden_json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(hidden_id);
+
+    let owner_token = fixture.auth_token().to_string();
+    let (owner_status, owner_json) = get_variants_json(&fixture, base_id, Some(&owner_token));
+    assert_eq!(owner_status, Status::Ok);
+    let owner_items = owner_json["body"].as_array().unwrap();
+    assert_eq!(owner_items.len(), 2, "owner sees every variant");
+
+    let (anonymous_status, anonymous_json) = get_variants_json(&fixture, base_id, None);
+    assert_eq!(anonymous_status, Status::Ok);
+    let anonymous_items = anonymous_json["body"].as_array().unwrap();
+    assert_eq!(anonymous_items.len(), 1, "anonymous sees public variants");
+    assert_eq!(anonymous_items[0]["id"].as_i64().unwrap() as i32, public_id);
+
+    let (variant_status, variant_json) = get_variants_json(&fixture, public_id, Some(&owner_token));
+    assert_eq!(variant_status, Status::Ok);
+    assert!(
+        variant_json["body"].as_array().unwrap().is_empty(),
+        "listing a variant returns an empty list"
+    );
+}
+
+#[test]
+fn variant_list_endpoint_private_base_returns_404_for_other_user() {
+    let mut fixture = support::Fixture::new(9_241_015);
+    let base_id = import_base_with_visibility(&mut fixture, 9_241_015, false);
+
+    let (status, json) = post_variant_json(&fixture, base_id, variant_body());
+    assert_eq!(status, Status::Created);
+    fixture.track_resume_id(json["body"]["id"].as_i64().unwrap() as i32);
+
+    let other = support::register_and_login(fixture.client(), "variant.other.get");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    let (other_status, _) = get_variants_json(&fixture, base_id, Some(&other.token));
+    assert_eq!(other_status, Status::NotFound, "private base stays hidden");
+
+    let owner_token = fixture.auth_token().to_string();
+    let (owner_status, owner_json) = get_variants_json(&fixture, base_id, Some(&owner_token));
+    assert_eq!(owner_status, Status::Ok);
+    assert_eq!(owner_json["body"].as_array().unwrap().len(), 1);
 }
 
 #[test]
