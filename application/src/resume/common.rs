@@ -1,5 +1,6 @@
+use chrono::NaiveDate;
 use diesel::prelude::{BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl};
-use domain::models::Resume;
+use domain::models::{PartialDate, Resume};
 use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
@@ -58,23 +59,56 @@ pub fn validate_executive_summary(
     }
 }
 
-pub fn validate_optional_url(
+pub fn validate_optional_text(
     value: Option<String>,
     field_name: &str,
+    max_length: usize,
 ) -> Result<Option<String>, ApplicationError> {
     match value {
         None => Ok(None),
         Some(value) if value.trim().is_empty() => Ok(None),
-        Some(value) if value.chars().count() > 500 => Err(ApplicationError::BadRequest(format!(
-            "{} must be at most 500 characters",
-            field_name
-        ))),
+        Some(value) if value.chars().count() > max_length => Err(ApplicationError::BadRequest(
+            format!("{} must be at most {} characters", field_name, max_length),
+        )),
         Some(value) => Ok(Some(value)),
     }
 }
 
+pub fn validate_optional_url(
+    value: Option<String>,
+    field_name: &str,
+) -> Result<Option<String>, ApplicationError> {
+    validate_optional_text(value, field_name, 500)
+}
+
 pub fn validate_video(video: Option<String>) -> Result<Option<String>, ApplicationError> {
     validate_optional_url(video, "Video")
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct VariantMetadata {
+    pub company_name: Option<String>,
+    pub role_title: Option<String>,
+    pub variant_label: Option<String>,
+    pub job_description: Option<String>,
+}
+
+pub fn validate_variant_metadata(
+    company_name: Option<String>,
+    role_title: Option<String>,
+    variant_label: Option<String>,
+    job_description: Option<String>,
+) -> Result<VariantMetadata, ApplicationError> {
+    Ok(VariantMetadata {
+        company_name: validate_optional_text(company_name, "Company name", 255)?,
+        role_title: validate_optional_text(role_title, "Role title", 255)?,
+        variant_label: validate_optional_text(variant_label, "Variant label", 255)?,
+        job_description: validate_optional_text(job_description, "Job description", 20_000)?,
+    })
+}
+
+pub fn partial_date_to_columns(value: PartialDate) -> (NaiveDate, String) {
+    (value.canonical_start_date(), value.precision.to_string())
 }
 
 pub fn app_err_from_diesel_err(err: diesel::result::Error) -> ApplicationError {
@@ -123,5 +157,80 @@ mod tests {
     #[test]
     fn test_validate_optional_url_passes_none() {
         assert_eq!(validate_optional_url(None, "Video URL").unwrap(), None);
+    }
+
+    #[test]
+    fn test_validate_variant_metadata_normalizes_blank_to_none() {
+        let metadata = validate_variant_metadata(
+            Some("   ".to_string()),
+            Some("\t".to_string()),
+            Some("\n".to_string()),
+            Some("  ".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            metadata,
+            VariantMetadata {
+                company_name: None,
+                role_title: None,
+                variant_label: None,
+                job_description: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_validate_variant_metadata_rejects_company_name_over_255() {
+        match validate_variant_metadata(Some("x".repeat(256)), None, None, None) {
+            Err(ApplicationError::BadRequest(msg)) => {
+                assert_eq!(msg, "Company name must be at most 255 characters");
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_variant_metadata_rejects_role_title_over_255() {
+        match validate_variant_metadata(None, Some("x".repeat(256)), None, None) {
+            Err(ApplicationError::BadRequest(msg)) => {
+                assert_eq!(msg, "Role title must be at most 255 characters");
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_variant_metadata_rejects_variant_label_over_255() {
+        match validate_variant_metadata(None, None, Some("x".repeat(256)), None) {
+            Err(ApplicationError::BadRequest(msg)) => {
+                assert_eq!(msg, "Variant label must be at most 255 characters");
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_variant_metadata_rejects_job_description_over_20000() {
+        match validate_variant_metadata(None, None, None, Some("x".repeat(20_001))) {
+            Err(ApplicationError::BadRequest(msg)) => {
+                assert_eq!(msg, "Job description must be at most 20000 characters");
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_variant_metadata_accepts_boundary_lengths() {
+        let metadata = validate_variant_metadata(
+            Some("x".repeat(255)),
+            Some("x".repeat(255)),
+            Some("x".repeat(255)),
+            Some("x".repeat(20_000)),
+        )
+        .unwrap();
+
+        assert_eq!(metadata.company_name.unwrap().chars().count(), 255);
+        assert_eq!(metadata.job_description.unwrap().chars().count(), 20_000);
     }
 }

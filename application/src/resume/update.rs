@@ -5,7 +5,8 @@ use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
 use crate::resume::common::{
-    app_err_from_diesel_err, find_resume, validate_executive_summary, validate_video,
+    app_err_from_diesel_err, find_resume, partial_date_to_columns, validate_executive_summary,
+    validate_video,
 };
 
 pub fn update_resume(
@@ -69,10 +70,10 @@ pub fn update_resume(
         job_description: resume.job_description,
         target_date: resume
             .target_date
-            .map(|value| value.map(|date| date.canonical_start_date())),
+            .map(|value| value.map(|date| partial_date_to_columns(date).0)),
         target_date_precision: resume
             .target_date
-            .map(|value| value.map(|date| date.precision.to_string())),
+            .map(|value| value.map(|date| partial_date_to_columns(date).1)),
         show_variant_tag: resume.show_variant_tag,
     };
 
