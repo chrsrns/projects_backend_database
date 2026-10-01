@@ -145,6 +145,14 @@ pub fn import_resume_markdown(
         video,
         created_by: Some(user_id_value),
         is_public: full_resume.is_public,
+        base_resume_id: None,
+        company_name: None,
+        role_title: None,
+        target_date: None,
+        target_date_precision: None,
+        job_description: None,
+        variant_label: None,
+        show_variant_tag: true,
     };
 
     run_in_transaction(&mut conn, move |conn| {

@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use domain::models::{Resume, UpdateResume};
+use domain::models::{Resume, UpdateResume, UpdateResumeChangeset};
 use domain::schema::resumes;
 use infrastructure::establish_connection;
 
@@ -43,12 +43,41 @@ pub fn update_resume(
         && resume.executive_summary.is_none()
         && resume.video.is_none()
         && resume.is_public.is_none()
+        && resume.company_name.is_none()
+        && resume.role_title.is_none()
+        && resume.variant_label.is_none()
+        && resume.job_description.is_none()
+        && resume.target_date.is_none()
+        && resume.show_variant_tag.is_none()
     {
         return Ok(existing);
     }
 
+    let changeset = UpdateResumeChangeset {
+        name: resume.name,
+        profile_image_url: resume.profile_image_url,
+        location: resume.location,
+        email: resume.email,
+        github_url: resume.github_url,
+        mobile_number: resume.mobile_number,
+        executive_summary: resume.executive_summary,
+        video: resume.video,
+        is_public: resume.is_public,
+        company_name: resume.company_name,
+        role_title: resume.role_title,
+        variant_label: resume.variant_label,
+        job_description: resume.job_description,
+        target_date: resume
+            .target_date
+            .map(|value| value.map(|date| date.canonical_start_date())),
+        target_date_precision: resume
+            .target_date
+            .map(|value| value.map(|date| date.precision.to_string())),
+        show_variant_tag: resume.show_variant_tag,
+    };
+
     match diesel::update(resumes::table.find(resume_id))
-        .set(&resume)
+        .set(&changeset)
         .get_result::<Resume>(&mut establish_connection())
     {
         Ok(updated_resume) => Ok(updated_resume),

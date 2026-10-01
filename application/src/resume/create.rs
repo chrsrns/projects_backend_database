@@ -24,6 +24,14 @@ pub fn create_resume(
         video: validate_video(resume.video)?,
         created_by: Some(user_id_value),
         is_public: resume.is_public.unwrap_or(false),
+        base_resume_id: None,
+        company_name: None,
+        role_title: None,
+        target_date: None,
+        target_date_precision: None,
+        job_description: None,
+        variant_label: None,
+        show_variant_tag: true,
     };
 
     match diesel::insert_into(resumes::table)
