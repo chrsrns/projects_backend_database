@@ -5,8 +5,8 @@ use domain::models::{
     Education, EducationKeyPoint, Framework, Language, NewEducation, NewEducationKeyPoint,
     NewFramework, NewLanguage, NewPortfolioKeyPoint, NewPortfolioProject, NewPortfolioTechnology,
     NewResume, NewSkill, NewVariantRequest, NewWorkExperience, NewWorkExperienceKeyPoint,
-    PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume, Skill, WorkExperience,
-    WorkExperienceKeyPoint,
+    PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume, ResumeView, Skill,
+    WorkExperience, WorkExperienceKeyPoint,
 };
 use infrastructure::run_in_transaction;
 
@@ -15,11 +15,12 @@ use crate::resume::common::{
     app_err_from_diesel_err, find_accessible_resume, find_resume, partial_date_to_columns,
     validate_variant_metadata,
 };
+use crate::resume::view;
 
 pub fn list_variants(
     base_id: i32,
     user_id_value: Option<i32>,
-) -> Result<Vec<Resume>, ApplicationError> {
+) -> Result<Vec<ResumeView>, ApplicationError> {
     use domain::schema::resumes::dsl as resumes_dsl;
 
     let base = find_accessible_resume(base_id, user_id_value)?;
@@ -32,16 +33,24 @@ pub fn list_variants(
         query = query.filter(resumes_dsl::is_public.eq(true));
     }
 
-    query
+    let variants = query
         .load::<Resume>(&mut infrastructure::establish_connection())
-        .map_err(app_err_from_diesel_err)
+        .map_err(app_err_from_diesel_err)?;
+
+    // Reaching this point already proved the caller may read the base, so
+    // every listed variant has a reachable base.
+    Ok(view::views_for_known_accessible_base(
+        variants,
+        user_id_value,
+        true,
+    ))
 }
 
 pub fn create_variant(
     user_id_value: i32,
     base_id: i32,
     request: NewVariantRequest,
-) -> Result<Resume, ApplicationError> {
+) -> Result<ResumeView, ApplicationError> {
     let base = find_resume(base_id)?;
 
     match base.created_by {
@@ -292,5 +301,6 @@ pub fn create_variant(
 
         Ok(resume)
     })
+    .map(|resume| ResumeView::from_resume(resume, true, true))
     .map_err(app_err_from_diesel_err)
 }

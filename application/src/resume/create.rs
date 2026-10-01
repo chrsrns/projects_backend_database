@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use domain::models::{NewResume, NewResumeRequest, Resume};
+use domain::models::{NewResume, NewResumeRequest, Resume, ResumeView};
 use infrastructure::establish_connection;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 pub fn create_resume(
     user_id_value: i32,
     resume: NewResumeRequest,
-) -> Result<Resume, ApplicationError> {
+) -> Result<ResumeView, ApplicationError> {
     use domain::schema::resumes;
 
     let new_resume = NewResume {
@@ -38,7 +38,9 @@ pub fn create_resume(
         .values(&new_resume)
         .get_result::<Resume>(&mut establish_connection())
     {
-        Ok(resume) => Ok(resume),
+        // A resume created here is always a base, and its creator is the
+        // caller, so no base-visibility lookup is needed.
+        Ok(resume) => Ok(ResumeView::from_resume(resume, false, true)),
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

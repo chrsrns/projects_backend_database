@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use domain::models::{Resume, UpdateResume, UpdateResumeChangeset};
+use domain::models::{Resume, ResumeView, UpdateResume, UpdateResumeChangeset};
 use domain::schema::resumes;
 use infrastructure::establish_connection;
 
@@ -13,7 +13,7 @@ pub fn update_resume(
     user_id_value: i32,
     resume_id: i32,
     mut resume: UpdateResume,
-) -> Result<Resume, ApplicationError> {
+) -> Result<ResumeView, ApplicationError> {
     let existing = find_resume(resume_id)?;
 
     match existing.created_by {
@@ -71,7 +71,9 @@ pub fn update_resume(
         && resume.target_date.is_none()
         && resume.show_variant_tag.is_none()
     {
-        return Ok(existing);
+        // Only the owner reaches this point, and a variant's base is always
+        // owned by the same user, so the base is reachable.
+        return Ok(ResumeView::from_resume(existing, true, true));
     }
 
     let changeset = UpdateResumeChangeset {
@@ -101,7 +103,7 @@ pub fn update_resume(
         .set(&changeset)
         .get_result::<Resume>(&mut establish_connection())
     {
-        Ok(updated_resume) => Ok(updated_resume),
+        Ok(updated_resume) => Ok(ResumeView::from_resume(updated_resume, true, true)),
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{
     NewEducation, NewEducationKeyPoint, NewFramework, NewLanguage, NewPortfolioKeyPoint,
     NewPortfolioProject, NewPortfolioTechnology, NewResume, NewSkill, NewWorkExperience,
-    NewWorkExperienceKeyPoint, Resume,
+    NewWorkExperienceKeyPoint, Resume, ResumeView,
 };
 use infrastructure::run_in_transaction;
 use shared::markdown;
@@ -40,7 +40,7 @@ pub fn resolve_parent_index(
 pub fn import_resume_markdown(
     markdown: &str,
     user_id_value: i32,
-) -> Result<(Resume, bool), ApplicationError> {
+) -> Result<(ResumeView, bool), ApplicationError> {
     let full_resume = markdown::markdown_to_resume(markdown).map_err(|err| match err {
         markdown::MarkdownError::InvalidMarkdown(msg) => ApplicationError::BadRequest(msg),
     })?;
@@ -363,6 +363,9 @@ pub fn import_resume_markdown(
 
         Ok((resume, existing_id.is_none()))
     })
+    // Import only ever creates or updates a base resume: variant rows are
+    // excluded from the email match, so the base is never referenced here.
+    .map(|(resume, created)| (ResumeView::from_resume(resume, false, true), created))
     .map_err(app_err_from_diesel_err)
 }
 

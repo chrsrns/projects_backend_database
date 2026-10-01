@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use application::error::ApplicationError;
 use application::resume::{markdown_export, markdown_import};
-use domain::models::Resume;
+use domain::models::ResumeView;
 use rocket::data::{self, FromData, ToByteUnit};
 use rocket::http::Status;
 use rocket::request::Request;
@@ -141,8 +141,8 @@ pub fn export_resume_markdown(resume_id: i32, maybe_auth: MaybeAuthSession) -> M
     security(("bearerAuth" = [])),
     request_body = String,
     responses(
-        (status = 200, description = "Updated resume", body = Response<Resume>, content_type = "application/json"),
-        (status = 201, description = "Created resume", body = Response<Resume>, content_type = "application/json"),
+        (status = 200, description = "Updated resume", body = Response<ResumeView>, content_type = "application/json"),
+        (status = 201, description = "Created resume", body = Response<ResumeView>, content_type = "application/json"),
         (status = 400, description = "Invalid Markdown"),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Forbidden"),
@@ -158,7 +158,7 @@ pub fn import_resume_markdown(
     auth: AuthSession,
     markdown: LimitedMarkdown,
     hub: &State<Hub>,
-) -> CustomJsonResult<Resume> {
+) -> CustomJsonResult<ResumeView> {
     match markdown_import::import_resume_markdown(&markdown.0, auth.user_id) {
         Ok((resume, true)) => {
             hub.publish_resume_changed(resume.id, ResumeChangedAction::Created);

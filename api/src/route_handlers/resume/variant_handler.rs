@@ -1,5 +1,5 @@
 use application::resume::variant;
-use domain::models::{NewVariantRequest, Resume};
+use domain::models::{NewVariantRequest, ResumeView};
 use rocket::State;
 use rocket::http::Status;
 use rocket::response::status::Custom;
@@ -22,7 +22,7 @@ use crate::realtime::{Hub, ResumeChangedAction};
     ),
     request_body(content = NewVariantRequest, content_type = "application/json"),
     responses(
-        (status = 201, description = "Created", body = Response<Resume>, content_type = "application/json"),
+        (status = 201, description = "Created", body = Response<ResumeView>, content_type = "application/json"),
         (status = 400, description = "Bad Request", body = Response<String>, content_type = "application/json"),
         (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
         (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
@@ -39,7 +39,7 @@ pub fn create_variant_handler(
     hub: &State<Hub>,
     resume_id: i32,
     request: Json<NewVariantRequest>,
-) -> CustomJsonResult<Resume> {
+) -> CustomJsonResult<ResumeView> {
     match variant::create_variant(auth.user_id, resume_id, request.into_inner()) {
         Ok(created) => {
             hub.publish_resume_changed(created.id, ResumeChangedAction::Created);
@@ -57,7 +57,7 @@ pub fn create_variant_handler(
         ("resume_id" = i32, Path, description = "Base resume id")
     ),
     responses(
-        (status = 200, description = "OK", body = Response<Vec<Resume>>, content_type = "application/json"),
+        (status = 200, description = "OK", body = Response<Vec<ResumeView>>, content_type = "application/json"),
         (status = 404, description = "Not Found", body = Response<String>, content_type = "application/json")
     )
 )]
@@ -65,7 +65,7 @@ pub fn create_variant_handler(
 pub fn list_variants_handler(
     resume_id: i32,
     maybe_auth: MaybeAuthSession,
-) -> JsonResult<Vec<Resume>> {
+) -> JsonResult<Vec<ResumeView>> {
     let user_id_value = maybe_auth.0.map(|auth| auth.user_id);
     match variant::list_variants(resume_id, user_id_value) {
         Ok(variants) => Ok(Json(Response { body: variants })),

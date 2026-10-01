@@ -392,7 +392,11 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
     fixture.track_resume_id(variant.id);
 
     assert!(variant.is_public, "base is public, so the clone is public");
-    assert!(variant.show_variant_tag, "tag defaults to true");
+    assert_eq!(
+        variant.show_variant_tag,
+        Some(true),
+        "tag defaults to true and is visible to the owner"
+    );
     assert_eq!(variant.base_resume_id, Some(base_id));
     assert_eq!(variant.created_by, Some(fixture.user_id()));
     assert_eq!(variant.company_name.as_deref(), Some("Acme Corp"));
@@ -405,7 +409,11 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
     fixture.track_resume_id(private.id);
 
     assert!(!private.is_public, "explicit is_public wins over the base");
-    assert!(!private.show_variant_tag, "explicit tag value is stored");
+    assert_eq!(
+        private.show_variant_tag,
+        Some(false),
+        "explicit tag value is stored"
+    );
 }
 
 fn post_variant(
@@ -575,11 +583,9 @@ fn variant_update_target_date_precision_moves_together() {
     let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
     fixture.track_resume_id(variant_id);
     assert_eq!(json["body"]["target_date_precision"], "month");
-    assert!(
-        json["body"]["target_date"]
-            .as_str()
-            .unwrap()
-            .starts_with("2026-03")
+    assert_eq!(
+        json["body"]["target_date"], "2026-03",
+        "a month-precision date keeps its precision in the payload"
     );
 
     let (status, json) = put_resume(
@@ -589,11 +595,9 @@ fn variant_update_target_date_precision_moves_together() {
     );
     assert_eq!(status, Status::Ok);
     assert_eq!(json["body"]["target_date_precision"], "year");
-    assert!(
-        json["body"]["target_date"]
-            .as_str()
-            .unwrap()
-            .starts_with("2026-01")
+    assert_eq!(
+        json["body"]["target_date"], "2026",
+        "a year-precision date is emitted without month or day"
     );
 
     let (status, json) = put_resume(
