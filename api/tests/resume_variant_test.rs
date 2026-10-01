@@ -408,6 +408,122 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
     assert!(!private.show_variant_tag, "explicit tag value is stored");
 }
 
+fn post_variant(
+    fixture: &support::Fixture,
+    base_id: i32,
+    body: Value,
+) -> rocket::local::blocking::LocalResponse<'_> {
+    fixture
+        .client()
+        .post(format!("/api/resume/{}/variants", base_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(body.to_string())
+        .dispatch()
+}
+
+fn variant_body() -> Value {
+    serde_json::json!({
+        "company_name": "Acme Corp",
+        "role_title": "Backend Engineer",
+        "target_date": "2026-03",
+        "job_description": "Build the thing",
+        "variant_label": "Acme 2026"
+    })
+}
+
+#[test]
+fn variant_create_endpoint_returns_201_and_publishes_for_variant_id_only() {
+    let mut fixture = support::Fixture::new(9_241_010);
+    let base_id = import_base(&mut fixture, 9_241_010);
+
+    let mut base_events = fixture.hub.subscribe(base_id);
+
+    let response = post_variant(&fixture, base_id, variant_body());
+    assert_eq!(response.status(), Status::Created, "create variant");
+
+    let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    assert_ne!(variant_id, base_id, "the clone is a new row");
+    assert!(
+        base_events.try_recv().is_err(),
+        "subscribers of the base are not notified"
+    );
+
+    // The clone publishes under its own id, so a subscriber on the variant
+    // receives later variant-scoped changes.
+    let mut variant_events = fixture.hub.subscribe(variant_id);
+    let update_status = fixture
+        .client()
+        .put(format!("/api/resume/{}", variant_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(serde_json::json!({ "variant_label": "Acme 2026 v2" }).to_string())
+        .dispatch()
+        .status();
+    assert_eq!(update_status, Status::Ok);
+
+    let event = variant_events.try_recv().expect("variant event");
+    assert_eq!(event.resume_id, variant_id);
+    assert!(
+        base_events.try_recv().is_err(),
+        "base subscribers stay silent"
+    );
+}
+
+#[test]
+fn variant_create_endpoint_rejects_nesting_with_400() {
+    let mut fixture = support::Fixture::new(9_241_011);
+    let base_id = import_base(&mut fixture, 9_241_011);
+
+    let response = post_variant(&fixture, base_id, variant_body());
+    assert_eq!(response.status(), Status::Created);
+    let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    let nested = post_variant(&fixture, variant_id, variant_body());
+    assert_eq!(nested.status(), Status::BadRequest, "no nested variants");
+}
+
+#[test]
+fn variant_create_endpoint_forbids_non_owner_with_403() {
+    let mut fixture = support::Fixture::new(9_241_012);
+    let base_id = import_base(&mut fixture, 9_241_012);
+
+    let response = post_variant(&fixture, base_id, variant_body());
+    assert_eq!(response.status(), Status::Created);
+    let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    let other = support::register_and_login(fixture.client(), "variant.other.post");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    // The base is public, so the other user can read it, but only the owner
+    // may clone. Ownership is checked before the nesting rule, so cloning the
+    // variant answers 403 rather than revealing that it is a variant.
+    let forbidden = fixture
+        .client()
+        .post(format!("/api/resume/{}/variants", variant_id))
+        .header(support::auth_header(&other.token))
+        .header(ContentType::JSON)
+        .body(variant_body().to_string())
+        .dispatch();
+    assert_eq!(forbidden.status(), Status::Forbidden);
+}
+
+#[test]
+fn variant_create_endpoint_missing_base_returns_404() {
+    let mut fixture = support::Fixture::new(9_241_013);
+
+    let response = post_variant(&fixture, 2_000_000_000, variant_body());
+    assert_eq!(response.status(), Status::NotFound);
+}
+
 #[test]
 fn variant_list_visibility_owner_vs_public() {
     let mut fixture = support::Fixture::new(9_241_006);

@@ -45,4 +45,5 @@ pub mod markdown_handler;
 pub mod portfolio_projects_handler;
 pub mod resume_handler;
 pub mod skills_handler;
+pub mod variant_handler;
 pub mod work_experiences_handler;
