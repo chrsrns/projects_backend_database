@@ -107,6 +107,28 @@ pub fn validate_variant_metadata(
     })
 }
 
+/// Normalizes a nullable text field on update.
+///
+/// Absent and an empty string both mean "leave the stored value alone", an
+/// explicit `null` clears it, and whitespace-only text normalizes to `null`
+/// so the column never holds a blank string.
+pub fn validate_optional_text_update(
+    value: Option<Option<String>>,
+    field_name: &str,
+    max_length: usize,
+) -> Result<Option<Option<String>>, ApplicationError> {
+    match value {
+        None => Ok(None),
+        Some(None) => Ok(Some(None)),
+        Some(Some(text)) if text.is_empty() => Ok(None),
+        Some(Some(text)) => Ok(Some(validate_optional_text(
+            Some(text),
+            field_name,
+            max_length,
+        )?)),
+    }
+}
+
 pub fn partial_date_to_columns(value: PartialDate) -> (NaiveDate, String) {
     (value.canonical_start_date(), value.precision.to_string())
 }

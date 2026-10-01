@@ -447,6 +447,19 @@ fn get_variants_json(
     (status, json)
 }
 
+fn put_resume(fixture: &support::Fixture, resume_id: i32, body: Value) -> (Status, Value) {
+    let response = fixture
+        .client()
+        .put(format!("/api/resume/{}", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(body.to_string())
+        .dispatch();
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
 fn variant_body() -> Value {
     serde_json::json!({
         "company_name": "Acme Corp",
@@ -455,6 +468,210 @@ fn variant_body() -> Value {
         "job_description": "Build the thing",
         "variant_label": "Acme 2026"
     })
+}
+
+#[test]
+fn variant_update_metadata_absent_blank_null_semantics() {
+    let mut fixture = support::Fixture::new(9_241_017);
+    let base_id = import_base(&mut fixture, 9_241_017);
+
+    let (status, json) = post_variant_json(&fixture, base_id, variant_body());
+    assert_eq!(status, Status::Created);
+    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+    assert_eq!(json["body"]["company_name"], "Acme Corp");
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "company_name": "Globex" }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(json["body"]["company_name"], "Globex");
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "company_name": "" }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        json["body"]["company_name"], "Globex",
+        "an empty string leaves the value alone"
+    );
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "company_name": null }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert!(
+        json["body"]["company_name"].is_null(),
+        "null clears the value"
+    );
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "company_name": "   " }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert!(
+        json["body"]["company_name"].is_null(),
+        "whitespace-only text is stored as null"
+    );
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "show_variant_tag": false }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(json["body"]["show_variant_tag"], Value::Bool(false));
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "show_variant_tag": null }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        json["body"]["show_variant_tag"],
+        Value::Bool(false),
+        "a null tag leaves the stored value alone"
+    );
+
+    let (status, _) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "role_title": "x".repeat(256) }),
+    );
+    assert_eq!(
+        status,
+        Status::BadRequest,
+        "role title cap is enforced on update"
+    );
+
+    let (status, _) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "job_description": "x".repeat(20_001) }),
+    );
+    assert_eq!(
+        status,
+        Status::BadRequest,
+        "job description cap is enforced on update"
+    );
+}
+
+#[test]
+fn variant_update_target_date_precision_moves_together() {
+    let mut fixture = support::Fixture::new(9_241_018);
+    let base_id = import_base(&mut fixture, 9_241_018);
+
+    let (status, json) = post_variant_json(&fixture, base_id, variant_body());
+    assert_eq!(status, Status::Created);
+    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+    assert_eq!(json["body"]["target_date_precision"], "month");
+    assert!(
+        json["body"]["target_date"]
+            .as_str()
+            .unwrap()
+            .starts_with("2026-03")
+    );
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "target_date": "2026" }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(json["body"]["target_date_precision"], "year");
+    assert!(
+        json["body"]["target_date"]
+            .as_str()
+            .unwrap()
+            .starts_with("2026-01")
+    );
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "target_date": "2026-03-15" }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(json["body"]["target_date_precision"], "day");
+    assert_eq!(json["body"]["target_date"], "2026-03-15");
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "target_date": "" }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        json["body"]["target_date_precision"], "day",
+        "an empty string leaves the date alone"
+    );
+
+    let (status, json) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "target_date": null }),
+    );
+    assert_eq!(status, Status::Ok);
+    assert!(json["body"]["target_date"].is_null());
+    assert!(
+        json["body"]["target_date_precision"].is_null(),
+        "clearing the date clears the precision with it"
+    );
+}
+
+#[test]
+fn base_metadata_put_returns_400_and_show_variant_tag_null_is_a_noop() {
+    let mut fixture = support::Fixture::new(9_241_019);
+    let base_id = import_base(&mut fixture, 9_241_019);
+
+    for body in [
+        serde_json::json!({ "company_name": "Acme" }),
+        serde_json::json!({ "role_title": "Engineer" }),
+        serde_json::json!({ "variant_label": "Acme 2026" }),
+        serde_json::json!({ "job_description": "Build" }),
+        serde_json::json!({ "target_date": "2026-03" }),
+        serde_json::json!({ "company_name": null }),
+        serde_json::json!({ "show_variant_tag": true }),
+        serde_json::json!({ "show_variant_tag": false }),
+    ] {
+        let (status, _) = put_resume(&fixture, base_id, body.clone());
+        assert_eq!(
+            status,
+            Status::BadRequest,
+            "variant metadata write on a base is rejected: {}",
+            body
+        );
+    }
+
+    let (status, json) = put_resume(
+        &fixture,
+        base_id,
+        serde_json::json!({ "show_variant_tag": null }),
+    );
+    assert_eq!(
+        status,
+        Status::Ok,
+        "a null tag on a base is indistinguishable from absent, so it is a no-op"
+    );
+    assert_eq!(json["body"]["show_variant_tag"], Value::Bool(true));
+
+    let (status, json) = put_resume(
+        &fixture,
+        base_id,
+        serde_json::json!({ "name": "Renamed base" }),
+    );
+    assert_eq!(status, Status::Ok, "ordinary fields still update");
+    assert_eq!(json["body"]["name"], "Renamed base");
 }
 
 #[test]

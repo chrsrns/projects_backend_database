@@ -6,7 +6,7 @@ use infrastructure::establish_connection;
 use crate::error::ApplicationError;
 use crate::resume::common::{
     app_err_from_diesel_err, find_resume, partial_date_to_columns, validate_executive_summary,
-    validate_video,
+    validate_optional_text_update, validate_video,
 };
 
 pub fn update_resume(
@@ -22,6 +22,26 @@ pub fn update_resume(
             return Err(ApplicationError::Forbidden);
         }
     }
+
+    let writes_variant_metadata = resume.company_name.is_some()
+        || resume.role_title.is_some()
+        || resume.variant_label.is_some()
+        || resume.job_description.is_some()
+        || resume.target_date.is_some()
+        || resume.show_variant_tag.is_some();
+
+    if existing.base_resume_id.is_none() && writes_variant_metadata {
+        return Err(ApplicationError::BadRequest(
+            "Variant metadata can only be set on a variant resume".to_string(),
+        ));
+    }
+
+    resume.company_name = validate_optional_text_update(resume.company_name, "Company name", 255)?;
+    resume.role_title = validate_optional_text_update(resume.role_title, "Role title", 255)?;
+    resume.variant_label =
+        validate_optional_text_update(resume.variant_label, "Variant label", 255)?;
+    resume.job_description =
+        validate_optional_text_update(resume.job_description, "Job description", 20_000)?;
 
     resume.executive_summary = resume
         .executive_summary
