@@ -83,11 +83,13 @@ fn variant_clone_deep_copies_all_children() {
     let mut fixture = support::Fixture::new(9_241_001);
     let base_id = import_base(&mut fixture, 9_241_001);
 
-    let variant = create_variant(fixture.user_id(), base_id, clone_request()).expect("clone");
-    fixture.track_resume_id(variant.id);
+    let (status, variant_json) = post_variant_json(&fixture, base_id, variant_body());
+    assert_eq!(status, Status::Created, "clone through the endpoint");
+    let variant_id = variant_json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
 
     let base = get_json(&fixture, &format!("/api/resume/{}", base_id));
-    let cloned = get_json(&fixture, &format!("/api/resume/{}", variant.id));
+    let cloned = get_json(&fixture, &format!("/api/resume/{}", variant_id));
 
     let base_resume = strip(&base["body"], &VOLATILE);
     let cloned_resume = strip(&cloned["body"], &VOLATILE);
@@ -106,7 +108,7 @@ fn variant_clone_deep_copies_all_children() {
     assert_eq!(base_resume["is_public"], cloned_resume["is_public"]);
 
     let base_education = get_json(&fixture, &format!("/api/resume/{}/education", base_id));
-    let cloned_education = get_json(&fixture, &format!("/api/resume/{}/education", variant.id));
+    let cloned_education = get_json(&fixture, &format!("/api/resume/{}/education", variant_id));
     let base_education_items = base_education["body"].as_array().unwrap();
     let cloned_education_items = cloned_education["body"].as_array().unwrap();
     assert_eq!(base_education_items.len(), 1);
@@ -131,7 +133,7 @@ fn variant_clone_deep_copies_all_children() {
         &fixture,
         &format!(
             "/api/resume/{}/education/{}/key_points",
-            variant.id, cloned_education_id
+            variant_id, cloned_education_id
         ),
     );
     assert_eq!(
@@ -147,7 +149,7 @@ fn variant_clone_deep_copies_all_children() {
     );
 
     let base_skills = get_json(&fixture, &format!("/api/resume/{}/skills", base_id));
-    let cloned_skills = get_json(&fixture, &format!("/api/resume/{}/skills", variant.id));
+    let cloned_skills = get_json(&fixture, &format!("/api/resume/{}/skills", variant_id));
     assert_eq!(base_skills["body"].as_array().unwrap().len(), 3);
     assert_eq!(
         strip(&base_skills["body"], &VOLATILE),
@@ -161,7 +163,7 @@ fn variant_clone_deep_copies_all_children() {
     );
     let cloned_work = get_json(
         &fixture,
-        &format!("/api/resume/{}/work_experiences", variant.id),
+        &format!("/api/resume/{}/work_experiences", variant_id),
     );
     assert_eq!(
         strip(&base_work["body"], &VOLATILE),
@@ -182,7 +184,7 @@ fn variant_clone_deep_copies_all_children() {
         &fixture,
         &format!(
             "/api/resume/{}/work_experiences/{}/key_points",
-            variant.id, cloned_work_id
+            variant_id, cloned_work_id
         ),
     );
     assert_eq!(
@@ -203,7 +205,7 @@ fn variant_clone_deep_copies_all_children() {
     );
     let cloned_projects = get_json(
         &fixture,
-        &format!("/api/resume/{}/portfolio_projects", variant.id),
+        &format!("/api/resume/{}/portfolio_projects", variant_id),
     );
     assert_eq!(
         strip(&base_projects["body"], &VOLATILE),
@@ -224,7 +226,7 @@ fn variant_clone_deep_copies_all_children() {
         &fixture,
         &format!(
             "/api/resume/{}/portfolio_projects/{}/key_points",
-            variant.id, cloned_project_id
+            variant_id, cloned_project_id
         ),
     );
     assert_eq!(
@@ -250,7 +252,7 @@ fn variant_clone_deep_copies_all_children() {
         &fixture,
         &format!(
             "/api/resume/{}/portfolio_projects/{}/technologies",
-            variant.id, cloned_project_id
+            variant_id, cloned_project_id
         ),
     );
     assert_eq!(
@@ -266,7 +268,7 @@ fn variant_clone_deep_copies_all_children() {
     );
 
     let base_languages = get_json(&fixture, &format!("/api/resume/{}/languages", base_id));
-    let cloned_languages = get_json(&fixture, &format!("/api/resume/{}/languages", variant.id));
+    let cloned_languages = get_json(&fixture, &format!("/api/resume/{}/languages", variant_id));
     assert_eq!(base_languages["body"].as_array().unwrap().len(), 2);
     assert_eq!(
         strip(&base_languages["body"], &VOLATILE),
@@ -288,7 +290,7 @@ fn variant_clone_deep_copies_all_children() {
             &fixture,
             &format!(
                 "/api/resume/{}/languages/{}/frameworks",
-                variant.id, cloned_language_id
+                variant_id, cloned_language_id
             ),
         );
         assert_eq!(
@@ -730,7 +732,7 @@ fn variant_email_put_rejected_even_same_value() {
 
     // The base keeps its own email writable, and the change does not
     // propagate to the variant.
-    let (status, json) = put_resume(
+    let (status, _) = put_resume(
         &fixture,
         base_id,
         serde_json::json!({ "email": format!("moved.{}.@example.com", unique_suffix()) }),
@@ -991,7 +993,7 @@ fn variant_create_endpoint_forbids_non_owner_with_403() {
 
 #[test]
 fn variant_create_endpoint_missing_base_returns_404() {
-    let mut fixture = support::Fixture::new(9_241_013);
+    let fixture = support::Fixture::new(9_241_013);
 
     let response = post_variant(&fixture, 2_000_000_000, variant_body());
     assert_eq!(response.status(), Status::NotFound);
