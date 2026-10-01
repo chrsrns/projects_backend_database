@@ -12,8 +12,30 @@ use infrastructure::run_in_transaction;
 
 use crate::error::ApplicationError;
 use crate::resume::common::{
-    app_err_from_diesel_err, find_resume, partial_date_to_columns, validate_variant_metadata,
+    app_err_from_diesel_err, find_accessible_resume, find_resume, partial_date_to_columns,
+    validate_variant_metadata,
 };
+
+pub fn list_variants(
+    base_id: i32,
+    user_id_value: Option<i32>,
+) -> Result<Vec<Resume>, ApplicationError> {
+    use domain::schema::resumes::dsl as resumes_dsl;
+
+    let base = find_accessible_resume(base_id, user_id_value)?;
+    let is_owner = base.created_by.is_some() && base.created_by == user_id_value;
+
+    let mut query = resumes_dsl::resumes
+        .filter(resumes_dsl::base_resume_id.eq(base_id))
+        .into_boxed();
+    if !is_owner {
+        query = query.filter(resumes_dsl::is_public.eq(true));
+    }
+
+    query
+        .load::<Resume>(&mut infrastructure::establish_connection())
+        .map_err(app_err_from_diesel_err)
+}
 
 pub fn create_variant(
     user_id_value: i32,

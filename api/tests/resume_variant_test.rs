@@ -1,4 +1,5 @@
-use application::resume::variant::create_variant;
+use application::error::ApplicationError;
+use application::resume::variant::{create_variant, list_variants};
 use domain::models::{NewVariantRequest, PartialDate};
 use rocket::http::{ContentType, Status};
 use serde_json::Value;
@@ -14,21 +15,25 @@ fn unique_suffix() -> u128 {
         .as_nanos()
 }
 
-fn variant_markdown(email: &str) -> String {
+fn variant_markdown(email: &str, public: bool) -> String {
     format!(
-        "# Jane Doe\n\n- Location: New York, NY\n- Email: {}\n- GitHub: https://github.com/janedoe\n- Mobile: +1987654321\n- Public: true\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (Sep 2020 - May 2024)\n- Degree: Bachelor of Science\n- Description: Focused on software engineering\n- Graduated with honors\n- Specialized in distributed systems\n\n## Skills\n\n- Rust - 90%\n- Python - 75%\n- JavaScript - 60%\n\n## Work Experience\n\n### Senior Software Engineer - Tech Corp (Jan 2020 - Present)\n- Description: Backend development\n- Led team of 5 developers\n- Improved system performance by 40%\n\n## Portfolio Projects\n\n### My Portfolio\n- Live: https://example.com\n- Source: https://github.com/janedoe/project\n- Technologies: Rust, Rocket, Diesel\n- Built a scalable resume API\n\n## Languages & Frameworks\n\n### Rust\n- Rocket\n- Actix\n\n### Python\n- Django\n- FastAPI\n",
-        email
+        "# Jane Doe\n\n- Location: New York, NY\n- Email: {}\n- GitHub: https://github.com/janedoe\n- Mobile: +1987654321\n- Public: {}\n\n## Education\n\n### Bachelor's in Computer Science - University of ABC (Sep 2020 - May 2024)\n- Degree: Bachelor of Science\n- Description: Focused on software engineering\n- Graduated with honors\n- Specialized in distributed systems\n\n## Skills\n\n- Rust - 90%\n- Python - 75%\n- JavaScript - 60%\n\n## Work Experience\n\n### Senior Software Engineer - Tech Corp (Jan 2020 - Present)\n- Description: Backend development\n- Led team of 5 developers\n- Improved system performance by 40%\n\n## Portfolio Projects\n\n### My Portfolio\n- Live: https://example.com\n- Source: https://github.com/janedoe/project\n- Technologies: Rust, Rocket, Diesel\n- Built a scalable resume API\n\n## Languages & Frameworks\n\n### Rust\n- Rocket\n- Actix\n\n### Python\n- Django\n- FastAPI\n",
+        email, public
     )
 }
 
 fn import_base(fixture: &mut support::Fixture, lock_key: i64) -> i32 {
+    import_base_with_visibility(fixture, lock_key, true)
+}
+
+fn import_base_with_visibility(fixture: &mut support::Fixture, lock_key: i64, public: bool) -> i32 {
     let email = format!("variant.base.{}.{}@example.com", lock_key, unique_suffix());
     let response = fixture
         .client()
         .post("/api/resume/import/markdown")
         .header(fixture.auth_header())
         .header(ContentType::new("text", "markdown"))
-        .body(variant_markdown(&email))
+        .body(variant_markdown(&email, public))
         .dispatch();
 
     assert_eq!(response.status(), Status::Created, "base import");
@@ -401,4 +406,69 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
 
     assert!(!private.is_public, "explicit is_public wins over the base");
     assert!(!private.show_variant_tag, "explicit tag value is stored");
+}
+
+#[test]
+fn variant_list_visibility_owner_vs_public() {
+    let mut fixture = support::Fixture::new(9_241_006);
+    let base_id = import_base(&mut fixture, 9_241_006);
+
+    let public_variant =
+        create_variant(fixture.user_id(), base_id, clone_request()).expect("clone public");
+    fixture.track_resume_id(public_variant.id);
+
+    let mut hidden_request = clone_request();
+    hidden_request.is_public = Some(false);
+    let private_variant =
+        create_variant(fixture.user_id(), base_id, hidden_request).expect("clone private");
+    fixture.track_resume_id(private_variant.id);
+
+    let owner_view = list_variants(base_id, Some(fixture.user_id())).expect("owner listing");
+    assert_eq!(owner_view.len(), 2, "owner sees every variant");
+
+    let anonymous_view = list_variants(base_id, None).expect("anonymous listing");
+    assert_eq!(
+        anonymous_view.len(),
+        1,
+        "anonymous sees public variants only"
+    );
+    assert_eq!(anonymous_view[0].id, public_variant.id);
+
+    let other = support::register_and_login(fixture.client(), "variant.other.list");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    let other_view = list_variants(base_id, Some(other.user_id)).expect("other listing");
+    assert_eq!(
+        other_view.len(),
+        1,
+        "another user sees public variants only"
+    );
+    assert_eq!(other_view[0].id, public_variant.id);
+}
+
+#[test]
+fn variant_list_private_base_hidden_from_non_owner() {
+    let mut fixture = support::Fixture::new(9_241_007);
+    let base_id = import_base_with_visibility(&mut fixture, 9_241_007, false);
+
+    let variant = create_variant(fixture.user_id(), base_id, clone_request()).expect("clone");
+    fixture.track_resume_id(variant.id);
+
+    let other = support::register_and_login(fixture.client(), "variant.other.private");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    match list_variants(base_id, Some(other.user_id)) {
+        Err(ApplicationError::NotFound(_)) => {}
+        Err(other_err) => panic!("expected NotFound, got {:?}", other_err),
+        Ok(_) => panic!("expected NotFound, but the listing succeeded"),
+    }
+
+    assert_eq!(
+        list_variants(base_id, Some(fixture.user_id()))
+            .expect("owner listing")
+            .len(),
+        1
+    );
 }
