@@ -458,6 +458,63 @@ fn variant_body() -> Value {
 }
 
 #[test]
+fn base_delete_with_variants_returns_409_and_keeps_the_base() {
+    let mut fixture = support::Fixture::new(9_241_016);
+    let base_id = import_base(&mut fixture, 9_241_016);
+
+    let (status, json) = post_variant_json(&fixture, base_id, variant_body());
+    assert_eq!(status, Status::Created);
+    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    let blocked_status = fixture
+        .client()
+        .delete(format!("/api/resume/{}", base_id))
+        .header(fixture.auth_header())
+        .dispatch()
+        .status();
+    assert_eq!(
+        blocked_status,
+        Status::Conflict,
+        "a base with variants cannot be deleted"
+    );
+
+    let base_status = fixture
+        .client()
+        .get(format!("/api/resume/{}", base_id))
+        .header(fixture.auth_header())
+        .dispatch()
+        .status();
+    assert_eq!(
+        base_status,
+        Status::Ok,
+        "the base survives the rejected delete"
+    );
+
+    let variant_delete_status = fixture
+        .client()
+        .delete(format!("/api/resume/{}", variant_id))
+        .header(fixture.auth_header())
+        .dispatch()
+        .status();
+    assert_eq!(variant_delete_status, Status::NoContent);
+    fixture.untrack_resume_id(variant_id);
+
+    let base_delete_status = fixture
+        .client()
+        .delete(format!("/api/resume/{}", base_id))
+        .header(fixture.auth_header())
+        .dispatch()
+        .status();
+    assert_eq!(
+        base_delete_status,
+        Status::NoContent,
+        "the base can be deleted once its variants are gone"
+    );
+    fixture.untrack_resume_id(base_id);
+}
+
+#[test]
 fn variant_list_endpoint_visibility_and_empty_on_variant() {
     let mut fixture = support::Fixture::new(9_241_014);
     let base_id = import_base(&mut fixture, 9_241_014);
