@@ -133,6 +133,10 @@ impl Fixture {
         &self.auth_token
     }
 
+    pub fn user_id(&self) -> i32 {
+        self.created_user_ids[0]
+    }
+
     pub fn auth_header(&self) -> Header<'static> {
         Header::new("Authorization", format!("Bearer {}", self.auth_token))
     }
@@ -159,10 +163,26 @@ impl Drop for Fixture {
         let connection = &mut self.lock_connection;
 
         if !self.created_resume_ids.is_empty() {
-            use domain::schema::resumes::dsl::*;
+            use domain::schema::resumes::dsl as resumes_dsl;
 
-            for resume_id in &self.created_resume_ids {
-                match diesel::delete(resumes.find(resume_id)).execute(connection) {
+            // A variant references its base, so variants must be deleted first
+            // or the base delete is rejected by the foreign key.
+            let variant_ids: Vec<i32> = resumes_dsl::resumes
+                .filter(resumes_dsl::id.eq_any(&self.created_resume_ids))
+                .filter(resumes_dsl::base_resume_id.is_not_null())
+                .select(resumes_dsl::id)
+                .load(connection)
+                .unwrap_or_default();
+
+            let base_ids: Vec<i32> = self
+                .created_resume_ids
+                .iter()
+                .copied()
+                .filter(|id| !variant_ids.contains(id))
+                .collect();
+
+            for resume_id in variant_ids.iter().chain(base_ids.iter()) {
+                match diesel::delete(resumes_dsl::resumes.find(resume_id)).execute(connection) {
                     Ok(_) => println!("✓ Deleted resume ID {}", resume_id),
                     Err(e) => eprintln!("✗ Failed to delete resume ID {}: {}", resume_id, e),
                 }

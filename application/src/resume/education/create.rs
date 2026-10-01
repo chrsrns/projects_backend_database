@@ -51,6 +51,7 @@ pub fn create_education(
         end_date_precision: end_pair.map(|(_, p)| p),
         description: payload.description,
         display_order: payload.display_order,
+        active: true,
     };
 
     match diesel::insert_into(education::table)
@@ -93,6 +94,7 @@ pub fn create_education_key_point(
         education_id: education_id_value,
         key_point: payload.key_point,
         display_order: payload.display_order,
+        active: true,
     };
 
     match diesel::insert_into(education_key_points::table)

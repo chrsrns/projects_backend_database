@@ -215,6 +215,7 @@ pub fn import_resume_markdown(
                 end_date_precision: end_pair.map(|(_, p)| p),
                 description: edu.description.clone(),
                 display_order: edu.display_order.or(Some(idx as i32)),
+                active: true,
             };
             let inserted: domain::models::Education = diesel::insert_into(education::table)
                 .values(&new_edu)
@@ -229,6 +230,7 @@ pub fn import_resume_markdown(
                 education_id: edu_id,
                 key_point: kp.key_point.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(education_key_points::table)
                 .values(&new_kp)
@@ -263,6 +265,7 @@ pub fn import_resume_markdown(
                 end_date_precision: end_pair.map(|(_, p)| p),
                 description: work.description.clone(),
                 display_order: work.display_order.or(Some(idx as i32)),
+                active: true,
             };
             let inserted: domain::models::WorkExperience =
                 diesel::insert_into(work_experiences::table)
@@ -278,6 +281,7 @@ pub fn import_resume_markdown(
                 work_experience_id: work_id,
                 key_point: kp.key_point.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(work_experience_key_points::table)
                 .values(&new_kp)
@@ -295,6 +299,7 @@ pub fn import_resume_markdown(
                 video_url: portfolio_video_urls[idx].clone(),
                 description: project.description.clone(),
                 display_order: project.display_order.or(Some(idx as i32)),
+                active: true,
             };
             let inserted: domain::models::PortfolioProject =
                 diesel::insert_into(portfolio_projects::table)
@@ -310,6 +315,7 @@ pub fn import_resume_markdown(
                 portfolio_project_id: project_id,
                 key_point: kp.key_point.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(portfolio_key_points::table)
                 .values(&new_kp)
@@ -322,6 +328,7 @@ pub fn import_resume_markdown(
                 portfolio_project_id: project_id,
                 technology_name: tech.technology_name.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(portfolio_technologies::table)
                 .values(&new_tech)
