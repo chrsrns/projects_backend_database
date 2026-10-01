@@ -479,6 +479,72 @@ fn variant_body() -> Value {
 }
 
 #[test]
+fn variant_list_ordered_by_target_date_desc_nulls_last() {
+    let mut fixture = support::Fixture::new(9_241_020);
+    let base_id = import_base(&mut fixture, 9_241_020);
+
+    let mut created = Vec::new();
+    for target_date in [
+        serde_json::json!(null),
+        serde_json::json!("2026"),
+        serde_json::json!("2026-03"),
+        serde_json::json!("2026-03"),
+        serde_json::json!("2027-01-15"),
+    ] {
+        let mut body = variant_body();
+        body["target_date"] = target_date;
+        let (status, json) = post_variant_json(&fixture, base_id, body);
+        assert_eq!(status, Status::Created);
+        let id = json["body"]["id"].as_i64().unwrap() as i32;
+        fixture.track_resume_id(id);
+        created.push((id, json["body"]["target_date"].clone()));
+    }
+
+    let owner_token = fixture.auth_token().to_string();
+    let (status, json) = get_variants_json(&fixture, base_id, Some(&owner_token));
+    assert_eq!(status, Status::Ok);
+    let items = json["body"].as_array().unwrap();
+    assert_eq!(items.len(), 5);
+
+    let ids: Vec<i32> = items
+        .iter()
+        .map(|item| item["id"].as_i64().unwrap() as i32)
+        .collect();
+    let dates: Vec<Value> = items
+        .iter()
+        .map(|item| item["target_date"].clone())
+        .collect();
+
+    let null_variant_id = created[0].0;
+    let year_id = created[1].0;
+    let first_month_id = created[2].0;
+    let second_month_id = created[3].0;
+    let day_id = created[4].0;
+
+    assert_eq!(
+        ids,
+        vec![
+            day_id,
+            second_month_id,
+            first_month_id,
+            year_id,
+            null_variant_id
+        ],
+        "newest target first, equal dates by descending id, undated last"
+    );
+    assert_eq!(
+        dates,
+        vec![
+            serde_json::json!("2027-01-15"),
+            serde_json::json!("2026-03"),
+            serde_json::json!("2026-03"),
+            serde_json::json!("2026"),
+            Value::Null
+        ]
+    );
+}
+
+#[test]
 fn variant_update_metadata_absent_blank_null_semantics() {
     let mut fixture = support::Fixture::new(9_241_017);
     let base_id = import_base(&mut fixture, 9_241_017);

@@ -34,6 +34,10 @@ pub fn list_variants(
     }
 
     let variants = query
+        .order((
+            resumes_dsl::target_date.desc().nulls_last(),
+            resumes_dsl::id.desc(),
+        ))
         .load::<Resume>(&mut infrastructure::establish_connection())
         .map_err(app_err_from_diesel_err)?;
 
