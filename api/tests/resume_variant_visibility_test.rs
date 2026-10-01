@@ -178,6 +178,74 @@ fn resume_view_shape_flat_across_all_endpoints() {
 }
 
 #[test]
+fn list_resumes_includes_variants_in_id_order() {
+    let mut fixture = support::Fixture::new(9_241_033);
+
+    let (status, base) = import_base(&fixture, 9_241_033, true);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let mut variant_ids = Vec::new();
+    for company in ["Acme Corp", "Globex", "Initech"] {
+        let (status, json) = post_variant(
+            &fixture,
+            base_id,
+            serde_json::json!({ "company_name": company, "is_public": true }),
+        );
+        assert_eq!(status, Status::Created);
+        let id = json["body"]["id"].as_i64().unwrap() as i32;
+        fixture.track_resume_id(id);
+        variant_ids.push(id);
+    }
+
+    let response = fixture
+        .client()
+        .get("/api/resumes")
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let items = json["body"].as_array().unwrap();
+
+    let ids: Vec<i32> = items
+        .iter()
+        .map(|item| item["id"].as_i64().unwrap() as i32)
+        .collect();
+    let mut sorted = ids.clone();
+    sorted.sort_unstable();
+    assert_eq!(ids, sorted, "the list keeps its ascending id order");
+
+    for id in std::iter::once(base_id).chain(variant_ids.iter().copied()) {
+        assert!(
+            ids.contains(&id),
+            "GET /resumes should include resume {}",
+            id
+        );
+    }
+
+    for variant_id in &variant_ids {
+        let item = items
+            .iter()
+            .find(|item| item["id"].as_i64().unwrap() as i32 == *variant_id)
+            .expect("variant present in the list");
+        assert_eq!(item["is_variant"], Value::Bool(true));
+        assert_eq!(
+            item["base_resume_id"].as_i64().unwrap() as i32,
+            base_id,
+            "the owner sees the parent link"
+        );
+    }
+
+    let base_item = items
+        .iter()
+        .find(|item| item["id"].as_i64().unwrap() as i32 == base_id)
+        .expect("base present in the list");
+    assert_eq!(base_item["is_variant"], Value::Bool(false));
+    assert!(base_item["base_resume_id"].is_null());
+}
+
+#[test]
 fn resume_view_redacts_base_and_tag_for_other_viewers() {
     let mut fixture = support::Fixture::new(9_241_031);
 
