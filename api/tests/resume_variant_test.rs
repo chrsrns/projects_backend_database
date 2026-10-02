@@ -702,6 +702,82 @@ fn variant_update_target_date_precision_moves_together() {
 }
 
 #[test]
+fn variant_create_rejects_malformed_target_date_with_422() {
+    let mut fixture = support::Fixture::new(9_241_050);
+    let base_id = import_base(&mut fixture, 9_241_050);
+
+    for malformed in [
+        serde_json::json!("2026-13"),
+        serde_json::json!("2026-13-01"),
+        serde_json::json!("not-a-date"),
+        serde_json::json!(""),
+    ] {
+        let mut body = variant_body();
+        body["target_date"] = malformed.clone();
+
+        let status = post_variant(&fixture, base_id, body).status();
+        assert_eq!(
+            status,
+            Status::UnprocessableEntity,
+            "target_date {} is rejected before the handler runs",
+            malformed
+        );
+    }
+
+    let owner_token = fixture.auth_token().to_string();
+    let (status, json) = get_variants_json(&fixture, base_id, Some(&owner_token));
+    assert_eq!(status, Status::Ok);
+    assert!(
+        json["body"].as_array().unwrap().is_empty(),
+        "a rejected body creates nothing"
+    );
+}
+
+#[test]
+fn resume_body_cannot_set_base_resume_id() {
+    let mut fixture = support::Fixture::new(9_241_051);
+    let base_id = import_base(&mut fixture, 9_241_051);
+
+    let created = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Forged Variant",
+                "email": format!("variant.forge.{}@example.com", unique_suffix()),
+                "is_public": true,
+                "base_resume_id": base_id
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(created.status(), Status::Created);
+
+    let created_json: Value = serde_json::from_str(&created.into_string().unwrap()).unwrap();
+    assert!(
+        created_json["body"]["base_resume_id"].is_null(),
+        "a create body cannot claim a parent"
+    );
+    assert_eq!(created_json["body"]["is_variant"], Value::Bool(false));
+    let forged_id = created_json["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(forged_id);
+
+    let (status, updated) = put_resume(
+        &fixture,
+        forged_id,
+        serde_json::json!({ "base_resume_id": base_id }),
+    );
+    assert_eq!(status, Status::Ok, "the field is dropped, not rejected");
+    assert!(
+        updated["body"]["base_resume_id"].is_null(),
+        "an update body cannot turn a base into a variant"
+    );
+    assert_eq!(updated["body"]["is_variant"], Value::Bool(false));
+}
+
+#[test]
 fn variant_email_put_rejected_even_same_value() {
     let mut fixture = support::Fixture::new(9_241_021);
     let base_id = import_base(&mut fixture, 9_241_021);

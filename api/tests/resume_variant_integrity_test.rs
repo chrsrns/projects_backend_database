@@ -147,6 +147,84 @@ fn user_delete_cascade_removes_base_and_variant() {
 }
 
 #[test]
+fn self_reference_and_precision_checks_fire() {
+    let mut fixture = support::Fixture::new(9_241_046);
+    let email = format!(
+        "variant.check.{}.{}@example.com",
+        9_241_046,
+        unique_suffix()
+    );
+    let resume_id = create_base(&mut fixture, &email);
+    let mut connection = infrastructure::establish_connection();
+
+    let self_reference = diesel::sql_query("UPDATE resumes SET base_resume_id = id WHERE id = $1")
+        .bind::<diesel::sql_types::Integer, _>(resume_id)
+        .execute(&mut connection)
+        .expect_err("a resume cannot be its own base");
+    assert!(
+        matches!(
+            self_reference,
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                _
+            )
+        ),
+        "expected a check violation, got {:?}",
+        self_reference
+    );
+
+    let unknown_precision = diesel::sql_query(
+        "UPDATE resumes SET target_date = DATE '2026-03-01', target_date_precision = 'fortnight' WHERE id = $1",
+    )
+    .bind::<diesel::sql_types::Integer, _>(resume_id)
+    .execute(&mut connection)
+    .expect_err("precision must be day, month or year");
+    assert!(
+        matches!(
+            unknown_precision,
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                _
+            )
+        ),
+        "expected a check violation, got {:?}",
+        unknown_precision
+    );
+
+    let precision_without_date =
+        diesel::sql_query("UPDATE resumes SET target_date_precision = 'day' WHERE id = $1")
+            .bind::<diesel::sql_types::Integer, _>(resume_id)
+            .execute(&mut connection)
+            .expect_err("a precision without a date is rejected");
+    assert!(
+        matches!(
+            precision_without_date,
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                _
+            )
+        ),
+        "expected a check violation, got {:?}",
+        precision_without_date
+    );
+
+    let response = fixture
+        .client()
+        .get(format!("/api/resume/{}", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+
+    assert!(
+        json["body"]["base_resume_id"].is_null(),
+        "the rejected writes left the row untouched"
+    );
+    assert!(json["body"]["target_date"].is_null());
+    assert!(json["body"]["target_date_precision"].is_null());
+}
+
+#[test]
 fn fk_violation_maps_to_409() {
     let _fixture = support::Fixture::new(9_241_043);
     let mut connection = infrastructure::establish_connection();
