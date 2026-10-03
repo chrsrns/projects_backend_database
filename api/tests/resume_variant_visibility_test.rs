@@ -97,6 +97,24 @@ fn get_resume(fixture: &support::Fixture, resume_id: i32, token: Option<&str>) -
     (status, json)
 }
 
+fn get_variants(
+    fixture: &support::Fixture,
+    resume_id: i32,
+    token: Option<&str>,
+) -> (Status, Value) {
+    let request = fixture
+        .client()
+        .get(format!("/api/resume/{}/variants", resume_id));
+    let request = match token {
+        Some(token) => request.header(support::auth_header(token)),
+        None => request,
+    };
+    let response = request.dispatch();
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
 #[test]
 fn resume_view_shape_flat_across_all_endpoints() {
     let mut fixture = support::Fixture::new(9_241_030);
@@ -354,5 +372,49 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
 
     // The private base itself stays invisible to the other user.
     let (status, _) = get_resume(&fixture, private_base_id, Some(&other.token));
+    assert_eq!(status, Status::NotFound);
+}
+
+#[test]
+fn variants_of_an_inaccessible_variant_returns_404() {
+    let mut fixture = support::Fixture::new(9_241_034);
+
+    // A private variant of a private base: the variant's own visibility is
+    // independent of its base, so this is the inaccessible case.
+    let (status, private_base) = import_base(&fixture, 9_241_034, false);
+    assert_eq!(status, Status::Created);
+    let private_base_id = private_base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(private_base_id);
+
+    let (status, private_variant) = post_variant(
+        &fixture,
+        private_base_id,
+        serde_json::json!({ "company_name": "Acme Corp", "is_public": false }),
+    );
+    assert_eq!(status, Status::Created);
+    let private_variant_id = private_variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(private_variant_id);
+
+    let other = support::register_and_login(fixture.client(), "variant.view.inaccessible");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    // The owner may read it, and a variant never has variants of its own,
+    // so the list is empty rather than missing.
+    let (status, owner_json) =
+        get_variants(&fixture, private_variant_id, Some(fixture.auth_token()));
+    assert_eq!(status, Status::Ok);
+    assert!(
+        owner_json["body"].as_array().unwrap().is_empty(),
+        "a variant has no variants of its own"
+    );
+
+    // Another user cannot reach the variant at all, so the access check
+    // answers before the (always empty) list is built.
+    let (status, _) = get_variants(&fixture, private_variant_id, Some(&other.token));
+    assert_eq!(status, Status::NotFound);
+
+    // Anonymous is the same case with no identity to match on.
+    let (status, _) = get_variants(&fixture, private_variant_id, None);
     assert_eq!(status, Status::NotFound);
 }
