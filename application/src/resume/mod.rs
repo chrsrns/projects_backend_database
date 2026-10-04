@@ -13,3 +13,5 @@ pub mod work_experiences;
 pub mod common;
 pub mod markdown_export;
 pub mod markdown_import;
+pub mod variant;
+pub mod view;

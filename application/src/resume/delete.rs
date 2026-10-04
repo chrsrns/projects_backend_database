@@ -24,6 +24,22 @@ pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), Applicati
         }
     }
 
+    let variant_count: i64 = match resumes::table
+        .filter(resumes::base_resume_id.eq(resume_id))
+        .count()
+        .get_result(&mut establish_connection())
+    {
+        Ok(count) => count,
+        Err(err) => return Err(app_err_from_diesel_err(err)),
+    };
+
+    if variant_count > 0 {
+        return Err(ApplicationError::Conflict(format!(
+            "Resume with id {} has {} variant(s) and cannot be deleted",
+            resume_id, variant_count
+        )));
+    }
+
     match diesel::delete(resumes::table.find(resume_id)).execute(&mut establish_connection()) {
         Ok(count) => {
             if count == 0 {

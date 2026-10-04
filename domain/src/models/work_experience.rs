@@ -99,6 +99,7 @@ pub struct NewWorkExperience {
     pub end_date_precision: Option<String>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -161,6 +162,7 @@ pub struct NewWorkExperienceKeyPoint {
     pub work_experience_id: i32,
     pub key_point: String,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Deserialize, ToSchema)]

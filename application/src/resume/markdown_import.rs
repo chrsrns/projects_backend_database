@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{
     NewEducation, NewEducationKeyPoint, NewFramework, NewLanguage, NewPortfolioKeyPoint,
     NewPortfolioProject, NewPortfolioTechnology, NewResume, NewSkill, NewWorkExperience,
-    NewWorkExperienceKeyPoint, Resume,
+    NewWorkExperienceKeyPoint, Resume, ResumeView,
 };
 use infrastructure::run_in_transaction;
 use shared::markdown;
@@ -40,7 +40,7 @@ pub fn resolve_parent_index(
 pub fn import_resume_markdown(
     markdown: &str,
     user_id_value: i32,
-) -> Result<(Resume, bool), ApplicationError> {
+) -> Result<(ResumeView, bool), ApplicationError> {
     let full_resume = markdown::markdown_to_resume(markdown).map_err(|err| match err {
         markdown::MarkdownError::InvalidMarkdown(msg) => ApplicationError::BadRequest(msg),
     })?;
@@ -122,8 +122,12 @@ pub fn import_resume_markdown(
     let existing_id = {
         use domain::schema::resumes;
         use domain::schema::resumes::dsl::*;
+        // A variant carries its base's email, so the match must ignore
+        // variant rows or an import would silently rewrite a tailored copy
+        // instead of the base resume it belongs to.
         let existing = resumes::table
             .filter(email.eq(&full_resume.email))
+            .filter(base_resume_id.is_null())
             .first::<Resume>(&mut conn)
             .optional()
             .map_err(app_err_from_diesel_err)?;
@@ -145,6 +149,14 @@ pub fn import_resume_markdown(
         video,
         created_by: Some(user_id_value),
         is_public: full_resume.is_public,
+        base_resume_id: None,
+        company_name: None,
+        role_title: None,
+        target_date: None,
+        target_date_precision: None,
+        job_description: None,
+        variant_label: None,
+        show_variant_tag: true,
     };
 
     run_in_transaction(&mut conn, move |conn| {
@@ -207,6 +219,7 @@ pub fn import_resume_markdown(
                 end_date_precision: end_pair.map(|(_, p)| p),
                 description: edu.description.clone(),
                 display_order: edu.display_order.or(Some(idx as i32)),
+                active: true,
             };
             let inserted: domain::models::Education = diesel::insert_into(education::table)
                 .values(&new_edu)
@@ -221,6 +234,7 @@ pub fn import_resume_markdown(
                 education_id: edu_id,
                 key_point: kp.key_point.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(education_key_points::table)
                 .values(&new_kp)
@@ -255,6 +269,7 @@ pub fn import_resume_markdown(
                 end_date_precision: end_pair.map(|(_, p)| p),
                 description: work.description.clone(),
                 display_order: work.display_order.or(Some(idx as i32)),
+                active: true,
             };
             let inserted: domain::models::WorkExperience =
                 diesel::insert_into(work_experiences::table)
@@ -270,6 +285,7 @@ pub fn import_resume_markdown(
                 work_experience_id: work_id,
                 key_point: kp.key_point.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(work_experience_key_points::table)
                 .values(&new_kp)
@@ -287,6 +303,7 @@ pub fn import_resume_markdown(
                 video_url: portfolio_video_urls[idx].clone(),
                 description: project.description.clone(),
                 display_order: project.display_order.or(Some(idx as i32)),
+                active: true,
             };
             let inserted: domain::models::PortfolioProject =
                 diesel::insert_into(portfolio_projects::table)
@@ -302,6 +319,7 @@ pub fn import_resume_markdown(
                 portfolio_project_id: project_id,
                 key_point: kp.key_point.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(portfolio_key_points::table)
                 .values(&new_kp)
@@ -314,6 +332,7 @@ pub fn import_resume_markdown(
                 portfolio_project_id: project_id,
                 technology_name: tech.technology_name.clone(),
                 display_order: None,
+                active: true,
             };
             diesel::insert_into(portfolio_technologies::table)
                 .values(&new_tech)
@@ -348,6 +367,9 @@ pub fn import_resume_markdown(
 
         Ok((resume, existing_id.is_none()))
     })
+    // Import only ever creates or updates a base resume: variant rows are
+    // excluded from the email match, so the base is never referenced here.
+    .map(|(resume, created)| (ResumeView::from_resume(resume, false, true), created))
     .map_err(app_err_from_diesel_err)
 }
 

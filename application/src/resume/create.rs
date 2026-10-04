@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use domain::models::{NewResume, NewResumeRequest, Resume};
+use domain::models::{NewResume, NewResumeRequest, Resume, ResumeView};
 use infrastructure::establish_connection;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 pub fn create_resume(
     user_id_value: i32,
     resume: NewResumeRequest,
-) -> Result<Resume, ApplicationError> {
+) -> Result<ResumeView, ApplicationError> {
     use domain::schema::resumes;
 
     let new_resume = NewResume {
@@ -24,13 +24,23 @@ pub fn create_resume(
         video: validate_video(resume.video)?,
         created_by: Some(user_id_value),
         is_public: resume.is_public.unwrap_or(false),
+        base_resume_id: None,
+        company_name: None,
+        role_title: None,
+        target_date: None,
+        target_date_precision: None,
+        job_description: None,
+        variant_label: None,
+        show_variant_tag: true,
     };
 
     match diesel::insert_into(resumes::table)
         .values(&new_resume)
         .get_result::<Resume>(&mut establish_connection())
     {
-        Ok(resume) => Ok(resume),
+        // A resume created here is always a base, and its creator is the
+        // caller, so no base-visibility lookup is needed.
+        Ok(resume) => Ok(ResumeView::from_resume(resume, false, true)),
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

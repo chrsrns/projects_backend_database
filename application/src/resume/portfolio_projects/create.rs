@@ -36,6 +36,7 @@ pub fn create_portfolio_project(
         video_url: validate_optional_url(payload.video_url, "Video URL")?,
         description: payload.description,
         display_order: payload.display_order,
+        active: true,
     };
 
     match diesel::insert_into(portfolio_projects::table)
@@ -80,6 +81,7 @@ pub fn create_portfolio_key_point(
         portfolio_project_id: project_id_value,
         key_point: payload.key_point,
         display_order: payload.display_order,
+        active: true,
     };
 
     match diesel::insert_into(portfolio_key_points::table)
@@ -122,6 +124,7 @@ pub fn create_portfolio_technology(
         portfolio_project_id: project_id_value,
         technology_name: payload.technology_name,
         display_order: payload.display_order,
+        active: true,
     };
 
     match diesel::insert_into(portfolio_technologies::table)

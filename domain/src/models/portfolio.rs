@@ -60,6 +60,7 @@ pub struct NewPortfolioProject {
     #[schema(max_length = 500)]
     pub description: Option<String>,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -120,6 +121,7 @@ pub struct NewPortfolioKeyPoint {
     pub portfolio_project_id: i32,
     pub key_point: String,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -155,6 +157,7 @@ pub struct NewPortfolioTechnology {
     pub portfolio_project_id: i32,
     pub technology_name: String,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Deserialize, ToSchema)]

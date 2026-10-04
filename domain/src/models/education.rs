@@ -102,6 +102,7 @@ pub struct NewEducation {
     pub end_date_precision: Option<String>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -167,6 +168,7 @@ pub struct NewEducationKeyPoint {
     pub education_id: i32,
     pub key_point: String,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Deserialize, ToSchema)]

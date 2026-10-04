@@ -6,6 +6,7 @@ mod parsed_resume;
 mod partial_date;
 mod portfolio;
 mod resume;
+mod resume_view;
 mod skills;
 mod work_experience;
 
@@ -17,5 +18,6 @@ pub use parsed_resume::*;
 pub use partial_date::*;
 pub use portfolio::*;
 pub use resume::*;
+pub use resume_view::*;
 pub use skills::*;
 pub use work_experience::*;

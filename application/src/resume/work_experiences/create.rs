@@ -62,6 +62,7 @@ pub fn create_work_experience(
         end_date_precision: end_pair.map(|(_, p)| p),
         description,
         display_order: payload.display_order,
+        active: true,
     };
 
     match diesel::insert_into(work_experiences::table)
@@ -104,6 +105,7 @@ pub fn create_work_experience_key_point(
         work_experience_id: work_id_value,
         key_point: payload.key_point,
         display_order: payload.display_order,
+        active: true,
     };
 
     match diesel::insert_into(work_experience_key_points::table)
