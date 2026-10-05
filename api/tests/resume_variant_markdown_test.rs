@@ -709,3 +709,191 @@ fn variant_metadata_apply_absent_null_and_caps() {
     let (status, _) = import_markdown_body(&fixture, body);
     assert_eq!(status, Status::BadRequest);
 }
+
+#[test]
+fn stale_email_marker_still_targets_variant() {
+    let mut fixture = support::Fixture::new(9_241_065);
+    let email = format!("stale.email.{}.{}@example.com", 9_241_065, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, variant) = post_variant(
+        &fixture,
+        base_id,
+        serde_json::json!({ "company_name": "Acme Corp" }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    let exported = export_markdown(&fixture, variant_id);
+
+    // The base email moves after the export; the marker must still route the
+    // re-import instead of creating a duplicate resume.
+    let (status, _) = put_resume(
+        &fixture,
+        base_id,
+        serde_json::json!({ "email": format!("moved.{}@example.com", unique_suffix()) }),
+    );
+    assert_eq!(status, Status::Ok);
+
+    let (status, updated) = import_markdown_body(&fixture, exported);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(updated["body"]["id"], variant_id);
+
+    let list = fixture
+        .client()
+        .get("/api/resumes")
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(list.status(), Status::Ok);
+    let resumes: Value = serde_json::from_str(&list.into_string().unwrap()).unwrap();
+    let ids: Vec<i64> = resumes["body"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_i64().unwrap())
+        .filter(|id| *id == base_id as i64 || *id == variant_id as i64)
+        .collect();
+    assert_eq!(ids.len(), 2, "no duplicate resume was created");
+}
+
+#[test]
+fn malformed_front_matter_returns_400_on_import() {
+    let fixture = support::Fixture::new(9_241_066);
+    let email = format!("fm.bad.{}.{}@example.com", 9_241_066, unique_suffix());
+    let body_md = markdown("Jane Doe", &email);
+
+    for front_matter in [
+        "resume_id: 1\nresume_id: 2",  // duplicate key
+        "resume_id: 1\n\nrole_title: x", // blank line inside block
+        "company_name: 42",            // metadata key without a variant target
+        "unknown: 1",                  // unknown key
+        "garbage line without colon",  // malformed line
+    ] {
+        let (status, _) = import_markdown_body(
+            &fixture,
+            format!("---\n{}\n---\n{}", front_matter, body_md),
+        );
+        assert_eq!(status, Status::BadRequest, "block: {:?}", front_matter);
+    }
+
+    // Unclosed fence.
+    let (status, _) =
+        import_markdown_body(&fixture, format!("---\nresume_id: 1\n{}", body_md));
+    assert_eq!(status, Status::BadRequest);
+}
+
+#[test]
+fn non_owner_export_omits_show_variant_tag() {
+    let mut fixture = support::Fixture::new(9_241_067);
+    let email = format!("tag.view.{}.{}@example.com", 9_241_067, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, variant) = post_variant(
+        &fixture,
+        base_id,
+        serde_json::json!({ "company_name": "Acme", "show_variant_tag": false }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    // Owner sees the tag flag in the front-matter.
+    let owner_export = export_markdown(&fixture, variant_id);
+    assert!(owner_export.contains("show_variant_tag: false"));
+
+    // An anonymous viewer of the public variant does not.
+    let anon_export = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", variant_id))
+        .dispatch();
+    assert_eq!(anon_export.status(), Status::Ok);
+    let exported = anon_export.into_string().expect("markdown body");
+    assert!(exported.contains(&format!("resume_id: {}", variant_id)));
+    assert!(exported.contains("company_name: \"Acme\""));
+    assert!(
+        !exported.contains("show_variant_tag"),
+        "the tag flag is owner-only"
+    );
+}
+
+#[test]
+fn variant_import_publishes_variant_id() {
+    let mut fixture = support::Fixture::new(9_241_068);
+    let email = format!("variant.pub.{}.{}@example.com", 9_241_068, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, variant) = post_variant(
+        &fixture,
+        base_id,
+        serde_json::json!({ "company_name": "Acme" }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    let mut variant_rx = fixture.hub.subscribe(variant_id);
+    let mut base_rx = fixture.hub.subscribe(base_id);
+
+    let imported = marked("Jane Doe", &email, &variant_id.to_string());
+    let (status, _) = import_markdown_body(&fixture, imported);
+    assert_eq!(status, Status::Ok);
+
+    let evt = variant_rx.try_recv().expect("variant changed event");
+    assert_eq!(evt.resume_id, variant_id);
+    assert_eq!(
+        evt.action,
+        api::realtime::ResumeChangedAction::Updated(api::realtime::SectionType::PersonalInfo)
+    );
+    assert!(
+        base_rx.try_recv().is_err(),
+        "subscribers of the base are not notified"
+    );
+}
+
+#[test]
+fn explicit_route_targets_variant() {
+    let mut fixture = support::Fixture::new(9_241_069);
+    let email = format!("explicit.var.{}.{}@example.com", 9_241_069, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, variant) = post_variant(
+        &fixture,
+        base_id,
+        serde_json::json!({ "company_name": "Acme" }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    let body = format!(
+        "---\nresume_id: {0}\nvariant_label: \"explicit\"\n---\n{1}",
+        variant_id,
+        markdown("Variant Renamed", &email)
+    );
+    let (status, updated) = import_markdown_into(&fixture, variant_id, body);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(updated["body"]["id"], variant_id);
+    assert_eq!(updated["body"]["name"], "Variant Renamed");
+    assert_eq!(updated["body"]["variant_label"], "explicit");
+    assert_eq!(updated["body"]["is_variant"], true);
+
+    let base_after = get_resume(&fixture, base_id);
+    assert_eq!(base_after["body"]["name"], "Jane Doe");
+}
