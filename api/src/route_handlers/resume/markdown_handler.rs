@@ -159,7 +159,7 @@ pub fn import_resume_markdown(
     markdown: LimitedMarkdown,
     hub: &State<Hub>,
 ) -> CustomJsonResult<ResumeView> {
-    match markdown_import::import_resume_markdown(&markdown.0, auth.user_id) {
+    match markdown_import::import_resume_markdown(&markdown.0, auth.user_id, None) {
         Ok((resume, true)) => {
             hub.publish_resume_changed(resume.id, ResumeChangedAction::Created);
             Ok(Custom(Status::Created, Json(Response { body: resume })))

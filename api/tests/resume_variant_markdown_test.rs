@@ -30,6 +30,40 @@ fn import_markdown(fixture: &support::Fixture, name: &str, email: &str) -> (Stat
     (status, json)
 }
 
+fn import_markdown_body(fixture: &support::Fixture, body: String) -> (Status, Value) {
+    let response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(ContentType::new("text", "markdown"))
+        .body(body)
+        .dispatch();
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
+fn import_markdown_body_as(
+    fixture: &support::Fixture,
+    token: &str,
+    body: String,
+) -> (Status, Value) {
+    let response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(support::auth_header(token))
+        .header(ContentType::new("text", "markdown"))
+        .body(body)
+        .dispatch();
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
+fn marked(name: &str, email: &str, resume_id: &str) -> String {
+    format!("---\nresume_id: {}\n---\n{}", resume_id, markdown(name, email))
+}
+
 fn post_variant(fixture: &support::Fixture, base_id: i32, body: Value) -> (Status, Value) {
     let response = fixture
         .client()
@@ -271,4 +305,116 @@ fn markdown_import_never_updates_variant_row() {
         variant_after["body"]["base_resume_id"].as_i64().unwrap() as i32,
         base_id
     );
+}
+
+#[test]
+fn marker_targets_named_base_row() {
+    let mut fixture = support::Fixture::new(9_241_050);
+    let email = format!("marker.base.{}.{}@example.com", 9_241_050, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let fresh_email = format!(
+        "marker.base.new.{}.{}@example.com",
+        9_241_050,
+        unique_suffix()
+    );
+    let (status, updated) =
+        import_markdown_body(&fixture, marked("Jane Marker", &fresh_email, &base_id.to_string()));
+    assert_eq!(status, Status::Ok, "the marker resolves the row");
+    assert_eq!(updated["body"]["id"], base_id);
+    assert_eq!(updated["body"]["name"], "Jane Marker");
+    assert_eq!(updated["body"]["email"], fresh_email);
+}
+
+#[test]
+fn marker_absent_row_returns_404() {
+    let fixture = support::Fixture::new(9_241_051);
+    let email = format!("marker.miss.{}.{}@example.com", 9_241_051, unique_suffix());
+
+    let (status, _) =
+        import_markdown_body(&fixture, marked("Jane Doe", &email, "999999999"));
+    assert_eq!(status, Status::NotFound);
+}
+
+#[test]
+fn marker_foreign_row_returns_403() {
+    let mut fixture = support::Fixture::new(9_241_052);
+    let email = format!("marker.foreign.{}.{}@example.com", 9_241_052, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let other = support::register_and_login(fixture.client(), "marker.foreign.other");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    let other_email = format!(
+        "marker.foreign.other.{}.{}@example.com",
+        9_241_052,
+        unique_suffix()
+    );
+    let (status, _) = import_markdown_body_as(
+        &fixture,
+        &other.token,
+        marked("Not Yours", &other_email, &base_id.to_string()),
+    );
+    assert_eq!(
+        status,
+        Status::Forbidden,
+        "a marker never falls back to email matching"
+    );
+}
+
+#[test]
+fn marker_malformed_values_return_400() {
+    let fixture = support::Fixture::new(9_241_053);
+    let email = format!("marker.bad.{}.{}@example.com", 9_241_053, unique_suffix());
+
+    for resume_id in ["\"abc\"", "0", "-3", "\"\"", "", "true", "1.5"] {
+        let (status, _) = import_markdown_body(
+            &fixture,
+            marked("Jane Doe", &format!("{}.{}", email, resume_id), resume_id),
+        );
+        assert_eq!(status, Status::BadRequest, "resume_id value: {}", resume_id);
+    }
+}
+
+#[test]
+fn marker_wins_over_email_match() {
+    let mut fixture = support::Fixture::new(9_241_054);
+    let email_a = format!("marker.wins.a.{}.{}@example.com", 9_241_054, unique_suffix());
+    let email_b = format!("marker.wins.b.{}.{}@example.com", 9_241_054, unique_suffix());
+
+    let (status, a) = import_markdown(&fixture, "Resume A", &email_a);
+    assert_eq!(status, Status::Created);
+    let a_id = a["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(a_id);
+
+    let (status, b) = import_markdown(&fixture, "Resume B", &email_b);
+    assert_eq!(status, Status::Created);
+    let b_id = b["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(b_id);
+
+    // Marker names A while the Email bullet matches B: the marker wins and B
+    // is left alone. A's email becomes the B email (still unique).
+    let email_new = format!(
+        "marker.wins.new.{}.{}@example.com",
+        9_241_054,
+        unique_suffix()
+    );
+    let (status, updated) =
+        import_markdown_body(&fixture, marked("A via marker", &email_new, &a_id.to_string()));
+    assert_eq!(status, Status::Ok);
+    assert_eq!(updated["body"]["id"], a_id);
+    assert_eq!(updated["body"]["name"], "A via marker");
+
+    let b_after = get_resume(&fixture, b_id);
+    assert_eq!(b_after["body"]["name"], "Resume B");
+    assert_eq!(b_after["body"]["email"], email_b);
 }

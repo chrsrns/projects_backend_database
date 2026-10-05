@@ -10,9 +10,35 @@ use shared::markdown;
 use crate::{
     error::ApplicationError,
     resume::common::{
-        app_err_from_diesel_err, validate_executive_summary, validate_optional_url, validate_video,
+        app_err_from_diesel_err, find_resume, validate_executive_summary, validate_optional_url,
+        validate_video,
     },
 };
+
+/// Decodes the `resume_id` routing marker. The marker must be a positive
+/// integer, either as a JSON number or a numeric JSON string; an empty value
+/// or any other scalar is malformed.
+fn resume_id_marker(value: &serde_json::Value) -> Result<i32, ApplicationError> {
+    let bad = || {
+        ApplicationError::BadRequest(
+            "front-matter resume_id must be a positive integer".to_string(),
+        )
+    };
+    match value {
+        serde_json::Value::Number(n) => n
+            .as_i64()
+            .and_then(|v| i32::try_from(v).ok())
+            .filter(|v| *v > 0)
+            .ok_or_else(bad),
+        serde_json::Value::String(s) => s
+            .trim()
+            .parse::<i32>()
+            .ok()
+            .filter(|v| *v > 0)
+            .ok_or_else(bad),
+        _ => Err(bad()),
+    }
+}
 
 /// Resolves an index into a parent ID map, returning `BadRequest` if the
 /// index is out of bounds (V21).
@@ -37,13 +63,33 @@ pub fn resolve_parent_index(
     })
 }
 
+/// Imports a markdown resume. `explicit_id` is the URL target of
+/// `POST /api/resume/{id}/import/markdown`; its ownership check runs before
+/// any front-matter handling and a front-matter `resume_id` must match it.
+/// Otherwise the front-matter `resume_id` marker picks the target, with the
+/// email match as the marker-less fallback and creation as the last resort.
 pub fn import_resume_markdown(
     markdown: &str,
     user_id_value: i32,
+    explicit_id: Option<i32>,
 ) -> Result<(ResumeView, bool), ApplicationError> {
-    let full_resume = markdown::markdown_to_resume(markdown).map_err(|err| match err {
+    let explicit_target = match explicit_id {
+        Some(resume_id) => {
+            let row = find_resume(resume_id)?;
+            match row.created_by {
+                Some(owner) if owner == user_id_value => {}
+                _ => return Err(ApplicationError::Forbidden),
+            }
+            Some(row)
+        }
+        None => None,
+    };
+
+    let parsed = markdown::parse_resume_markdown(markdown).map_err(|err| match err {
         markdown::MarkdownError::InvalidMarkdown(msg) => ApplicationError::BadRequest(msg),
     })?;
+    let front_matter = parsed.front_matter.unwrap_or_default();
+    let full_resume = parsed.resume;
 
     // Pre-flight bounds check (V21): validate all child → parent index
     // references before opening the database transaction.  This lets us
@@ -117,26 +163,69 @@ pub fn import_resume_markdown(
         .map(|p| validate_optional_url(p.source_code_link.clone(), "Source Code Link"))
         .collect::<Result<Vec<_>, _>>()?;
 
+    let marker_id = front_matter
+        .resume_id
+        .as_ref()
+        .map(resume_id_marker)
+        .transpose()?;
+
+    if let (Some(target_id), Some(marker_id)) = (explicit_id, marker_id)
+        && marker_id != target_id
+    {
+        return Err(ApplicationError::BadRequest(
+            "front-matter resume_id does not match the target resume id".to_string(),
+        ));
+    }
+
     let mut conn = infrastructure::establish_connection();
 
-    let existing_id = {
-        use domain::schema::resumes;
-        use domain::schema::resumes::dsl::*;
-        // A variant carries its base's email, so the match must ignore
-        // variant rows or an import would silently rewrite a tailored copy
-        // instead of the base resume it belongs to.
-        let existing = resumes::table
-            .filter(email.eq(&full_resume.email))
-            .filter(base_resume_id.is_null())
-            .first::<Resume>(&mut conn)
-            .optional()
-            .map_err(app_err_from_diesel_err)?;
-        match existing {
-            Some(r) if r.created_by == Some(user_id_value) => Some(r.id),
-            Some(_) => return Err(ApplicationError::Forbidden),
-            None => None,
-        }
+    // Resolution order: an explicit route id wins, then the front-matter
+    // marker, then the email match (base rows only), then creation. A marker
+    // that names a missing or foreign row fails loudly instead of falling
+    // back to the email match.
+    let target_row: Option<Resume> = match explicit_target {
+        Some(row) => Some(row),
+        None => match marker_id {
+            Some(marker_id) => {
+                use domain::schema::resumes;
+                let row = resumes::table
+                    .find(marker_id)
+                    .first::<Resume>(&mut conn)
+                    .optional()
+                    .map_err(app_err_from_diesel_err)?;
+                match row {
+                    Some(r) if r.created_by == Some(user_id_value) => Some(r),
+                    Some(_) => return Err(ApplicationError::Forbidden),
+                    None => {
+                        return Err(ApplicationError::NotFound(format!(
+                            "Resume with id {} not found",
+                            marker_id
+                        )))
+                    }
+                }
+            }
+            None => {
+                use domain::schema::resumes;
+                use domain::schema::resumes::dsl::*;
+                // A variant carries its base's email, so the match must ignore
+                // variant rows or an import would silently rewrite a tailored copy
+                // instead of the base resume it belongs to.
+                let existing = resumes::table
+                    .filter(email.eq(&full_resume.email))
+                    .filter(base_resume_id.is_null())
+                    .first::<Resume>(&mut conn)
+                    .optional()
+                    .map_err(app_err_from_diesel_err)?;
+                match existing {
+                    Some(r) if r.created_by == Some(user_id_value) => Some(r),
+                    Some(_) => return Err(ApplicationError::Forbidden),
+                    None => None,
+                }
+            }
+        },
     };
+
+    let existing_id = target_row.as_ref().map(|r| r.id);
 
     let new_resume = NewResume {
         name: full_resume.name.clone(),
@@ -367,9 +456,13 @@ pub fn import_resume_markdown(
 
         Ok((resume, existing_id.is_none()))
     })
-    // Import only ever creates or updates a base resume: variant rows are
-    // excluded from the email match, so the base is never referenced here.
-    .map(|(resume, created)| (ResumeView::from_resume(resume, false, true), created))
+    // The email match only ever resolves a base resume, but the marker and
+    // the explicit route may target a variant; its base is owned by the same
+    // user, so it is always reachable for this viewer.
+    .map(|(resume, created)| {
+        let base_accessible = resume.base_resume_id.is_some();
+        (ResumeView::from_resume(resume, base_accessible, true), created)
+    })
     .map_err(app_err_from_diesel_err)
 }
 
