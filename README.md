@@ -54,14 +54,15 @@ A variant is a full deep copy of a base resume, tagged with the company, role, t
 - **POST** `/api/resume/{id}/variants` — clone a base resume into a variant (Bearer auth, owner only)
 - **GET** `/api/resume/{id}/variants` — list a base resume's variants, newest target first, undated last
 
-Variant targeting metadata is deliberately excluded from Markdown export/import and from `ResumeDocument`.
+Variant targeting metadata round-trips through a `---` front-matter block in the Markdown export/import (see the format document); it stays out of `ResumeDocument`.
 
 ### Markdown resume endpoints
 
-Markdown bodies are accepted as `text/markdown` up to 1 MiB (larger payloads get a `413`).
+Markdown bodies are accepted as `text/markdown` up to 1 MiB (larger payloads get a `413`). Every export opens with a front-matter block whose `resume_id` marker routes a re-import back onto that row; `POST /api/resume/import/markdown` resolves marker, then email match, then create. Stripping the marker imports the content as a new resume. The explicit route `POST /api/resume/{id}/import/markdown` targets the URL id (owner only; a disagreeing marker answers `400`). On a variant target the `Email`/`Public` bullets are validated but ignored, and the front-matter metadata keys apply with absent = no change and empty/`null` = `NULL`.
 
 - **GET** `/api/resume/{id}/export/markdown` — export a resume as Markdown (public resumes are anonymous, private need owner auth)
 - **POST** `/api/resume/import/markdown` — import Markdown into a resume (Bearer auth)
+- **POST** `/api/resume/{id}/import/markdown` — import Markdown into the named resume or variant (Bearer auth, owner)
 - **GET** `/api/resume/markdown-format` — the Markdown format specification (anonymous)
 - **POST** `/api/resume/validate/markdown` — validate Markdown against the parser (anonymous, no database access). Always `200` with `Response<MarkdownValidationReport>`: `{body: {valid, errors: [{section, message}]}}` (`section` may be `null`).
 - **POST** `/api/resume/convert/markdown` — convert Markdown to a resume document (anonymous, no database access). `200` with `Response<ResumeDocumentEnvelope>`: `{body: {schema_version, generator, document}}`; `400` on invalid Markdown.
