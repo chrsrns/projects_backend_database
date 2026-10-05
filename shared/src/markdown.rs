@@ -13,6 +13,179 @@ pub enum MarkdownError {
     InvalidMarkdown(String),
 }
 
+/// Keys allowed inside the optional `---` front-matter block. `resume_id` is
+/// the import routing marker; the rest are variant targeting metadata.
+const FRONT_MATTER_KEYS: &[&str] = &[
+    "resume_id",
+    "company_name",
+    "role_title",
+    "target_date",
+    "job_description",
+    "variant_label",
+    "show_variant_tag",
+];
+
+/// Front-matter values decoded from the head block. `None` = key absent;
+/// `Some(Value::Null)` covers both `key:` and `key: null`. Per-key type and
+/// target rules are enforced by the import layer, not here.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FrontMatter {
+    pub resume_id: Option<serde_json::Value>,
+    pub company_name: Option<serde_json::Value>,
+    pub role_title: Option<serde_json::Value>,
+    pub target_date: Option<serde_json::Value>,
+    pub job_description: Option<serde_json::Value>,
+    pub variant_label: Option<serde_json::Value>,
+    pub show_variant_tag: Option<serde_json::Value>,
+}
+
+impl FrontMatter {
+    /// True when any variant targeting metadata key is present. `resume_id`
+    /// is a routing marker, not metadata.
+    pub fn has_metadata(&self) -> bool {
+        self.company_name.is_some()
+            || self.role_title.is_some()
+            || self.target_date.is_some()
+            || self.job_description.is_some()
+            || self.variant_label.is_some()
+            || self.show_variant_tag.is_some()
+    }
+}
+
+/// A markdown document split into its optional front-matter and the parsed
+/// resume body.
+#[derive(Debug)]
+pub struct ParsedMarkdown {
+    pub front_matter: Option<FrontMatter>,
+    pub resume: ParsedResume,
+}
+
+fn is_front_matter_fence(line: &str) -> bool {
+    line.trim_end() == "---"
+}
+
+/// Detects and parses the optional front-matter block, returning the decoded
+/// keys and the byte offset at which the markdown body starts. A file whose
+/// first non-blank line is not a `---` fence is reported as body-only.
+fn split_front_matter(markdown: &str) -> Result<(Option<FrontMatter>, usize), MarkdownError> {
+    let after_bom = markdown.strip_prefix('\u{feff}').unwrap_or(markdown);
+    let bom_len = markdown.len() - after_bom.len();
+
+    let mut cursor = 0usize;
+    loop {
+        let rest = &after_bom[cursor..];
+        let line_end = rest.find('\n').map(|i| cursor + i).unwrap_or(after_bom.len());
+        let line = &after_bom[cursor..line_end];
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.trim().is_empty() {
+            if line_end == after_bom.len() {
+                return Ok((None, 0));
+            }
+            cursor = line_end + 1;
+            continue;
+        }
+        if !is_front_matter_fence(line) {
+            return Ok((None, 0));
+        }
+        cursor = line_end + 1;
+        break;
+    }
+
+    let mut front_matter = FrontMatter::default();
+    loop {
+        if cursor >= after_bom.len() {
+            return Err(MarkdownError::InvalidMarkdown(
+                "Unclosed front-matter block: missing closing '---' line".to_string(),
+            ));
+        }
+        let rest = &after_bom[cursor..];
+        let line_end = rest.find('\n').map(|i| cursor + i).unwrap_or(after_bom.len());
+        let line = &after_bom[cursor..line_end];
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        let next = if line_end == after_bom.len() {
+            after_bom.len()
+        } else {
+            line_end + 1
+        };
+        if is_front_matter_fence(line) {
+            return Ok((Some(front_matter), bom_len + next));
+        }
+        if line.trim().is_empty() {
+            return Err(MarkdownError::InvalidMarkdown(
+                "Blank line inside front-matter block".to_string(),
+            ));
+        }
+        let (key, raw_value) = line.split_once(':').ok_or_else(|| {
+            MarkdownError::InvalidMarkdown(format!("Malformed front-matter line: '{}'", line))
+        })?;
+        let key = key.trim();
+        let raw_value = raw_value.trim();
+        if !FRONT_MATTER_KEYS.contains(&key) {
+            return Err(MarkdownError::InvalidMarkdown(format!(
+                "Unknown front-matter key '{}'. Expected one of: {}",
+                key,
+                FRONT_MATTER_KEYS.join(", ")
+            )));
+        }
+        let value = if raw_value.is_empty() {
+            serde_json::Value::Null
+        } else {
+            let value: serde_json::Value = serde_json::from_str(raw_value).map_err(|_| {
+                MarkdownError::InvalidMarkdown(format!(
+                    "Front-matter key '{}' value is not a JSON scalar: '{}'",
+                    key, raw_value
+                ))
+            })?;
+            if value.is_object() || value.is_array() {
+                return Err(MarkdownError::InvalidMarkdown(format!(
+                    "Front-matter key '{}' must be a JSON scalar, got '{}'",
+                    key, raw_value
+                )));
+            }
+            value
+        };
+        let slot = match key {
+            "resume_id" => &mut front_matter.resume_id,
+            "company_name" => &mut front_matter.company_name,
+            "role_title" => &mut front_matter.role_title,
+            "target_date" => &mut front_matter.target_date,
+            "job_description" => &mut front_matter.job_description,
+            "variant_label" => &mut front_matter.variant_label,
+            "show_variant_tag" => &mut front_matter.show_variant_tag,
+            _ => unreachable!("key checked against FRONT_MATTER_KEYS"),
+        };
+        if slot.is_some() {
+            return Err(MarkdownError::InvalidMarkdown(format!(
+                "Duplicate front-matter key '{}'",
+                key
+            )));
+        }
+        *slot = Some(value);
+        cursor = next;
+    }
+}
+
+/// Parses a resume markdown document, including its optional front-matter
+/// block. The block is stripped before the body is parsed; a malformed block
+/// is an error even when the body is well formed.
+pub fn parse_resume_markdown(markdown: &str) -> Result<ParsedMarkdown, MarkdownError> {
+    let (front_matter, body_start) = split_front_matter(markdown)?;
+    let body = if front_matter.is_some() {
+        &markdown[body_start..]
+    } else {
+        markdown
+    };
+    let resume = markdown_body_to_resume(body)?;
+    Ok(ParsedMarkdown {
+        front_matter,
+        resume,
+    })
+}
+
+fn json_scalar(value: &str) -> serde_json::Value {
+    serde_json::Value::String(value.to_string())
+}
+
 pub fn format_markdown_date(date: NaiveDate, precision: DatePrecision) -> String {
     PartialDate {
         canonical: date,
@@ -78,8 +251,54 @@ fn find_last_date_range(
     )))
 }
 
-pub fn resume_to_markdown(resume: &FullResume) -> String {
+fn write_front_matter_line(output: &mut String, key: &str, value: &serde_json::Value) {
+    writeln!(output, "{}: {}", key, value).unwrap();
+}
+
+fn write_front_matter_text(output: &mut String, key: &str, value: &Option<String>) {
+    if let Some(value) = value {
+        write_front_matter_line(output, key, &json_scalar(value));
+    }
+}
+
+/// Serializes a resume to the markdown format. The head always carries a
+/// `---` front-matter block with the `resume_id` marker; variant rows also
+/// emit their stored non-null metadata keys, and `show_variant_tag` is emitted
+/// only when the viewer owns the row.
+pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String {
     let mut output = String::new();
+    let row = &resume.resume;
+
+    writeln!(output, "---").unwrap();
+    write_front_matter_line(&mut output, "resume_id", &serde_json::json!(row.id));
+    write_front_matter_text(&mut output, "company_name", &row.company_name);
+    write_front_matter_text(&mut output, "role_title", &row.role_title);
+    if let Some(target_date) = row.target_date {
+        let partial = PartialDate {
+            canonical: target_date,
+            precision: row
+                .target_date_precision
+                .as_deref()
+                .and_then(|value| DatePrecision::from_str(value).ok())
+                .unwrap_or(DatePrecision::Day),
+        };
+        write_front_matter_line(
+            &mut output,
+            "target_date",
+            &json_scalar(&partial.to_iso_string()),
+        );
+    }
+    write_front_matter_text(&mut output, "job_description", &row.job_description);
+    write_front_matter_text(&mut output, "variant_label", &row.variant_label);
+    if row.base_resume_id.is_some() && viewer_is_owner {
+        write_front_matter_line(
+            &mut output,
+            "show_variant_tag",
+            &serde_json::Value::Bool(row.show_variant_tag),
+        );
+    }
+    writeln!(output, "---").unwrap();
+    writeln!(output).unwrap();
 
     writeln!(output, "# {}", resume.resume.name).unwrap();
     writeln!(output).unwrap();
@@ -278,6 +497,10 @@ pub fn resume_to_markdown(resume: &FullResume) -> String {
 }
 
 pub fn markdown_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError> {
+    Ok(parse_resume_markdown(markdown)?.resume)
+}
+
+fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError> {
     let parser = Parser::new(markdown);
     let events: Vec<Event> = parser.collect();
 
@@ -1291,5 +1514,259 @@ mod tests {
         let parsed = markdown_to_resume(markdown).expect("parse ok");
         let project = parsed.portfolio_projects.first().expect("one project");
         assert_eq!(project.video_url, None);
+    }
+
+    fn resume_row() -> domain::models::Resume {
+        domain::models::Resume {
+            id: 7,
+            name: "Jane Doe".to_string(),
+            profile_image_url: None,
+            location: None,
+            email: "jane@example.com".to_string(),
+            github_url: None,
+            mobile_number: None,
+            created_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            updated_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            created_by: Some(1),
+            is_public: true,
+            executive_summary: None,
+            video: None,
+            base_resume_id: None,
+            company_name: None,
+            role_title: None,
+            target_date: None,
+            target_date_precision: None,
+            job_description: None,
+            variant_label: None,
+            show_variant_tag: true,
+        }
+    }
+
+    fn full_resume(resume: domain::models::Resume) -> FullResume {
+        FullResume {
+            resume,
+            education: vec![],
+            education_key_points: std::collections::HashMap::new(),
+            skills: vec![],
+            work_experiences: vec![],
+            work_experience_key_points: std::collections::HashMap::new(),
+            portfolio_projects: vec![],
+            portfolio_key_points: std::collections::HashMap::new(),
+            portfolio_technologies: std::collections::HashMap::new(),
+            languages: vec![],
+            frameworks: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_front_matter_marker_parsed_and_stripped() {
+        let markdown =
+            "---\nresume_id: 42\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        let fm = parsed.front_matter.expect("front-matter present");
+        assert_eq!(fm.resume_id, Some(serde_json::json!(42)));
+        assert_eq!(parsed.resume.name, "Jane");
+        assert_eq!(parsed.resume.email, "jane@example.com");
+    }
+
+    #[test]
+    fn test_front_matter_detected_after_bom() {
+        let markdown =
+            "\u{feff}---\nresume_id: 7\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        let fm = parsed.front_matter.expect("front-matter present");
+        assert_eq!(fm.resume_id, Some(serde_json::json!(7)));
+        assert_eq!(parsed.resume.name, "Jane");
+    }
+
+    #[test]
+    fn test_front_matter_detected_after_leading_blank_lines() {
+        let markdown =
+            "\n  \n---\nresume_id: 9\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        let fm = parsed.front_matter.expect("front-matter present");
+        assert_eq!(fm.resume_id, Some(serde_json::json!(9)));
+    }
+
+    #[test]
+    fn test_front_matter_empty_block_allowed() {
+        let markdown = "---\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        assert!(parsed.front_matter.is_some());
+        assert_eq!(parsed.resume.name, "Jane");
+    }
+
+    #[test]
+    fn test_front_matter_fence_allows_trailing_whitespace() {
+        let markdown =
+            "---   \nresume_id: 5\n---\t\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.front_matter.expect("front-matter").resume_id,
+            Some(serde_json::json!(5))
+        );
+    }
+
+    #[test]
+    fn test_front_matter_metadata_keys_parsed() {
+        let markdown = "---\nresume_id: 4\ncompany_name: \"Acme Corp\"\nrole_title: \"Engineer\"\ntarget_date: \"2026-03\"\njob_description: \"Own things\"\nvariant_label: \"v1\"\nshow_variant_tag: true\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        let fm = parsed.front_matter.expect("front-matter");
+        assert_eq!(fm.company_name, Some(serde_json::json!("Acme Corp")));
+        assert_eq!(fm.role_title, Some(serde_json::json!("Engineer")));
+        assert_eq!(fm.target_date, Some(serde_json::json!("2026-03")));
+        assert_eq!(fm.job_description, Some(serde_json::json!("Own things")));
+        assert_eq!(fm.variant_label, Some(serde_json::json!("v1")));
+        assert_eq!(fm.show_variant_tag, Some(serde_json::json!(true)));
+    }
+
+    #[test]
+    fn test_front_matter_bare_key_is_null_value() {
+        let markdown = "---\ncompany_name:\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        let fm = parsed.front_matter.expect("front-matter");
+        assert_eq!(fm.company_name, Some(serde_json::Value::Null));
+    }
+
+    #[test]
+    fn test_front_matter_unclosed_fence_is_error() {
+        let markdown = "---\nresume_id: 4\n# Jane\n\n- Email: jane@example.com\n";
+        assert!(parse_resume_markdown(markdown).is_err());
+    }
+
+    #[test]
+    fn test_front_matter_duplicate_key_is_error() {
+        let markdown =
+            "---\nresume_id: 4\nresume_id: 5\n---\n# Jane\n\n- Email: jane@example.com\n";
+        assert!(parse_resume_markdown(markdown).is_err());
+    }
+
+    #[test]
+    fn test_front_matter_unknown_key_is_error() {
+        let markdown =
+            "---\nunknown_key: 4\n---\n# Jane\n\n- Email: jane@example.com\n";
+        assert!(parse_resume_markdown(markdown).is_err());
+    }
+
+    #[test]
+    fn test_front_matter_blank_line_inside_is_error() {
+        let markdown =
+            "---\nresume_id: 4\n\nresume_id: 5\n---\n# Jane\n\n- Email: jane@example.com\n";
+        assert!(parse_resume_markdown(markdown).is_err());
+    }
+
+    #[test]
+    fn test_front_matter_malformed_line_is_error() {
+        let markdown = "---\nnot a key line\n---\n# Jane\n\n- Email: jane@example.com\n";
+        assert!(parse_resume_markdown(markdown).is_err());
+    }
+
+    #[test]
+    fn test_front_matter_non_scalar_value_is_error() {
+        let markdown = "---\nresume_id: [1]\n---\n# Jane\n\n- Email: jane@example.com\n";
+        assert!(parse_resume_markdown(markdown).is_err());
+    }
+
+    #[test]
+    fn test_front_matter_key_whitespace_tolerated() {
+        let markdown =
+            "---\n  resume_id : 4 \n---\n# Jane\n\n- Email: jane@example.com\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.front_matter.expect("front-matter").resume_id,
+            Some(serde_json::json!(4))
+        );
+    }
+
+    #[test]
+    fn test_late_dash_fence_is_body_not_front_matter() {
+        let markdown = "# Jane\n\n- Email: jane@example.com\n\n---\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        assert!(parsed.front_matter.is_none());
+        assert_eq!(parsed.resume.name, "Jane");
+    }
+
+    #[test]
+    fn test_front_matter_strips_before_section_parse() {
+        let markdown =
+            "---\nresume_id: 4\n---\n# Jane\n\n- Email: jane@example.com\n\n## Skills\n\n- Rust - 90%\n";
+        let parsed = parse_resume_markdown(markdown).expect("parse ok");
+        assert_eq!(parsed.resume.skills.len(), 1);
+        assert_eq!(parsed.resume.skills[0].skill_name, "Rust");
+    }
+
+    #[test]
+    fn test_export_emits_resume_id_marker_for_base() {
+        let output = resume_to_markdown(&full_resume(resume_row()), true);
+        assert!(output.starts_with("---\nresume_id: 7\n---\n"));
+        assert!(output.contains("# Jane Doe"));
+    }
+
+    #[test]
+    fn test_export_variant_emits_metadata_keys() {
+        let mut resume = resume_row();
+        resume.id = 12;
+        resume.base_resume_id = Some(7);
+        resume.company_name = Some("Acme Corp".to_string());
+        resume.role_title = Some("Engineer".to_string());
+        resume.target_date = Some(NaiveDate::from_ymd_opt(2026, 3, 1).unwrap());
+        resume.target_date_precision = Some("month".to_string());
+        resume.job_description = Some("Line with \"quotes\"".to_string());
+        resume.variant_label = Some("acme".to_string());
+        resume.show_variant_tag = false;
+
+        let output = resume_to_markdown(&full_resume(resume), true);
+        assert!(output.contains("resume_id: 12\n"));
+        assert!(output.contains("company_name: \"Acme Corp\"\n"));
+        assert!(output.contains("role_title: \"Engineer\"\n"));
+        assert!(output.contains("target_date: \"2026-03\"\n"));
+        assert!(output.contains("job_description: \"Line with \\\"quotes\\\"\"\n"));
+        assert!(output.contains("variant_label: \"acme\"\n"));
+        assert!(output.contains("show_variant_tag: false\n"));
+    }
+
+    #[test]
+    fn test_export_variant_omits_show_variant_tag_for_non_owner() {
+        let mut resume = resume_row();
+        resume.base_resume_id = Some(7);
+        resume.company_name = Some("Acme".to_string());
+        resume.show_variant_tag = false;
+
+        let output = resume_to_markdown(&full_resume(resume), false);
+        assert!(output.contains("company_name: \"Acme\"\n"));
+        assert!(!output.contains("show_variant_tag"));
+    }
+
+    #[test]
+    fn test_export_omits_null_metadata_keys() {
+        let mut resume = resume_row();
+        resume.base_resume_id = Some(7);
+        resume.company_name = Some("Acme".to_string());
+
+        let output = resume_to_markdown(&full_resume(resume), true);
+        assert!(output.contains("company_name: \"Acme\"\n"));
+        assert!(!output.contains("role_title:"));
+        assert!(!output.contains("job_description:"));
+    }
+
+    #[test]
+    fn test_export_import_round_trip_front_matter() {
+        let mut resume = resume_row();
+        resume.id = 21;
+        resume.base_resume_id = Some(7);
+        resume.company_name = Some("Acme".to_string());
+
+        let exported = resume_to_markdown(&full_resume(resume), true);
+        let parsed = parse_resume_markdown(&exported).expect("round-trip parse ok");
+        let fm = parsed.front_matter.expect("front-matter");
+        assert_eq!(fm.resume_id, Some(serde_json::json!(21)));
+        assert_eq!(fm.company_name, Some(serde_json::json!("Acme")));
+        assert_eq!(parsed.resume.name, "Jane Doe");
     }
 }
