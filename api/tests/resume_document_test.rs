@@ -425,3 +425,88 @@ fn test_convert_matches_golden_fixture() {
         "convert output drifted from golden fixture"
     );
 }
+
+#[test]
+fn test_validate_front_matter_is_accepted() {
+    let markdown = format!(
+        "---\nresume_id: 12\ncompany_name: \"Acme Corp\"\nshow_variant_tag: false\n---\n{}",
+        sample_markdown()
+    );
+    let client = client();
+    let response = client
+        .post("/api/resume/validate/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("validate body")).expect("valid json");
+    assert_eq!(json["body"]["valid"], true);
+}
+
+#[test]
+fn test_validate_malformed_front_matter_is_invalid() {
+    let markdown = format!("---\nresume_id: 12\n{}", sample_markdown());
+    let client = client();
+    let response = client
+        .post("/api/resume/validate/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("validate body")).expect("valid json");
+    assert_eq!(json["body"]["valid"], false);
+    assert_eq!(
+        json["body"]["errors"]
+            .as_array()
+            .expect("errors array")
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn test_convert_front_matter_is_stripped() {
+    let client = client();
+    let bare = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(sample_markdown())
+        .dispatch();
+    let bare: Value =
+        serde_json::from_str(&bare.into_string().expect("convert body")).expect("valid json");
+
+    let with_front_matter = format!(
+        "---\nresume_id: 99\ncompany_name: \"Acme\"\n---\n{}",
+        sample_markdown()
+    );
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(with_front_matter)
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("convert body")).expect("valid json");
+
+    assert_eq!(json, bare, "front-matter keys never reach ResumeDocument");
+    let document = serde_json::to_string(&json["body"]["document"]).unwrap();
+    assert!(!document.contains("Acme"));
+    assert_eq!(json["body"]["schema_version"], 1);
+}
+
+#[test]
+fn test_convert_malformed_front_matter_is_400() {
+    let markdown = format!("---\nresume_id: 12\n{}", sample_markdown());
+    let client = client();
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::BadRequest);
+}
