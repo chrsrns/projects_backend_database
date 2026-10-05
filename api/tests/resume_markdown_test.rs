@@ -7,6 +7,18 @@ fn markdown_content_type() -> ContentType {
     ContentType::new("text", "markdown")
 }
 
+/// Exports open with a `---` front-matter block whose `resume_id` marker
+/// routes a re-import back onto the exported row. Strip it when a test wants
+/// the content to land as a brand-new resume instead of updating the source.
+fn strip_front_matter(markdown: &str) -> String {
+    if let Some(rest) = markdown.strip_prefix("---\n")
+        && let Some((_, body)) = rest.split_once("\n---\n")
+    {
+        return body.to_string();
+    }
+    markdown.to_string()
+}
+
 fn unique_markdown_email(lock_key: i64) -> String {
     format!(
         "markdown.test.{}.{}@example.com",
@@ -516,7 +528,7 @@ fn test_export_resume_markdown_round_trip() {
         .header(fixture.auth_header())
         .dispatch();
     assert_eq!(export_response.status(), Status::Ok);
-    let markdown = export_response.into_string().expect("markdown body");
+    let markdown = strip_front_matter(&export_response.into_string().expect("markdown body"));
 
     let unique_import_email = format!(
         "roundtrip.user.{}.{}@example.com",
@@ -1159,7 +1171,7 @@ fn test_executive_summary_markdown_round_trip() {
         .header(fixture.auth_header())
         .dispatch();
     assert_eq!(export_response.status(), Status::Ok);
-    let markdown = export_response.into_string().expect("markdown body");
+    let markdown = strip_front_matter(&export_response.into_string().expect("markdown body"));
     assert!(markdown.contains("## Summary"));
     assert!(markdown.contains(summary));
 
@@ -1323,7 +1335,7 @@ fn test_export_resume_markdown_with_year_only_precision() {
         .header(fixture.auth_header())
         .dispatch();
     assert_eq!(export_response.status(), Status::Ok);
-    let exported = export_response.into_string().expect("markdown body");
+    let exported = strip_front_matter(&export_response.into_string().expect("markdown body"));
     assert!(exported.contains(
         "### Bachelor's in Computer Science - University of ABC (2020 - 2024) [order: 0]"
     ));
@@ -1405,7 +1417,7 @@ fn test_export_resume_markdown_with_month_year_round_trip() {
         .header(fixture.auth_header())
         .dispatch();
     assert_eq!(export_response.status(), Status::Ok);
-    let exported = export_response.into_string().expect("markdown body");
+    let exported = strip_front_matter(&export_response.into_string().expect("markdown body"));
     assert!(exported.contains(
         "### Bachelor's in Computer Science - University of ABC (Sep 2020 - May 2024) [order: 0]"
     ));
@@ -1572,7 +1584,7 @@ fn test_video_markdown_round_trip() {
         .dispatch();
 
     assert_eq!(export_response.status(), Status::Ok);
-    let markdown = export_response.into_string().expect("markdown body");
+    let markdown = strip_front_matter(&export_response.into_string().expect("markdown body"));
     assert!(markdown.contains("- Video: "));
     assert!(markdown.contains(video_url));
 
@@ -1679,7 +1691,7 @@ fn test_portfolio_video_url_markdown_round_trip() {
         .dispatch();
 
     assert_eq!(export_response.status(), Status::Ok);
-    let markdown = export_response.into_string().expect("markdown body");
+    let markdown = strip_front_matter(&export_response.into_string().expect("markdown body"));
     assert!(markdown.contains("## Portfolio Projects"));
     assert!(markdown.contains("- Video: "));
     assert!(markdown.contains(video_url));
