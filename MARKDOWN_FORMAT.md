@@ -1,6 +1,34 @@
 # Resume Markdown Format
 
-This document describes the Markdown format used by the resume import/export API. A file that follows this format can be imported via `POST /api/resume/import/markdown` and exported via `GET /api/resume/{id}/export/markdown`.
+This document describes the Markdown format used by the resume import/export API. A file that follows this format can be imported via `POST /api/resume/import/markdown` or `POST /api/resume/{id}/import/markdown` and exported via `GET /api/resume/{id}/export/markdown`.
+
+## Front matter (optional)
+
+An exported resume opens with a `---`-fenced front-matter block. On import the block picks the target row and carries variant targeting metadata; it is stripped before the body is parsed, so it never reaches resume fields or `ResumeDocument`.
+
+```markdown
+---
+resume_id: 42
+company_name: "Acme Corp"
+role_title: "Staff Backend Engineer"
+target_date: "2026-03"
+job_description: "Own the resume pipeline"
+variant_label: "acme-tailoring"
+show_variant_tag: true
+---
+# Jane Doe
+```
+
+- **Placement**: the first non-blank line of the file must be `---` (trailing whitespace allowed). An optional UTF-8 BOM and leading blank lines are tolerated. If the first non-blank line is not `---`, the file parses without a front-matter block.
+- **Lines**: one `key: <JSON scalar>` or bare `key:` per line; leading whitespace and whitespace around the colon are tolerated. A bare `key:` and `key: null` are equivalent.
+- **Keys**: `resume_id`, `company_name`, `role_title`, `target_date`, `job_description`, `variant_label`, `show_variant_tag`. Values must be JSON scalars — strings are double-quoted and JSON-escaped, `show_variant_tag` is `true`/`false`, `resume_id` is an integer or numeric string.
+- **Rejected with `400`**: unknown or duplicate keys, a line without a colon, a blank line inside the block, a non-scalar value, and an unclosed fence. A file that opens with `---` never degrades to body text — a legacy file whose first non-blank line is a `---` thematic break must remove it or make the block well formed.
+- **`resume_id`**: routing marker, must be a positive integer. `resume_id:` empty, `null`, or a non-integer value → `400`. Absent/foreign row → `404`/`403`; the marker never falls back to the email match.
+- **Variant metadata keys** (`company_name`, `role_title`, `target_date`, `job_description`, `variant_label`, `show_variant_tag`): applied only when the import target is a variant. On a variant target: absent key = no change, empty/`null` = stored `NULL` (`show_variant_tag` rejects empty/`null` instead — it is a required boolean), strings obey the usual caps, `target_date` is an ISO partial date (`YYYY`, `YYYY-MM`, `YYYY-MM-DD`). Metadata keys on a base resume target or on the create path → `400`.
+- **Export**: always emits `resume_id`. A variant export also emits every stored non-null metadata key; `show_variant_tag` is emitted only when the exporter owns the resume.
+- **Variant target quirk**: on a variant the markdown `Email` and `Public` bullets are still required/validated but ignored — the stored `email`, `is_public`, and `created_by` win.
+- **Explicit route**: `POST /api/resume/{id}/import/markdown` targets the URL id directly (owner only). A front-matter `resume_id` that disagrees with the URL id → `400`.
+- **Validate/convert**: `POST /api/resume/validate/markdown` and `POST /api/resume/convert/markdown` parse the block and ignore it; a malformed block reports invalid or answers `400`.
 
 ## Top-level header (H1)
 

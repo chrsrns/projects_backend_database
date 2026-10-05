@@ -70,6 +70,7 @@ impl Modify for ServerAddon {
         crate::variant_handler::list_variants_handler,
         crate::markdown_handler::export_resume_markdown,
         crate::markdown_handler::import_resume_markdown,
+        crate::markdown_handler::import_resume_markdown_into,
         crate::markdown_handler::validate_resume_markdown,
         crate::markdown_handler::convert_resume_markdown,
         crate::markdown_handler::get_markdown_format,

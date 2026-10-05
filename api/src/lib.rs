@@ -171,6 +171,7 @@ pub fn build_rocket_with_llm_client(
                 variant_handler::list_variants_handler,
                 markdown_handler::export_resume_markdown,
                 markdown_handler::import_resume_markdown,
+                markdown_handler::import_resume_markdown_into,
                 markdown_handler::validate_resume_markdown,
                 markdown_handler::convert_resume_markdown,
                 markdown_handler::get_markdown_format,

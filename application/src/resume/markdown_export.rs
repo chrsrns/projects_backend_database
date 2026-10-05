@@ -67,6 +67,10 @@ pub fn export_resume_markdown(
         frameworks.insert(language.id, fws);
     }
 
+    // `show_variant_tag` is owner-only output; the front-matter marker is
+    // always emitted so a re-import can target this exact row.
+    let viewer_is_owner = resume.created_by.is_some() && resume.created_by == user_id_value;
+
     let full_resume = FullResume {
         resume,
         education: education_items,
@@ -81,5 +85,5 @@ pub fn export_resume_markdown(
         frameworks,
     };
 
-    Ok(markdown::resume_to_markdown(&full_resume))
+    Ok(markdown::resume_to_markdown(&full_resume, viewer_is_owner))
 }

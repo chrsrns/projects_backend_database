@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{
     NewEducation, NewEducationKeyPoint, NewFramework, NewLanguage, NewPortfolioKeyPoint,
     NewPortfolioProject, NewPortfolioTechnology, NewResume, NewSkill, NewWorkExperience,
-    NewWorkExperienceKeyPoint, Resume, ResumeView,
+    NewWorkExperienceKeyPoint, PartialDate, Resume, ResumeView,
 };
 use infrastructure::run_in_transaction;
 use shared::markdown;
@@ -10,9 +10,148 @@ use shared::markdown;
 use crate::{
     error::ApplicationError,
     resume::common::{
-        app_err_from_diesel_err, validate_executive_summary, validate_optional_url, validate_video,
+        app_err_from_diesel_err, find_resume, partial_date_to_columns, validate_executive_summary,
+        validate_optional_text, validate_optional_url, validate_video,
     },
 };
+
+/// Front-matter metadata decoded into update semantics: `None` = key absent,
+/// no change; `Some(None)` = empty or `null` value, store `NULL`; `Some(_)` =
+/// validated write. Only a variant target may carry these.
+#[derive(Default)]
+struct FrontMatterUpdates {
+    company_name: Option<Option<String>>,
+    role_title: Option<Option<String>>,
+    variant_label: Option<Option<String>>,
+    job_description: Option<Option<String>>,
+    target_date: Option<Option<PartialDate>>,
+    show_variant_tag: Option<bool>,
+}
+
+fn front_matter_text(
+    value: Option<&serde_json::Value>,
+    field_name: &str,
+    max_length: usize,
+) -> Result<Option<Option<String>>, ApplicationError> {
+    match value {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(Some(None)),
+        Some(serde_json::Value::String(s)) => Ok(Some(validate_optional_text(
+            Some(s.clone()),
+            field_name,
+            max_length,
+        )?)),
+        Some(other) => Err(ApplicationError::BadRequest(format!(
+            "front-matter {} must be a JSON string or null, got {}",
+            field_name, other
+        ))),
+    }
+}
+
+fn front_matter_target_date(
+    value: Option<&serde_json::Value>,
+) -> Result<Option<Option<PartialDate>>, ApplicationError> {
+    match value {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(Some(None)),
+        Some(serde_json::Value::String(s)) => PartialDate::from_iso_str(s)
+            .map(|date| Some(Some(date)))
+            .map_err(|err| {
+                ApplicationError::BadRequest(format!(
+                    "front-matter target_date is malformed: {}",
+                    err
+                ))
+            }),
+        Some(other) => Err(ApplicationError::BadRequest(format!(
+            "front-matter target_date must be an ISO partial date string or null, got {}",
+            other
+        ))),
+    }
+}
+
+fn front_matter_show_variant_tag(
+    value: Option<&serde_json::Value>,
+) -> Result<Option<bool>, ApplicationError> {
+    match value {
+        None => Ok(None),
+        Some(serde_json::Value::Bool(flag)) => Ok(Some(*flag)),
+        Some(other) => Err(ApplicationError::BadRequest(format!(
+            "front-matter show_variant_tag must be true or false, got {}",
+            other
+        ))),
+    }
+}
+
+/// Row update applied by a markdown import. Content fields are always set
+/// (`Some(None)` stores NULL, so a dropped bullet clears the column); `email`
+/// and `is_public` are skipped entirely on a variant target; the variant
+/// metadata fields use the absent/null/set tri-state.
+#[derive(AsChangeset)]
+#[diesel(table_name = domain::schema::resumes)]
+struct ImportResumeChangeset {
+    name: String,
+    profile_image_url: Option<Option<String>>,
+    location: Option<Option<String>>,
+    email: Option<String>,
+    github_url: Option<Option<String>>,
+    mobile_number: Option<Option<String>>,
+    executive_summary: Option<Option<String>>,
+    video: Option<Option<String>>,
+    is_public: Option<bool>,
+    company_name: Option<Option<String>>,
+    role_title: Option<Option<String>>,
+    variant_label: Option<Option<String>>,
+    job_description: Option<Option<String>>,
+    target_date: Option<Option<chrono::NaiveDate>>,
+    target_date_precision: Option<Option<String>>,
+    show_variant_tag: Option<bool>,
+}
+
+fn decode_front_matter_metadata(
+    front_matter: &markdown::FrontMatter,
+) -> Result<FrontMatterUpdates, ApplicationError> {
+    Ok(FrontMatterUpdates {
+        company_name: front_matter_text(front_matter.company_name.as_ref(), "Company name", 255)?,
+        role_title: front_matter_text(front_matter.role_title.as_ref(), "Role title", 255)?,
+        variant_label: front_matter_text(
+            front_matter.variant_label.as_ref(),
+            "Variant label",
+            255,
+        )?,
+        job_description: front_matter_text(
+            front_matter.job_description.as_ref(),
+            "Job description",
+            20_000,
+        )?,
+        target_date: front_matter_target_date(front_matter.target_date.as_ref())?,
+        show_variant_tag: front_matter_show_variant_tag(front_matter.show_variant_tag.as_ref())?,
+    })
+}
+
+/// Decodes the `resume_id` routing marker. The marker must be a positive
+/// integer, either as a JSON number or a numeric JSON string; an empty value
+/// or any other scalar is malformed.
+fn resume_id_marker(value: &serde_json::Value) -> Result<i32, ApplicationError> {
+    let bad = || {
+        ApplicationError::BadRequest(
+            "front-matter resume_id must be a positive integer".to_string(),
+        )
+    };
+    match value {
+        serde_json::Value::Number(n) => n
+            .as_i64()
+            .and_then(|v| i32::try_from(v).ok())
+            .filter(|v| *v > 0)
+            .ok_or_else(bad),
+        serde_json::Value::String(s) => s
+            .trim()
+            .parse::<i32>()
+            .ok()
+            .filter(|v| *v > 0)
+            .ok_or_else(bad),
+        _ => Err(bad()),
+    }
+}
 
 /// Resolves an index into a parent ID map, returning `BadRequest` if the
 /// index is out of bounds (V21).
@@ -37,13 +176,33 @@ pub fn resolve_parent_index(
     })
 }
 
+/// Imports a markdown resume. `explicit_id` is the URL target of
+/// `POST /api/resume/{id}/import/markdown`; its ownership check runs before
+/// any front-matter handling and a front-matter `resume_id` must match it.
+/// Otherwise the front-matter `resume_id` marker picks the target, with the
+/// email match as the marker-less fallback and creation as the last resort.
 pub fn import_resume_markdown(
     markdown: &str,
     user_id_value: i32,
+    explicit_id: Option<i32>,
 ) -> Result<(ResumeView, bool), ApplicationError> {
-    let full_resume = markdown::markdown_to_resume(markdown).map_err(|err| match err {
+    let explicit_target = match explicit_id {
+        Some(resume_id) => {
+            let row = find_resume(resume_id)?;
+            match row.created_by {
+                Some(owner) if owner == user_id_value => {}
+                _ => return Err(ApplicationError::Forbidden),
+            }
+            Some(row)
+        }
+        None => None,
+    };
+
+    let parsed = markdown::parse_resume_markdown(markdown).map_err(|err| match err {
         markdown::MarkdownError::InvalidMarkdown(msg) => ApplicationError::BadRequest(msg),
     })?;
+    let front_matter = parsed.front_matter.unwrap_or_default();
+    let full_resume = parsed.resume;
 
     // Pre-flight bounds check (V21): validate all child → parent index
     // references before opening the database transaction.  This lets us
@@ -117,26 +276,87 @@ pub fn import_resume_markdown(
         .map(|p| validate_optional_url(p.source_code_link.clone(), "Source Code Link"))
         .collect::<Result<Vec<_>, _>>()?;
 
+    let marker_id = front_matter
+        .resume_id
+        .as_ref()
+        .map(resume_id_marker)
+        .transpose()?;
+
+    if let (Some(target_id), Some(marker_id)) = (explicit_id, marker_id)
+        && marker_id != target_id
+    {
+        return Err(ApplicationError::BadRequest(
+            "front-matter resume_id does not match the target resume id".to_string(),
+        ));
+    }
+
     let mut conn = infrastructure::establish_connection();
 
-    let existing_id = {
-        use domain::schema::resumes;
-        use domain::schema::resumes::dsl::*;
-        // A variant carries its base's email, so the match must ignore
-        // variant rows or an import would silently rewrite a tailored copy
-        // instead of the base resume it belongs to.
-        let existing = resumes::table
-            .filter(email.eq(&full_resume.email))
-            .filter(base_resume_id.is_null())
-            .first::<Resume>(&mut conn)
-            .optional()
-            .map_err(app_err_from_diesel_err)?;
-        match existing {
-            Some(r) if r.created_by == Some(user_id_value) => Some(r.id),
-            Some(_) => return Err(ApplicationError::Forbidden),
-            None => None,
-        }
+    // Resolution order: an explicit route id wins, then the front-matter
+    // marker, then the email match (base rows only), then creation. A marker
+    // that names a missing or foreign row fails loudly instead of falling
+    // back to the email match.
+    let target_row: Option<Resume> = match explicit_target {
+        Some(row) => Some(row),
+        None => match marker_id {
+            Some(marker_id) => {
+                use domain::schema::resumes;
+                let row = resumes::table
+                    .find(marker_id)
+                    .first::<Resume>(&mut conn)
+                    .optional()
+                    .map_err(app_err_from_diesel_err)?;
+                match row {
+                    Some(r) if r.created_by == Some(user_id_value) => Some(r),
+                    Some(_) => return Err(ApplicationError::Forbidden),
+                    None => {
+                        return Err(ApplicationError::NotFound(format!(
+                            "Resume with id {} not found",
+                            marker_id
+                        )));
+                    }
+                }
+            }
+            None => {
+                use domain::schema::resumes;
+                use domain::schema::resumes::dsl::*;
+                // A variant carries its base's email, so the match must ignore
+                // variant rows or an import would silently rewrite a tailored copy
+                // instead of the base resume it belongs to.
+                let existing = resumes::table
+                    .filter(email.eq(&full_resume.email))
+                    .filter(base_resume_id.is_null())
+                    .first::<Resume>(&mut conn)
+                    .optional()
+                    .map_err(app_err_from_diesel_err)?;
+                match existing {
+                    Some(r) if r.created_by == Some(user_id_value) => Some(r),
+                    Some(_) => return Err(ApplicationError::Forbidden),
+                    None => None,
+                }
+            }
+        },
     };
+
+    let target_is_variant = target_row
+        .as_ref()
+        .is_some_and(|r| r.base_resume_id.is_some());
+
+    // Metadata keys exist to retarget variants; on a base target or the
+    // create path there is nothing to apply them to.
+    if !target_is_variant && front_matter.has_metadata() {
+        return Err(ApplicationError::BadRequest(
+            "front-matter metadata keys require a variant import target".to_string(),
+        ));
+    }
+
+    let metadata = if target_is_variant {
+        decode_front_matter_metadata(&front_matter)?
+    } else {
+        FrontMatterUpdates::default()
+    };
+
+    let existing_id = target_row.as_ref().map(|r| r.id);
 
     let new_resume = NewResume {
         name: full_resume.name.clone(),
@@ -160,7 +380,6 @@ pub fn import_resume_markdown(
     };
 
     run_in_transaction(&mut conn, move |conn| {
-        use domain::schema::resumes::dsl as resumes_dsl;
         use domain::schema::{
             education, education_key_points, frameworks, languages, portfolio_key_points,
             portfolio_projects, portfolio_technologies, resumes, skills,
@@ -183,18 +402,42 @@ pub fn import_resume_markdown(
             )
             .execute(conn)?;
 
+            // A variant keeps its stored email, is_public and created_by:
+            // the markdown Email/Public bullets stay required by the format
+            // but are ignored on a variant target. Front-matter metadata
+            // keys apply with absent = no change and empty/null = NULL.
+            let changeset = ImportResumeChangeset {
+                name: new_resume.name.clone(),
+                profile_image_url: Some(new_resume.profile_image_url.clone()),
+                location: Some(new_resume.location.clone()),
+                email: if target_is_variant {
+                    None
+                } else {
+                    Some(new_resume.email.clone())
+                },
+                github_url: Some(new_resume.github_url.clone()),
+                mobile_number: Some(new_resume.mobile_number.clone()),
+                executive_summary: Some(new_resume.executive_summary.clone()),
+                video: Some(new_resume.video.clone()),
+                is_public: if target_is_variant {
+                    None
+                } else {
+                    Some(new_resume.is_public)
+                },
+                company_name: metadata.company_name.clone(),
+                role_title: metadata.role_title.clone(),
+                variant_label: metadata.variant_label.clone(),
+                job_description: metadata.job_description.clone(),
+                target_date: metadata
+                    .target_date
+                    .map(|value| value.map(|date| partial_date_to_columns(date).0)),
+                target_date_precision: metadata
+                    .target_date
+                    .map(|value| value.map(|date| partial_date_to_columns(date).1)),
+                show_variant_tag: metadata.show_variant_tag,
+            };
             diesel::update(resumes::table.find(resume_id))
-                .set((
-                    resumes_dsl::name.eq(&new_resume.name),
-                    resumes_dsl::profile_image_url.eq(&new_resume.profile_image_url),
-                    resumes_dsl::location.eq(&new_resume.location),
-                    resumes_dsl::email.eq(&new_resume.email),
-                    resumes_dsl::github_url.eq(&new_resume.github_url),
-                    resumes_dsl::mobile_number.eq(&new_resume.mobile_number),
-                    resumes_dsl::executive_summary.eq(&new_resume.executive_summary),
-                    resumes_dsl::video.eq(&new_resume.video),
-                    resumes_dsl::is_public.eq(new_resume.is_public),
-                ))
+                .set(&changeset)
                 .get_result::<Resume>(conn)?
         } else {
             diesel::insert_into(resumes::table)
@@ -367,9 +610,16 @@ pub fn import_resume_markdown(
 
         Ok((resume, existing_id.is_none()))
     })
-    // Import only ever creates or updates a base resume: variant rows are
-    // excluded from the email match, so the base is never referenced here.
-    .map(|(resume, created)| (ResumeView::from_resume(resume, false, true), created))
+    // The email match only ever resolves a base resume, but the marker and
+    // the explicit route may target a variant; its base is owned by the same
+    // user, so it is always reachable for this viewer.
+    .map(|(resume, created)| {
+        let base_accessible = resume.base_resume_id.is_some();
+        (
+            ResumeView::from_resume(resume, base_accessible, true),
+            created,
+        )
+    })
     .map_err(app_err_from_diesel_err)
 }
 
