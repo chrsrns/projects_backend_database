@@ -61,7 +61,11 @@ fn import_markdown_body_as(
 }
 
 fn marked(name: &str, email: &str, resume_id: &str) -> String {
-    format!("---\nresume_id: {}\n---\n{}", resume_id, markdown(name, email))
+    format!(
+        "---\nresume_id: {}\n---\n{}",
+        resume_id,
+        markdown(name, email)
+    )
 }
 
 fn post_variant(fixture: &support::Fixture, base_id: i32, body: Value) -> (Status, Value) {
@@ -324,8 +328,10 @@ fn marker_targets_named_base_row() {
         9_241_050,
         unique_suffix()
     );
-    let (status, updated) =
-        import_markdown_body(&fixture, marked("Jane Marker", &fresh_email, &base_id.to_string()));
+    let (status, updated) = import_markdown_body(
+        &fixture,
+        marked("Jane Marker", &fresh_email, &base_id.to_string()),
+    );
     assert_eq!(status, Status::Ok, "the marker resolves the row");
     assert_eq!(updated["body"]["id"], base_id);
     assert_eq!(updated["body"]["name"], "Jane Marker");
@@ -337,15 +343,18 @@ fn marker_absent_row_returns_404() {
     let fixture = support::Fixture::new(9_241_051);
     let email = format!("marker.miss.{}.{}@example.com", 9_241_051, unique_suffix());
 
-    let (status, _) =
-        import_markdown_body(&fixture, marked("Jane Doe", &email, "999999999"));
+    let (status, _) = import_markdown_body(&fixture, marked("Jane Doe", &email, "999999999"));
     assert_eq!(status, Status::NotFound);
 }
 
 #[test]
 fn marker_foreign_row_returns_403() {
     let mut fixture = support::Fixture::new(9_241_052);
-    let email = format!("marker.foreign.{}.{}@example.com", 9_241_052, unique_suffix());
+    let email = format!(
+        "marker.foreign.{}.{}@example.com",
+        9_241_052,
+        unique_suffix()
+    );
 
     let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
     assert_eq!(status, Status::Created);
@@ -390,8 +399,16 @@ fn marker_malformed_values_return_400() {
 #[test]
 fn marker_wins_over_email_match() {
     let mut fixture = support::Fixture::new(9_241_054);
-    let email_a = format!("marker.wins.a.{}.{}@example.com", 9_241_054, unique_suffix());
-    let email_b = format!("marker.wins.b.{}.{}@example.com", 9_241_054, unique_suffix());
+    let email_a = format!(
+        "marker.wins.a.{}.{}@example.com",
+        9_241_054,
+        unique_suffix()
+    );
+    let email_b = format!(
+        "marker.wins.b.{}.{}@example.com",
+        9_241_054,
+        unique_suffix()
+    );
 
     let (status, a) = import_markdown(&fixture, "Resume A", &email_a);
     assert_eq!(status, Status::Created);
@@ -410,8 +427,10 @@ fn marker_wins_over_email_match() {
         9_241_054,
         unique_suffix()
     );
-    let (status, updated) =
-        import_markdown_body(&fixture, marked("A via marker", &email_new, &a_id.to_string()));
+    let (status, updated) = import_markdown_body(
+        &fixture,
+        marked("A via marker", &email_new, &a_id.to_string()),
+    );
     assert_eq!(status, Status::Ok);
     assert_eq!(updated["body"]["id"], a_id);
     assert_eq!(updated["body"]["name"], "A via marker");
@@ -441,15 +460,22 @@ fn import_markdown_into(
 #[test]
 fn explicit_route_updates_named_base() {
     let mut fixture = support::Fixture::new(9_241_055);
-    let email = format!("explicit.base.{}.{}@example.com", 9_241_055, unique_suffix());
+    let email = format!(
+        "explicit.base.{}.{}@example.com",
+        9_241_055,
+        unique_suffix()
+    );
 
     let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
     assert_eq!(status, Status::Created);
     let base_id = base["body"]["id"].as_i64().unwrap() as i32;
     fixture.track_resume_id(base_id);
 
-    let (status, updated) =
-        import_markdown_into(&fixture, base_id, markdown("Renamed", "renamed@example.com"));
+    let (status, updated) = import_markdown_into(
+        &fixture,
+        base_id,
+        markdown("Renamed", "renamed@example.com"),
+    );
     assert_eq!(status, Status::Ok);
     assert_eq!(updated["body"]["id"], base_id);
     assert_eq!(updated["body"]["name"], "Renamed");
@@ -503,15 +529,15 @@ fn explicit_route_rejects_conflicting_marker() {
     let b_id = b["body"]["id"].as_i64().unwrap() as i32;
     fixture.track_resume_id(b_id);
 
-    let (status, _) = import_markdown_into(
-        &fixture,
-        a_id,
-        marked("Clash", &email_a, &b_id.to_string()),
-    );
+    let (status, _) =
+        import_markdown_into(&fixture, a_id, marked("Clash", &email_a, &b_id.to_string()));
     assert_eq!(status, Status::BadRequest);
 
-    let (status, updated) =
-        import_markdown_into(&fixture, a_id, marked("Agreed", &email_a, &a_id.to_string()));
+    let (status, updated) = import_markdown_into(
+        &fixture,
+        a_id,
+        marked("Agreed", &email_a, &a_id.to_string()),
+    );
     assert_eq!(status, Status::Ok);
     assert_eq!(updated["body"]["name"], "Agreed");
 }
@@ -529,7 +555,11 @@ fn export_markdown(fixture: &support::Fixture, resume_id: i32) -> String {
 #[test]
 fn variant_marker_reimport_updates_variant() {
     let mut fixture = support::Fixture::new(9_241_060);
-    let email = format!("variant.marker.{}.{}@example.com", 9_241_060, unique_suffix());
+    let email = format!(
+        "variant.marker.{}.{}@example.com",
+        9_241_060,
+        unique_suffix()
+    );
 
     let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
     assert_eq!(status, Status::Created);
@@ -579,11 +609,8 @@ fn variant_import_keeps_stored_email_and_visibility() {
     let base_id = base["body"]["id"].as_i64().unwrap() as i32;
     fixture.track_resume_id(base_id);
 
-    let (status, variant) = post_variant(
-        &fixture,
-        base_id,
-        serde_json::json!({ "is_public": false }),
-    );
+    let (status, variant) =
+        post_variant(&fixture, base_id, serde_json::json!({ "is_public": false }));
     assert_eq!(status, Status::Created);
     let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
     fixture.track_resume_id(variant_id);
@@ -591,8 +618,12 @@ fn variant_import_keeps_stored_email_and_visibility() {
 
     // The markdown body demands a different email and Public: true; on a
     // variant target both are ignored and the stored values win.
-    let imported = marked("Jane Doe", "totally.different@example.com", &variant_id.to_string())
-        .replace("- Public: true", "- Public: false");
+    let imported = marked(
+        "Jane Doe",
+        "totally.different@example.com",
+        &variant_id.to_string(),
+    )
+    .replace("- Public: true", "- Public: false");
     let (status, updated) = import_markdown_body(&fixture, imported);
     assert_eq!(status, Status::Ok);
     assert_eq!(updated["body"]["email"], email);
@@ -620,7 +651,10 @@ fn metadata_keys_on_base_target_return_400() {
     let (status, _) = import_markdown_into(
         &fixture,
         base_id,
-        format!("---\ncompany_name: \"Acme\"\n---\n{}", markdown("Jane Doe", &email)),
+        format!(
+            "---\ncompany_name: \"Acme\"\n---\n{}",
+            markdown("Jane Doe", &email)
+        ),
     );
     assert_eq!(status, Status::BadRequest);
 }
@@ -768,22 +802,19 @@ fn malformed_front_matter_returns_400_on_import() {
     let body_md = markdown("Jane Doe", &email);
 
     for front_matter in [
-        "resume_id: 1\nresume_id: 2",  // duplicate key
+        "resume_id: 1\nresume_id: 2",    // duplicate key
         "resume_id: 1\n\nrole_title: x", // blank line inside block
-        "company_name: 42",            // metadata key without a variant target
-        "unknown: 1",                  // unknown key
-        "garbage line without colon",  // malformed line
+        "company_name: 42",              // metadata key without a variant target
+        "unknown: 1",                    // unknown key
+        "garbage line without colon",    // malformed line
     ] {
-        let (status, _) = import_markdown_body(
-            &fixture,
-            format!("---\n{}\n---\n{}", front_matter, body_md),
-        );
+        let (status, _) =
+            import_markdown_body(&fixture, format!("---\n{}\n---\n{}", front_matter, body_md));
         assert_eq!(status, Status::BadRequest, "block: {:?}", front_matter);
     }
 
     // Unclosed fence.
-    let (status, _) =
-        import_markdown_body(&fixture, format!("---\nresume_id: 1\n{}", body_md));
+    let (status, _) = import_markdown_body(&fixture, format!("---\nresume_id: 1\n{}", body_md));
     assert_eq!(status, Status::BadRequest);
 }
 

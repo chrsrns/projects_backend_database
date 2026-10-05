@@ -74,7 +74,10 @@ fn split_front_matter(markdown: &str) -> Result<(Option<FrontMatter>, usize), Ma
     let mut cursor = 0usize;
     loop {
         let rest = &after_bom[cursor..];
-        let line_end = rest.find('\n').map(|i| cursor + i).unwrap_or(after_bom.len());
+        let line_end = rest
+            .find('\n')
+            .map(|i| cursor + i)
+            .unwrap_or(after_bom.len());
         let line = &after_bom[cursor..line_end];
         let line = line.strip_suffix('\r').unwrap_or(line);
         if line.trim().is_empty() {
@@ -99,7 +102,10 @@ fn split_front_matter(markdown: &str) -> Result<(Option<FrontMatter>, usize), Ma
             ));
         }
         let rest = &after_bom[cursor..];
-        let line_end = rest.find('\n').map(|i| cursor + i).unwrap_or(after_bom.len());
+        let line_end = rest
+            .find('\n')
+            .map(|i| cursor + i)
+            .unwrap_or(after_bom.len());
         let line = &after_bom[cursor..line_end];
         let line = line.strip_suffix('\r').unwrap_or(line);
         let next = if line_end == after_bom.len() {
@@ -1566,8 +1572,7 @@ mod tests {
 
     #[test]
     fn test_front_matter_marker_parsed_and_stripped() {
-        let markdown =
-            "---\nresume_id: 42\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let markdown = "---\nresume_id: 42\n---\n# Jane\n\n- Email: jane@example.com\n";
         let parsed = parse_resume_markdown(markdown).expect("parse ok");
         let fm = parsed.front_matter.expect("front-matter present");
         assert_eq!(fm.resume_id, Some(serde_json::json!(42)));
@@ -1577,8 +1582,7 @@ mod tests {
 
     #[test]
     fn test_front_matter_detected_after_bom() {
-        let markdown =
-            "\u{feff}---\nresume_id: 7\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let markdown = "\u{feff}---\nresume_id: 7\n---\n# Jane\n\n- Email: jane@example.com\n";
         let parsed = parse_resume_markdown(markdown).expect("parse ok");
         let fm = parsed.front_matter.expect("front-matter present");
         assert_eq!(fm.resume_id, Some(serde_json::json!(7)));
@@ -1587,8 +1591,7 @@ mod tests {
 
     #[test]
     fn test_front_matter_detected_after_leading_blank_lines() {
-        let markdown =
-            "\n  \n---\nresume_id: 9\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let markdown = "\n  \n---\nresume_id: 9\n---\n# Jane\n\n- Email: jane@example.com\n";
         let parsed = parse_resume_markdown(markdown).expect("parse ok");
         let fm = parsed.front_matter.expect("front-matter present");
         assert_eq!(fm.resume_id, Some(serde_json::json!(9)));
@@ -1604,8 +1607,7 @@ mod tests {
 
     #[test]
     fn test_front_matter_fence_allows_trailing_whitespace() {
-        let markdown =
-            "---   \nresume_id: 5\n---\t\n# Jane\n\n- Email: jane@example.com\n";
+        let markdown = "---   \nresume_id: 5\n---\t\n# Jane\n\n- Email: jane@example.com\n";
         let parsed = parse_resume_markdown(markdown).expect("parse ok");
         assert_eq!(
             parsed.front_matter.expect("front-matter").resume_id,
@@ -1649,8 +1651,7 @@ mod tests {
 
     #[test]
     fn test_front_matter_unknown_key_is_error() {
-        let markdown =
-            "---\nunknown_key: 4\n---\n# Jane\n\n- Email: jane@example.com\n";
+        let markdown = "---\nunknown_key: 4\n---\n# Jane\n\n- Email: jane@example.com\n";
         assert!(parse_resume_markdown(markdown).is_err());
     }
 
@@ -1675,8 +1676,7 @@ mod tests {
 
     #[test]
     fn test_front_matter_key_whitespace_tolerated() {
-        let markdown =
-            "---\n  resume_id : 4 \n---\n# Jane\n\n- Email: jane@example.com\n";
+        let markdown = "---\n  resume_id : 4 \n---\n# Jane\n\n- Email: jane@example.com\n";
         let parsed = parse_resume_markdown(markdown).expect("parse ok");
         assert_eq!(
             parsed.front_matter.expect("front-matter").resume_id,
@@ -1694,8 +1694,7 @@ mod tests {
 
     #[test]
     fn test_front_matter_strips_before_section_parse() {
-        let markdown =
-            "---\nresume_id: 4\n---\n# Jane\n\n- Email: jane@example.com\n\n## Skills\n\n- Rust - 90%\n";
+        let markdown = "---\nresume_id: 4\n---\n# Jane\n\n- Email: jane@example.com\n\n## Skills\n\n- Rust - 90%\n";
         let parsed = parse_resume_markdown(markdown).expect("parse ok");
         assert_eq!(parsed.resume.skills.len(), 1);
         assert_eq!(parsed.resume.skills[0].skill_name, "Rust");

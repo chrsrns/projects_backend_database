@@ -10,8 +10,8 @@ use shared::markdown;
 use crate::{
     error::ApplicationError,
     resume::common::{
-        app_err_from_diesel_err, find_resume, partial_date_to_columns,
-        validate_executive_summary, validate_optional_text, validate_optional_url, validate_video,
+        app_err_from_diesel_err, find_resume, partial_date_to_columns, validate_executive_summary,
+        validate_optional_text, validate_optional_url, validate_video,
     },
 };
 
@@ -111,11 +111,7 @@ fn decode_front_matter_metadata(
     front_matter: &markdown::FrontMatter,
 ) -> Result<FrontMatterUpdates, ApplicationError> {
     Ok(FrontMatterUpdates {
-        company_name: front_matter_text(
-            front_matter.company_name.as_ref(),
-            "Company name",
-            255,
-        )?,
+        company_name: front_matter_text(front_matter.company_name.as_ref(), "Company name", 255)?,
         role_title: front_matter_text(front_matter.role_title.as_ref(), "Role title", 255)?,
         variant_label: front_matter_text(
             front_matter.variant_label.as_ref(),
@@ -128,9 +124,7 @@ fn decode_front_matter_metadata(
             20_000,
         )?,
         target_date: front_matter_target_date(front_matter.target_date.as_ref())?,
-        show_variant_tag: front_matter_show_variant_tag(
-            front_matter.show_variant_tag.as_ref(),
-        )?,
+        show_variant_tag: front_matter_show_variant_tag(front_matter.show_variant_tag.as_ref())?,
     })
 }
 
@@ -319,7 +313,7 @@ pub fn import_resume_markdown(
                         return Err(ApplicationError::NotFound(format!(
                             "Resume with id {} not found",
                             marker_id
-                        )))
+                        )));
                     }
                 }
             }
@@ -621,7 +615,10 @@ pub fn import_resume_markdown(
     // user, so it is always reachable for this viewer.
     .map(|(resume, created)| {
         let base_accessible = resume.base_resume_id.is_some();
-        (ResumeView::from_resume(resume, base_accessible, true), created)
+        (
+            ResumeView::from_resume(resume, base_accessible, true),
+            created,
+        )
     })
     .map_err(app_err_from_diesel_err)
 }
