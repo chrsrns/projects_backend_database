@@ -177,6 +177,47 @@ pub fn import_resume_markdown(
 
 #[utoipa::path(
     post,
+    path = "/resume/{resume_id}/import/markdown",
+    tag = "Resumes",
+    security(("bearerAuth" = [])),
+    params(
+        ("resume_id" = i32, Path, description = "Resume ID to import into")
+    ),
+    request_body = String,
+    responses(
+        (status = 200, description = "Updated resume", body = Response<ResumeView>, content_type = "application/json"),
+        (status = 400, description = "Invalid Markdown or front-matter marker mismatch"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Not found"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
+    )
+)]
+#[post(
+    "/resume/<resume_id>/import/markdown",
+    format = "text/markdown",
+    data = "<markdown>"
+)]
+pub fn import_resume_markdown_into(
+    auth: AuthSession,
+    markdown: LimitedMarkdown,
+    hub: &State<Hub>,
+    resume_id: i32,
+) -> CustomJsonResult<ResumeView> {
+    match markdown_import::import_resume_markdown(&markdown.0, auth.user_id, Some(resume_id)) {
+        Ok((resume, _)) => {
+            hub.publish_resume_changed(
+                resume.id,
+                ResumeChangedAction::Updated(SectionType::PersonalInfo),
+            );
+            Ok(Custom(Status::Ok, Json(Response { body: resume })))
+        }
+        Err(err) => Err(map_markdown_error(err)),
+    }
+}
+
+#[utoipa::path(
+    post,
     path = "/resume/validate/markdown",
     tag = "Resumes",
     request_body(content = String, content_type = "text/markdown"),
