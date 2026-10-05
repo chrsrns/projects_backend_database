@@ -101,7 +101,7 @@ fn get_resume(fixture: &support::Fixture, resume_id: i32) -> Value {
 }
 
 #[test]
-fn variant_metadata_absent_from_markdown_and_resume_document() {
+fn variant_metadata_in_front_matter_but_not_resume_document() {
     let mut fixture = support::Fixture::new(9_241_041);
     let email = format!(
         "variant.md.meta.{}.{}@example.com",
@@ -149,10 +149,14 @@ fn variant_metadata_absent_from_markdown_and_resume_document() {
         exported.contains("Jane Doe"),
         "resume content still exports"
     );
+    assert!(
+        exported.starts_with("---\n"),
+        "the export opens with a front-matter block"
+    );
     for value in metadata {
         assert!(
-            !exported.contains(value),
-            "variant metadata must not reach Markdown: {}",
+            exported.contains(value),
+            "variant metadata round-trips through front-matter: {}",
             value
         );
     }
@@ -182,7 +186,7 @@ fn variant_metadata_absent_from_markdown_and_resume_document() {
 }
 
 #[test]
-fn variant_markdown_export_reimport_updates_base() {
+fn variant_markdown_export_reimport_updates_variant() {
     let mut fixture = support::Fixture::new(9_241_042);
     let email = format!(
         "variant.md.reimport.{}.{}@example.com",
@@ -220,8 +224,8 @@ fn variant_markdown_export_reimport_updates_base() {
     let exported = export.into_string().expect("markdown body");
     assert!(exported.contains("Acme Tailored"));
     assert!(
-        !exported.contains("Acme Corp"),
-        "targeting metadata stays out of the export"
+        exported.contains("company_name: \"Acme Corp\""),
+        "the export carries the variant's targeting metadata"
     );
 
     let reimport = fixture
@@ -234,25 +238,23 @@ fn variant_markdown_export_reimport_updates_base() {
     assert_eq!(
         reimport.status(),
         Status::Ok,
-        "the base is updated in place"
+        "the variant is updated in place"
     );
 
     let reimported: Value = serde_json::from_str(&reimport.into_string().unwrap()).unwrap();
     assert_eq!(
         reimported["body"]["id"].as_i64().unwrap() as i32,
-        base_id,
-        "a variant's export updates its base, never the variant row"
+        variant_id,
+        "the marker routes the import back to the variant row"
     );
     assert_eq!(reimported["body"]["name"], "Acme Tailored");
-    assert!(reimported["body"]["base_resume_id"].is_null());
-
-    let variant_after = get_resume(&fixture, variant_id);
+    assert_eq!(reimported["body"]["is_variant"], true);
     assert_eq!(
-        variant_after["body"]["base_resume_id"].as_i64().unwrap() as i32,
+        reimported["body"]["base_resume_id"].as_i64().unwrap() as i32,
         base_id,
         "the variant stays linked to its base"
     );
-    assert_eq!(variant_after["body"]["company_name"], "Acme Corp");
+    assert_eq!(reimported["body"]["company_name"], "Acme Corp");
 }
 
 #[test]
@@ -417,4 +419,293 @@ fn marker_wins_over_email_match() {
     let b_after = get_resume(&fixture, b_id);
     assert_eq!(b_after["body"]["name"], "Resume B");
     assert_eq!(b_after["body"]["email"], email_b);
+}
+
+fn import_markdown_into(
+    fixture: &support::Fixture,
+    resume_id: i32,
+    body: String,
+) -> (Status, Value) {
+    let response = fixture
+        .client()
+        .post(format!("/api/resume/{}/import/markdown", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::new("text", "markdown"))
+        .body(body)
+        .dispatch();
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
+#[test]
+fn explicit_route_updates_named_base() {
+    let mut fixture = support::Fixture::new(9_241_055);
+    let email = format!("explicit.base.{}.{}@example.com", 9_241_055, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, updated) =
+        import_markdown_into(&fixture, base_id, markdown("Renamed", "renamed@example.com"));
+    assert_eq!(status, Status::Ok);
+    assert_eq!(updated["body"]["id"], base_id);
+    assert_eq!(updated["body"]["name"], "Renamed");
+}
+
+#[test]
+fn explicit_route_absent_returns_404() {
+    let fixture = support::Fixture::new(9_241_056);
+    let (status, _) =
+        import_markdown_into(&fixture, 999_999_999, markdown("Jane Doe", "x@example.com"));
+    assert_eq!(status, Status::NotFound);
+}
+
+#[test]
+fn explicit_route_foreign_returns_403() {
+    let mut fixture = support::Fixture::new(9_241_057);
+    let email = format!("explicit.f.{}.{}@example.com", 9_241_057, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let other = support::register_and_login(fixture.client(), "explicit.other");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    let response = fixture
+        .client()
+        .post(format!("/api/resume/{}/import/markdown", base_id))
+        .header(support::auth_header(&other.token))
+        .header(ContentType::new("text", "markdown"))
+        .body(markdown("Not Yours", "y@example.com"))
+        .dispatch();
+    assert_eq!(response.status(), Status::Forbidden);
+}
+
+#[test]
+fn explicit_route_rejects_conflicting_marker() {
+    let mut fixture = support::Fixture::new(9_241_058);
+    let email_a = format!("explicit.a.{}.{}@example.com", 9_241_058, unique_suffix());
+    let email_b = format!("explicit.b.{}.{}@example.com", 9_241_058, unique_suffix());
+
+    let (status, a) = import_markdown(&fixture, "Resume A", &email_a);
+    assert_eq!(status, Status::Created);
+    let a_id = a["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(a_id);
+
+    let (status, b) = import_markdown(&fixture, "Resume B", &email_b);
+    assert_eq!(status, Status::Created);
+    let b_id = b["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(b_id);
+
+    let (status, _) = import_markdown_into(
+        &fixture,
+        a_id,
+        marked("Clash", &email_a, &b_id.to_string()),
+    );
+    assert_eq!(status, Status::BadRequest);
+
+    let (status, updated) =
+        import_markdown_into(&fixture, a_id, marked("Agreed", &email_a, &a_id.to_string()));
+    assert_eq!(status, Status::Ok);
+    assert_eq!(updated["body"]["name"], "Agreed");
+}
+
+fn export_markdown(fixture: &support::Fixture, resume_id: i32) -> String {
+    let response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok);
+    response.into_string().expect("markdown body")
+}
+
+#[test]
+fn variant_marker_reimport_updates_variant() {
+    let mut fixture = support::Fixture::new(9_241_060);
+    let email = format!("variant.marker.{}.{}@example.com", 9_241_060, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, variant) = post_variant(
+        &fixture,
+        base_id,
+        serde_json::json!({ "company_name": "Acme Corp" }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    let (status, _) = put_resume(
+        &fixture,
+        variant_id,
+        serde_json::json!({ "name": "Acme Tailored" }),
+    );
+    assert_eq!(status, Status::Ok);
+
+    let exported = export_markdown(&fixture, variant_id);
+    assert!(exported.contains("Acme Tailored"));
+    assert!(exported.contains(&format!("resume_id: {}", variant_id)));
+
+    let (status, updated) = import_markdown_body(&fixture, exported);
+    assert_eq!(status, Status::Ok, "the marker re-imports into the variant");
+    assert_eq!(updated["body"]["id"], variant_id);
+    assert_eq!(updated["body"]["is_variant"], true);
+    assert_eq!(updated["body"]["company_name"], "Acme Corp");
+
+    let base_after = get_resume(&fixture, base_id);
+    assert_eq!(
+        base_after["body"]["name"], "Jane Doe",
+        "the base keeps its own content"
+    );
+}
+
+#[test]
+fn variant_import_keeps_stored_email_and_visibility() {
+    let mut fixture = support::Fixture::new(9_241_061);
+    let email = format!("variant.keep.{}.{}@example.com", 9_241_061, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, variant) = post_variant(
+        &fixture,
+        base_id,
+        serde_json::json!({ "is_public": false }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+    assert_eq!(variant["body"]["is_public"], false);
+
+    // The markdown body demands a different email and Public: true; on a
+    // variant target both are ignored and the stored values win.
+    let imported = marked("Jane Doe", "totally.different@example.com", &variant_id.to_string())
+        .replace("- Public: true", "- Public: false");
+    let (status, updated) = import_markdown_body(&fixture, imported);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(updated["body"]["email"], email);
+    assert_eq!(updated["body"]["is_public"], false);
+}
+
+#[test]
+fn metadata_keys_on_base_target_return_400() {
+    let mut fixture = support::Fixture::new(9_241_062);
+    let email = format!("meta.base.{}.{}@example.com", 9_241_062, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let body = format!(
+        "---\nresume_id: {}\ncompany_name: \"Acme\"\n---\n{}",
+        base_id,
+        markdown("Jane Doe", &email)
+    );
+    let (status, _) = import_markdown_body(&fixture, body);
+    assert_eq!(status, Status::BadRequest);
+
+    let (status, _) = import_markdown_into(
+        &fixture,
+        base_id,
+        format!("---\ncompany_name: \"Acme\"\n---\n{}", markdown("Jane Doe", &email)),
+    );
+    assert_eq!(status, Status::BadRequest);
+}
+
+#[test]
+fn metadata_keys_on_create_path_return_400() {
+    let fixture = support::Fixture::new(9_241_063);
+    let email = format!("meta.create.{}.{}@example.com", 9_241_063, unique_suffix());
+
+    let body = format!(
+        "---\ncompany_name: \"Acme\"\n---\n{}",
+        markdown("Jane Doe", &email)
+    );
+    let (status, _) = import_markdown_body(&fixture, body);
+    assert_eq!(status, Status::BadRequest);
+}
+
+#[test]
+fn variant_metadata_apply_absent_null_and_caps() {
+    let mut fixture = support::Fixture::new(9_241_064);
+    let email = format!("meta.apply.{}.{}@example.com", 9_241_064, unique_suffix());
+
+    let (status, base) = import_markdown(&fixture, "Jane Doe", &email);
+    assert_eq!(status, Status::Created);
+    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(base_id);
+
+    let (status, variant) = post_variant(
+        &fixture,
+        base_id,
+        serde_json::json!({
+            "company_name": "Acme Corp",
+            "role_title": "Engineer",
+            "target_date": "2026-03"
+        }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    fixture.track_resume_id(variant_id);
+
+    // Absent keys leave stored values; a null key stores NULL; a string
+    // applies after validation; a number on a string key is rejected.
+    let body = format!(
+        "---\nresume_id: {0}\nrole_title: null\nvariant_label: \"tailored\"\nshow_variant_tag: false\n---\n{1}",
+        variant_id,
+        markdown("Jane Doe", &email)
+    );
+    let (status, updated) = import_markdown_body(&fixture, body);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(updated["body"]["company_name"], "Acme Corp");
+    assert!(updated["body"]["role_title"].is_null());
+    assert_eq!(updated["body"]["variant_label"], "tailored");
+    assert_eq!(updated["body"]["show_variant_tag"], false);
+    assert_eq!(updated["body"]["target_date"], "2026-03");
+
+    let body = format!(
+        "---\nresume_id: {0}\ncompany_name: \"{1}\"\n---\n{2}",
+        variant_id,
+        "x".repeat(256),
+        markdown("Jane Doe", &email)
+    );
+    let (status, _) = import_markdown_body(&fixture, body);
+    assert_eq!(status, Status::BadRequest);
+
+    let body = format!(
+        "---\nresume_id: {0}\ntarget_date: \"not-a-date\"\n---\n{1}",
+        variant_id,
+        markdown("Jane Doe", &email)
+    );
+    let (status, _) = import_markdown_body(&fixture, body);
+    assert_eq!(status, Status::BadRequest);
+
+    let body = format!(
+        "---\nresume_id: {0}\ncompany_name: 42\n---\n{1}",
+        variant_id,
+        markdown("Jane Doe", &email)
+    );
+    let (status, _) = import_markdown_body(&fixture, body);
+    assert_eq!(status, Status::BadRequest);
+
+    let body = format!(
+        "---\nresume_id: {0}\nshow_variant_tag: \"yes\"\n---\n{1}",
+        variant_id,
+        markdown("Jane Doe", &email)
+    );
+    let (status, _) = import_markdown_body(&fixture, body);
+    assert_eq!(status, Status::BadRequest);
 }
