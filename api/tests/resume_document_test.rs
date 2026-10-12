@@ -531,7 +531,10 @@ fn test_convert_emits_parsed_active_flags() {
     assert_eq!(edu_kps[0]["active"], false);
     assert_eq!(edu_kps[1]["active"], true);
     assert_eq!(document["work_experiences"][0]["active"], false);
-    assert_eq!(document["work_experience_key_points"]["1"][0]["active"], false);
+    assert_eq!(
+        document["work_experience_key_points"]["1"][0]["active"],
+        false
+    );
     assert_eq!(document["portfolio_projects"][0]["active"], false);
     assert_eq!(document["portfolio_key_points"]["1"][0]["active"], false);
     let techs = &document["portfolio_technologies"]["1"];

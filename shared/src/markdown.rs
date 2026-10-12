@@ -980,11 +980,7 @@ fn validate_email(email: &str) -> Result<(), MarkdownError> {
 /// Byte index of the `[` that opens the trailing `[...]` bracket of `text`,
 /// when `text` ends with `]`. Unclosed or absent brackets yield `None`.
 fn trailing_bracket_start(text: &str) -> Option<usize> {
-    if text.ends_with(']') {
-        text[..text.len() - 1].rfind('[')
-    } else {
-        None
-    }
+    text.strip_suffix(']').and_then(|s| s.rfind('['))
 }
 
 /// Peels at most one `[active: <v>]` token and one `[order: <n>]` marker from
