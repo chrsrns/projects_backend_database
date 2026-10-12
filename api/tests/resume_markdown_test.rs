@@ -1981,7 +1981,7 @@ fn test_portfolio_url_bullets_too_long_rejected() {
 fn get_list(fixture: &support::Fixture, url: String) -> Vec<Value> {
     let response = fixture
         .client()
-        .get(url)
+        .get(&url)
         .header(fixture.auth_header())
         .dispatch();
     assert_eq!(response.status(), Status::Ok, "GET {} failed", url);
@@ -2097,14 +2097,17 @@ fn test_active_markdown_round_trip() {
         .dispatch();
     assert_eq!(import_response.status(), Status::Ok);
 
+    // The import deletes and reinserts all children, so every entity id is
+    // new — fetch the fresh parent ids from the post-import lists.
     let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
     assert_eq!(education.len(), 1);
     assert_eq!(education[0]["active"], false);
+    let new_education_id = education[0]["id"].as_i64().expect("education id") as i32;
     let edu_kps = get_list(
         &fixture,
         format!(
             "/api/resume/{}/education/{}/key_points",
-            resume_id, education_id
+            resume_id, new_education_id
         ),
     );
     assert_eq!(edu_kps[0]["active"], false);
@@ -2114,11 +2117,12 @@ fn test_active_markdown_round_trip() {
         format!("/api/resume/{}/work_experiences", resume_id),
     );
     assert_eq!(work[0]["active"], false);
+    let new_work_id = work[0]["id"].as_i64().expect("work id") as i32;
     let work_kps = get_list(
         &fixture,
         format!(
             "/api/resume/{}/work_experiences/{}/key_points",
-            resume_id, work_id
+            resume_id, new_work_id
         ),
     );
     assert_eq!(work_kps[0]["active"], false);
@@ -2128,11 +2132,12 @@ fn test_active_markdown_round_trip() {
         format!("/api/resume/{}/portfolio_projects", resume_id),
     );
     assert_eq!(projects[0]["active"], false);
+    let new_project_id = projects[0]["id"].as_i64().expect("project id") as i32;
     let proj_kps = get_list(
         &fixture,
         format!(
             "/api/resume/{}/portfolio_projects/{}/key_points",
-            resume_id, project_id
+            resume_id, new_project_id
         ),
     );
     assert_eq!(proj_kps[0]["active"], false);
@@ -2140,7 +2145,7 @@ fn test_active_markdown_round_trip() {
         &fixture,
         format!(
             "/api/resume/{}/portfolio_projects/{}/technologies",
-            resume_id, project_id
+            resume_id, new_project_id
         ),
     );
     assert_eq!(techs[0]["active"], false);
