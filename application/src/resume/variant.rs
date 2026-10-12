@@ -13,7 +13,7 @@ use infrastructure::run_in_transaction;
 use crate::error::ApplicationError;
 use crate::resume::common::{
     app_err_from_diesel_err, find_accessible_resume, find_resume, partial_date_to_columns,
-    validate_variant_metadata,
+    require_owner, validate_variant_metadata, viewer_is_owner,
 };
 use crate::resume::view;
 
@@ -24,7 +24,7 @@ pub fn list_variants(
     use domain::schema::resumes::dsl as resumes_dsl;
 
     let base = find_accessible_resume(base_id, user_id_value)?;
-    let is_owner = base.created_by.is_some() && base.created_by == user_id_value;
+    let is_owner = viewer_is_owner(&base, user_id_value);
 
     let mut query = resumes_dsl::resumes
         .filter(resumes_dsl::base_resume_id.eq(base_id))
@@ -57,10 +57,7 @@ pub fn create_variant(
 ) -> Result<ResumeView, ApplicationError> {
     let base = find_resume(base_id)?;
 
-    match base.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => return Err(ApplicationError::Forbidden),
-    }
+    require_owner(&base, user_id_value)?;
 
     if base.base_resume_id.is_some() {
         return Err(ApplicationError::BadRequest(

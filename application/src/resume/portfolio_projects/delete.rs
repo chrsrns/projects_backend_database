@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume},
+    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn delete_portfolio_project(
@@ -23,12 +23,7 @@ pub fn delete_portfolio_project(
 
     let resume: Resume = find_resume(existing.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     match diesel::delete(portfolio_projects::table.find(project_id_value))
         .execute(&mut establish_connection())
@@ -83,12 +78,7 @@ pub fn delete_portfolio_key_point(
 
     let resume: Resume = find_resume(project.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     match diesel::delete(portfolio_key_points::table.find(key_point_id_value))
         .execute(&mut establish_connection())
@@ -143,12 +133,7 @@ pub fn delete_portfolio_technology(
 
     let resume: Resume = find_resume(project.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     match diesel::delete(portfolio_technologies::table.find(tech_id_value))
         .execute(&mut establish_connection())

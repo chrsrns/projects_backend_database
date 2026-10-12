@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume},
+    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn create_framework(
@@ -18,12 +18,7 @@ pub fn create_framework(
 
     let existing_resume: Resume = find_resume(resume_id_value)?;
 
-    match existing_resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&existing_resume, user_id_value)?;
 
     let _language: Language = match languages_dsl::languages
         .filter(languages_dsl::id.eq(language_id_value))

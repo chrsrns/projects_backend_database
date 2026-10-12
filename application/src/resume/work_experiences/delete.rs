@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume},
+    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn delete_work_experience(
@@ -23,12 +23,7 @@ pub fn delete_work_experience(
 
     let resume: Resume = find_resume(existing.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     match diesel::delete(work_experiences::table.find(work_id_value))
         .execute(&mut establish_connection())
@@ -72,12 +67,7 @@ pub fn delete_work_experience_key_point(
 
     let resume: Resume = find_resume(work.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     match diesel::delete(work_experience_key_points::table.find(kp_id_value))
         .execute(&mut establish_connection())

@@ -5,8 +5,8 @@ use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
 use crate::resume::common::{
-    app_err_from_diesel_err, find_resume, partial_date_to_columns, validate_executive_summary,
-    validate_optional_text_update, validate_video,
+    app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
+    validate_executive_summary, validate_optional_text_update, validate_video,
 };
 
 pub fn update_resume(
@@ -16,12 +16,7 @@ pub fn update_resume(
 ) -> Result<ResumeView, ApplicationError> {
     let existing = find_resume(resume_id)?;
 
-    match existing.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&existing, user_id_value)?;
 
     if existing.base_resume_id.is_some() && resume.email.is_some() {
         return Err(ApplicationError::BadRequest(
