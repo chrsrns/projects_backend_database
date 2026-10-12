@@ -279,13 +279,9 @@ pub fn RequestBuilder(
                     </div>
 
                     {move || {
-                        if let Some(err) = error.get() {
-                            Some(view! {
+                        error.get().map(|err| view! {
                                 <div class="error-message">{err}</div>
                             })
-                        } else {
-                            None
-                        }
                     }}
                 </div>
             }

@@ -77,7 +77,7 @@ pub fn SchemaForm(
                     value.get().get(&field_name).cloned().unwrap_or(Value::Null)
                 });
 
-                let value_for_update = value.clone();
+                let value_for_update = value;
                 let name_for_update = name.clone();
                 let on_change = Callback::new(move |new_val: Value| {
                     value_for_update.update(|v| {
@@ -309,7 +309,7 @@ fn SchemaFieldInput(
             // Sync child signal back to parent, skipping the initial fire so
             // mounting this component does not trigger a spurious on_change
             // that cascades writes up the signal tree (V43).
-            let parent_callback = on_change.clone();
+            let parent_callback = on_change;
             let mounted = StoredValue::new(false);
             Effect::new(move |_| {
                 let val = child_signal.get();
@@ -654,9 +654,9 @@ pub fn default_value_for_schema(schema: &Value) -> Value {
                 variants
                     .iter()
                     .find(|v| v.get("properties").is_some() || v.get("type").is_some())
-                    .map(|v| std::borrow::Cow::Borrowed(v))
+                    .map(std::borrow::Cow::Borrowed)
             })
-            .unwrap_or_else(|| std::borrow::Cow::Borrowed(schema))
+            .unwrap_or(std::borrow::Cow::Borrowed(schema))
     } else {
         std::borrow::Cow::Borrowed(schema)
     };

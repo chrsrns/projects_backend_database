@@ -13,15 +13,15 @@ pub fn ResponseViewer(
 
     // Watch for new responses and detect tokens
     Effect::new(move |_| {
-        if let Some(resp) = response.get() {
-            if resp.status >= 200 && resp.status < 300 {
-                if let Some(t) = extract_token_from_json(&resp.body) {
-                    // Only show if different from current token
-                    if t != token.get() {
-                        set_detected_token.set(t);
-                        set_show_token_banner.set(true);
-                    }
-                }
+        if let Some(resp) = response.get()
+            && resp.status >= 200
+            && resp.status < 300
+            && let Some(t) = extract_token_from_json(&resp.body)
+        {
+            // Only show if different from current token
+            if t != token.get() {
+                set_detected_token.set(t);
+                set_show_token_banner.set(true);
             }
         }
     });
@@ -176,10 +176,10 @@ fn search_for_token(value: &Value) -> Option<String> {
     match value {
         Value::Object(map) => {
             // Check direct "token" key first
-            if let Some(token_val) = map.get("token") {
-                if let Some(s) = token_val.as_str() {
-                    return Some(s.to_string());
-                }
+            if let Some(token_val) = map.get("token")
+                && let Some(s) = token_val.as_str()
+            {
+                return Some(s.to_string());
             }
             // Otherwise search nested values
             for v in map.values() {

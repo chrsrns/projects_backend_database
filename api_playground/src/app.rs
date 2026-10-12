@@ -142,16 +142,12 @@ pub fn App() -> impl IntoView {
                 }}
 
                 {move || {
-                    if let Some(err) = error.get() {
-                        Some(view! {
+                    error.get().map(|err| view! {
                             <div class="error-banner">
                                 {"Failed to load endpoints: "}
                                 {err}
                             </div>
                         })
-                    } else {
-                        None
-                    }
                 }}
             </header>
 
