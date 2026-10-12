@@ -188,7 +188,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                 end_date: edu.end_date,
                 description: edu.description.clone(),
                 display_order: edu.display_order,
-                active: true,
+                active: edu.active,
             })
             .collect();
 
@@ -210,7 +210,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                     education_id: parent_id,
                     key_point: kp.key_point.clone(),
                     display_order: None,
-                    active: true,
+                    active: kp.active,
                 });
         }
 
@@ -240,7 +240,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                 end_date: work.end_date,
                 description: work.description.clone(),
                 display_order: work.display_order,
-                active: true,
+                active: work.active,
             })
             .collect();
 
@@ -262,7 +262,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                     work_experience_id: parent_id,
                     key_point: kp.key_point.clone(),
                     display_order: None,
-                    active: true,
+                    active: kp.active,
                 });
         }
 
@@ -279,7 +279,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                 source_code_link: project.source_code_link.clone(),
                 description: project.description.clone(),
                 display_order: project.display_order,
-                active: true,
+                active: project.active,
                 video_url: project.video_url.clone(),
             })
             .collect();
@@ -302,7 +302,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                     portfolio_project_id: parent_id,
                     key_point: kp.key_point.clone(),
                     display_order: None,
-                    active: true,
+                    active: kp.active,
                 });
         }
 
@@ -322,7 +322,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                     portfolio_project_id: parent_id,
                     technology_name: tech.technology_name.clone(),
                     display_order: None,
-                    active: true,
+                    active: tech.active,
                 },
             );
         }
@@ -439,6 +439,7 @@ mod tests {
                 end_date: Some(month_date(2024, 5)),
                 description: None,
                 display_order: Some(3),
+                active: true,
             },
             ParsedEducation {
                 education_stage: "Master's".to_string(),
@@ -448,6 +449,7 @@ mod tests {
                 end_date: None,
                 description: None,
                 display_order: None,
+                active: true,
             },
         ];
 
@@ -473,6 +475,7 @@ mod tests {
                 end_date: None,
                 description: None,
                 display_order: None,
+                active: true,
             },
             ParsedEducation {
                 education_stage: "B".to_string(),
@@ -482,20 +485,24 @@ mod tests {
                 end_date: None,
                 description: None,
                 display_order: None,
+                active: true,
             },
         ];
         parsed.education_key_points = vec![
             ParsedEducationKeyPoint {
                 education_index: 0,
                 key_point: "kp one".to_string(),
+                active: true,
             },
             ParsedEducationKeyPoint {
                 education_index: 1,
                 key_point: "kp two".to_string(),
+                active: true,
             },
             ParsedEducationKeyPoint {
                 education_index: 0,
                 key_point: "kp three".to_string(),
+                active: true,
             },
         ];
 
@@ -564,6 +571,7 @@ mod tests {
             end_date: None,
             description: None,
             display_order: None,
+            active: true,
         }];
 
         let document = ResumeDocument::from(parsed);
@@ -587,19 +595,23 @@ mod tests {
             video_url: None,
             description: None,
             display_order: None,
+            active: true,
         }];
         parsed.portfolio_key_points = vec![ParsedPortfolioKeyPoint {
             portfolio_project_index: 0,
             key_point: "did thing".to_string(),
+            active: true,
         }];
         parsed.portfolio_technologies = vec![
             ParsedPortfolioTechnology {
                 portfolio_project_index: 0,
                 technology_name: "Rust".to_string(),
+                active: true,
             },
             ParsedPortfolioTechnology {
                 portfolio_project_index: 0,
                 technology_name: "Rocket".to_string(),
+                active: true,
             },
         ];
         parsed.languages = vec![
@@ -623,10 +635,12 @@ mod tests {
             end_date: Some(month_date(2022, 6)),
             description: None,
             display_order: None,
+            active: true,
         }];
         parsed.work_experience_key_points = vec![ParsedWorkExperienceKeyPoint {
             work_experience_index: 0,
             key_point: "shipped".to_string(),
+            active: true,
         }];
 
         let document = ResumeDocument::from(parsed);

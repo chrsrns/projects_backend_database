@@ -341,7 +341,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
         for edu in &resume.education {
             writeln!(
                 output,
-                "### {} - {} ({} - {}) [order: {}]",
+                "### {} - {} ({} - {}) [order: {}]{}",
                 edu.education_stage,
                 edu.institution_name,
                 format_markdown_date(
@@ -355,7 +355,8 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
                         .as_deref()
                         .and_then(|s| DatePrecision::from_str(s).ok()),
                 ),
-                edu.display_order.unwrap_or(0)
+                edu.display_order.unwrap_or(0),
+                active_suffix(edu.active)
             )
             .unwrap();
 
@@ -368,7 +369,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
 
             if let Some(key_points) = resume.education_key_points.get(&edu.id) {
                 for kp in key_points {
-                    writeln!(output, "- {}", kp.key_point).unwrap();
+                    writeln!(output, "- {}{}", kp.key_point, active_suffix(kp.active)).unwrap();
                 }
             }
             writeln!(output).unwrap();
@@ -401,7 +402,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
             }
             writeln!(
                 output,
-                " ({} - {}) [order: {}]",
+                " ({} - {}) [order: {}]{}",
                 format_markdown_date(
                     work.start_date,
                     DatePrecision::from_str(&work.start_date_precision)
@@ -413,7 +414,8 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
                         .as_deref()
                         .and_then(|s| DatePrecision::from_str(s).ok()),
                 ),
-                work.display_order.unwrap_or(0)
+                work.display_order.unwrap_or(0),
+                active_suffix(work.active)
             )
             .unwrap();
 
@@ -423,7 +425,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
 
             if let Some(key_points) = resume.work_experience_key_points.get(&work.id) {
                 for kp in key_points {
-                    writeln!(output, "- {}", kp.key_point).unwrap();
+                    writeln!(output, "- {}{}", kp.key_point, active_suffix(kp.active)).unwrap();
                 }
             }
             writeln!(output).unwrap();
@@ -436,9 +438,10 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
         for project in &resume.portfolio_projects {
             writeln!(
                 output,
-                "### {} [order: {}]",
+                "### {} [order: {}]{}",
                 project.project_name,
-                project.display_order.unwrap_or(0)
+                project.display_order.unwrap_or(0),
+                active_suffix(project.active)
             )
             .unwrap();
 
@@ -460,7 +463,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
             {
                 let names: Vec<String> = technologies
                     .iter()
-                    .map(|t| t.technology_name.clone())
+                    .map(|t| format!("{}{}", t.technology_name, active_suffix(t.active)))
                     .collect();
                 writeln!(output, "- Technologies: {}", names.join(", ")).unwrap();
             }
@@ -471,7 +474,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
 
             if let Some(key_points) = resume.portfolio_key_points.get(&project.id) {
                 for kp in key_points {
-                    writeln!(output, "- {}", kp.key_point).unwrap();
+                    writeln!(output, "- {}{}", kp.key_point, active_suffix(kp.active)).unwrap();
                 }
             }
             writeln!(output).unwrap();
@@ -567,7 +570,10 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
             }
             Event::End(TagEnd::Heading(_)) => {
                 if heading_level == HeadingLevel::H1 {
-                    resume_name = Some(heading_text.trim().to_string());
+                    // The H1 carries no `active`/`order` markers; a well-formed
+                    // `[active:]` token is stripped and ignored anyway.
+                    let (name, _, _) = peel_suffix_markers(&heading_text, false)?;
+                    resume_name = Some(name.trim().to_string());
                 } else if heading_level == HeadingLevel::H2 {
                     if current_section == Section::Summary {
                         let s = summary_text.trim();
@@ -576,7 +582,8 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                         }
                         summary_text.clear();
                     }
-                    current_section = match heading_text.trim() {
+                    let (section_name, _, _) = peel_suffix_markers(&heading_text, false)?;
+                    current_section = match section_name.trim() {
                         "Education" => Section::Education,
                         "Skills" => Section::Skills,
                         "Work Experience" => Section::WorkExperience,
@@ -608,6 +615,7 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                                 end_date: parsed.end_date,
                                 description: None,
                                 display_order: parsed.display_order,
+                                active: parsed.active,
                             });
                         }
                         Section::WorkExperience => {
@@ -621,28 +629,34 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                                 end_date: parsed.end_date,
                                 description: None,
                                 display_order: parsed.display_order,
+                                active: parsed.active,
                             });
                         }
                         Section::Portfolio => {
                             let idx = portfolio_projects.len();
                             current_portfolio_index = Some(idx);
-                            let display_order = extract_display_order(&heading_text);
+                            let (project_name, display_order, active) =
+                                peel_suffix_markers(&heading_text, true)?;
                             portfolio_projects.push(ParsedPortfolioProject {
-                                project_name: strip_order_suffix(&heading_text),
+                                project_name,
                                 image_url: None,
                                 project_link: None,
                                 source_code_link: None,
                                 video_url: None,
                                 description: None,
                                 display_order,
+                                active: active.unwrap_or(true),
                             });
                         }
                         Section::Languages => {
                             let idx = languages.len();
                             current_language_index = Some(idx);
-                            let display_order = extract_display_order(&heading_text);
+                            // `[active:]` is a token here but languages carry
+                            // no `active` column, so it is stripped and ignored.
+                            let (language_name, display_order, _active) =
+                                peel_suffix_markers(&heading_text, true)?;
                             languages.push(ParsedLanguage {
-                                language_name: strip_order_suffix(&heading_text),
+                                language_name,
                                 display_order,
                             });
                         }
@@ -664,6 +678,9 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
 
                 match current_section {
                     Section::Header => {
+                        // Header fields carry no `active`; a trailing token is
+                        // stripped and ignored (malformed values still error).
+                        let (bullet, _, _) = peel_suffix_markers(&bullet, false)?;
                         if let Some((key, value)) = bullet.split_once(':') {
                             let key = key.trim();
                             let value = value.trim().to_string();
@@ -698,6 +715,7 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                         });
                     }
                     Section::Education => {
+                        let (bullet, _, active) = peel_suffix_markers(&bullet, false)?;
                         if let Some(edu) = education.last_mut() {
                             if let Some(degree) = bullet.strip_prefix("Degree:") {
                                 edu.degree = Some(degree.trim().to_string());
@@ -707,11 +725,13 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                                 education_key_points.push(ParsedEducationKeyPoint {
                                     education_index: idx,
                                     key_point: bullet,
+                                    active: active.unwrap_or(true),
                                 });
                             }
                         }
                     }
                     Section::WorkExperience => {
+                        let (bullet, _, active) = peel_suffix_markers(&bullet, false)?;
                         if let Some(work) = work_experiences.last_mut() {
                             if let Some(description) = bullet.strip_prefix("Description:") {
                                 work.description = Some(description.trim().to_string());
@@ -719,49 +739,65 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                                 work_experience_key_points.push(ParsedWorkExperienceKeyPoint {
                                     work_experience_index: idx,
                                     key_point: bullet,
+                                    active: active.unwrap_or(true),
                                 });
                             }
                         }
                     }
                     Section::Portfolio => {
-                        if let Some(project) = portfolio_projects.last_mut() {
-                            if let Some(link_text) = bullet.strip_prefix("Live:") {
-                                project.project_link = Some(link_text.trim().to_string());
-                            } else if let Some(source_text) = bullet.strip_prefix("Source:") {
-                                project.source_code_link = Some(source_text.trim().to_string());
-                            } else if let Some(image_text) = bullet.strip_prefix("Image:") {
-                                project.image_url = Some(image_text.trim().to_string());
-                            } else if let Some(video_text) = bullet.strip_prefix("Video:") {
-                                if item_had_link {
-                                    project.video_url = None;
-                                } else {
-                                    project.video_url = Some(video_text.trim().to_string());
+                        // `Technologies:` carries `[active:]` per comma item,
+                        // so it must be matched before the bullet-level strip.
+                        if let Some(tech_text) = bullet.strip_prefix("Technologies:") {
+                            let mut tech_items = Vec::new();
+                            for item in tech_text.split(',') {
+                                let (name, _, active) = peel_suffix_markers(item.trim(), false)?;
+                                if name.is_empty() {
+                                    continue;
                                 }
-                            } else if let Some(tech_text) = bullet.strip_prefix("Technologies:") {
-                                let tech_names: Vec<String> = tech_text
-                                    .split(',')
-                                    .map(|s| s.trim().to_string())
-                                    .filter(|s| !s.is_empty())
-                                    .collect();
-                                if let Some(idx) = current_portfolio_index {
-                                    for name in tech_names {
-                                        portfolio_technologies.push(ParsedPortfolioTechnology {
-                                            portfolio_project_index: idx,
-                                            technology_name: name,
-                                        });
+                                tech_items.push((name, active.unwrap_or(true)));
+                            }
+                            if let Some(idx) = current_portfolio_index {
+                                for (name, active) in tech_items {
+                                    portfolio_technologies.push(ParsedPortfolioTechnology {
+                                        portfolio_project_index: idx,
+                                        technology_name: name,
+                                        active,
+                                    });
+                                }
+                            }
+                        } else {
+                            let (bullet, _, active) = peel_suffix_markers(&bullet, false)?;
+                            if let Some(project) = portfolio_projects.last_mut() {
+                                if let Some(link_text) = bullet.strip_prefix("Live:") {
+                                    project.project_link = Some(link_text.trim().to_string());
+                                } else if let Some(source_text) = bullet.strip_prefix("Source:") {
+                                    project.source_code_link = Some(source_text.trim().to_string());
+                                } else if let Some(image_text) = bullet.strip_prefix("Image:") {
+                                    project.image_url = Some(image_text.trim().to_string());
+                                } else if let Some(video_text) = bullet.strip_prefix("Video:") {
+                                    if item_had_link {
+                                        project.video_url = None;
+                                    } else {
+                                        project.video_url = Some(video_text.trim().to_string());
                                     }
+                                } else if let Some(description) =
+                                    bullet.strip_prefix("Description:")
+                                {
+                                    project.description = Some(description.trim().to_string());
+                                } else if let Some(idx) = current_portfolio_index {
+                                    portfolio_key_points.push(ParsedPortfolioKeyPoint {
+                                        portfolio_project_index: idx,
+                                        key_point: bullet,
+                                        active: active.unwrap_or(true),
+                                    });
                                 }
-                            } else if let Some(description) = bullet.strip_prefix("Description:") {
-                                project.description = Some(description.trim().to_string());
-                            } else if let Some(idx) = current_portfolio_index {
-                                portfolio_key_points.push(ParsedPortfolioKeyPoint {
-                                    portfolio_project_index: idx,
-                                    key_point: bullet,
-                                });
                             }
                         }
                     }
                     Section::Languages => {
+                        // Frameworks carry no `active`; a trailing token is
+                        // stripped and ignored.
+                        let (bullet, _, _) = peel_suffix_markers(&bullet, false)?;
                         if let Some(idx) = current_language_index {
                             frameworks.push(ParsedFramework {
                                 language_index: idx,
@@ -769,7 +805,11 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                             });
                         }
                     }
-                    Section::Summary => {}
+                    // Bullets under `## Summary` are ignored, but a malformed
+                    // `[active:]` token still surfaces as a parse error.
+                    Section::Summary => {
+                        let _ = peel_suffix_markers(&bullet, false)?;
+                    }
                 }
             }
             Event::Start(Tag::Link { dest_url, .. }) => {
@@ -937,36 +977,75 @@ fn validate_email(email: &str) -> Result<(), MarkdownError> {
     Ok(())
 }
 
-fn extract_display_order(text: &str) -> Option<i32> {
-    let trimmed = text.trim_end();
-    if let Some(start) = trimmed.rfind("[order:")
-        && let Some(end) = trimmed[start..].find(']')
-    {
-        let after_bracket = &trimmed[start + end + 1..];
-        if after_bracket.trim().is_empty() {
-            let order_str = trimmed[start + 7..start + end].trim();
-            return order_str.parse().ok();
-        }
-    }
-    None
+/// Byte index of the `[` that opens the trailing `[...]` bracket of `text`,
+/// when `text` ends with `]`. Unclosed or absent brackets yield `None`.
+fn trailing_bracket_start(text: &str) -> Option<usize> {
+    text.strip_suffix(']').and_then(|s| s.rfind('['))
 }
 
-fn strip_order_suffix(text: &str) -> String {
-    let trimmed = text.trim_end();
-    if let Some(start) = trimmed.rfind("[order:")
-        && let Some(end) = trimmed[start..].find(']')
-    {
-        let after_bracket = &trimmed[start + end + 1..];
-        if after_bracket.trim().is_empty() {
-            return trimmed[..start].trim_end().to_string();
+/// Peels at most one `[active: <v>]` token and one `[order: <n>]` marker from
+/// the end of `text`, in either order, and returns the remaining text plus
+/// the extracted values.
+///
+/// `[order:]` is only a marker where the format defines it — `order_defined`
+/// is true for H3 headings and skill bullets, false on key-point bullets,
+/// `Technologies:` items, and every markerless position. When it is not a
+/// marker the bracket stays literal, so a `[active:]` before it is no longer
+/// in token position and stays literal too.
+///
+/// A second marker of an already-peeled kind ends the peel, leaving earlier
+/// duplicates as literal text. An `[active:]` token whose value is not
+/// `true` or `false` (trimmed, case-sensitive) is a parse error.
+fn peel_suffix_markers(
+    text: &str,
+    order_defined: bool,
+) -> Result<(String, Option<i32>, Option<bool>), MarkdownError> {
+    let mut rest = text.trim_end().to_string();
+    let mut display_order = None;
+    let mut active = None;
+
+    for _ in 0..2 {
+        let Some(start) = trailing_bracket_start(&rest) else {
+            break;
+        };
+        let inner = &rest[start + 1..rest.len() - 1];
+        if let Some(value) = inner.strip_prefix("active:") {
+            if active.is_some() {
+                break;
+            }
+            let value = value.trim();
+            active = Some(match value {
+                "true" => true,
+                "false" => false,
+                _ => {
+                    return Err(MarkdownError::InvalidMarkdown(format!(
+                        "Invalid [active:] marker value '{}': expected 'true' or 'false'",
+                        value
+                    )));
+                }
+            });
+        } else if order_defined && inner.starts_with("order:") {
+            if display_order.is_some() {
+                break;
+            }
+            display_order = inner[6..].trim().parse().ok();
+        } else {
+            break;
         }
+        rest = rest[..start].trim_end().to_string();
     }
-    text.to_string()
+
+    Ok((rest, display_order, active))
+}
+
+/// Emit suffix for inactive rows; active rows carry no marker.
+fn active_suffix(active: bool) -> &'static str {
+    if active { "" } else { " [active: false]" }
 }
 
 fn parse_education_heading(text: &str) -> Result<ParsedEducation, MarkdownError> {
-    let text = text.trim();
-    let (start_date, end_date, paren_open) = find_last_date_range(text)?;
+    let (text, display_order, active) = peel_suffix_markers(text.trim(), true)?;
+    let (start_date, end_date, paren_open) = find_last_date_range(&text)?;
     let header_part = text[..paren_open].trim();
 
     let separator = " - ";
@@ -986,8 +1065,6 @@ fn parse_education_heading(text: &str) -> Result<ParsedEducation, MarkdownError>
         )));
     }
 
-    let display_order = extract_display_order(text);
-
     Ok(ParsedEducation {
         education_stage,
         institution_name,
@@ -996,12 +1073,13 @@ fn parse_education_heading(text: &str) -> Result<ParsedEducation, MarkdownError>
         end_date,
         description: None,
         display_order,
+        active: active.unwrap_or(true),
     })
 }
 
 fn parse_work_experience_heading(text: &str) -> Result<ParsedWorkExperience, MarkdownError> {
-    let text = text.trim();
-    let (start_date, end_date, paren_open) = find_last_date_range(text)?;
+    let (text, display_order, active) = peel_suffix_markers(text.trim(), true)?;
+    let (start_date, end_date, paren_open) = find_last_date_range(&text)?;
     let title_part = text[..paren_open].trim();
 
     let separator = " - ";
@@ -1021,8 +1099,6 @@ fn parse_work_experience_heading(text: &str) -> Result<ParsedWorkExperience, Mar
         )));
     }
 
-    let display_order = extract_display_order(text);
-
     Ok(ParsedWorkExperience {
         job_title,
         company_name,
@@ -1030,15 +1106,18 @@ fn parse_work_experience_heading(text: &str) -> Result<ParsedWorkExperience, Mar
         end_date,
         description: None,
         display_order,
+        active: active.unwrap_or(true),
     })
 }
 
 fn parse_skill_bullet(text: &str) -> Result<ParsedSkill, MarkdownError> {
-    let text = text.trim();
+    // `[order:]` is a marker on skill bullets; `[active:]` is a token too but
+    // skills carry no `active` column, so the value is stripped and ignored.
+    let (text, display_order, _active) = peel_suffix_markers(text.trim(), true)?;
+    let text = text.as_str();
     if let Some(pos) = text.rfind(" - ") {
         let name = text[..pos].trim().to_string();
-        let pct_part = strip_order_suffix(text[pos + 3..].trim());
-        let pct_str = pct_part.trim_end_matches('%').trim();
+        let pct_str = text[pos + 3..].trim().trim_end_matches('%').trim();
         let confidence_percentage = pct_str.parse().map_err(|_| {
             MarkdownError::InvalidMarkdown(format!(
                 "Skill bullet has invalid percentage: '{}'",
@@ -1057,7 +1136,6 @@ fn parse_skill_bullet(text: &str) -> Result<ParsedSkill, MarkdownError> {
                 confidence_percentage
             )));
         }
-        let display_order = extract_display_order(text);
         return Ok(ParsedSkill {
             skill_name: name,
             confidence_percentage,
@@ -1115,24 +1193,29 @@ mod tests {
     }
 
     #[test]
-    fn test_order_suffix_extraction_is_consistent_with_multiple_markers() {
-        let text = "Rust [order: 1] extra [order: 2]";
-        assert_eq!(extract_display_order(text), Some(2));
-        assert_eq!(strip_order_suffix(text), "Rust [order: 1] extra");
+    fn test_peel_suffix_markers_is_consistent_with_multiple_markers() {
+        let (text, order, active) =
+            peel_suffix_markers("Rust [order: 1] extra [order: 2]", true).expect("peel ok");
+        assert_eq!(text, "Rust [order: 1] extra");
+        assert_eq!(order, Some(2));
+        assert_eq!(active, None);
     }
 
     #[test]
-    fn test_non_trailing_order_marker_is_not_extracted() {
-        let text = "Rust [order: not a number] extra";
-        assert_eq!(extract_display_order(text), None);
-        assert_eq!(strip_order_suffix(text), "Rust [order: not a number] extra");
+    fn test_non_trailing_order_marker_is_not_peeled() {
+        let (text, order, active) =
+            peel_suffix_markers("Rust [order: not a number] extra", true).expect("peel ok");
+        assert_eq!(text, "Rust [order: not a number] extra");
+        assert_eq!(order, None);
+        assert_eq!(active, None);
     }
 
     #[test]
-    fn test_order_marker_without_closing_bracket_is_not_extracted() {
-        let text = "Rust [order: 1";
-        assert_eq!(extract_display_order(text), None);
-        assert_eq!(strip_order_suffix(text), "Rust [order: 1");
+    fn test_order_marker_without_closing_bracket_is_not_peeled() {
+        let (text, order, active) = peel_suffix_markers("Rust [order: 1", true).expect("peel ok");
+        assert_eq!(text, "Rust [order: 1");
+        assert_eq!(order, None);
+        assert_eq!(active, None);
     }
 
     #[test]
@@ -1161,6 +1244,7 @@ mod tests {
             education_key_points: vec![ParsedEducationKeyPoint {
                 education_index: 0,
                 key_point: "Graduated".to_string(),
+                active: true,
             }],
             skills: vec![],
             work_experiences: vec![],
@@ -1193,6 +1277,7 @@ mod tests {
             work_experience_key_points: vec![ParsedWorkExperienceKeyPoint {
                 work_experience_index: 0,
                 key_point: "Did work".to_string(),
+                active: true,
             }],
             portfolio_projects: vec![],
             portfolio_key_points: vec![],
@@ -1224,6 +1309,7 @@ mod tests {
             portfolio_key_points: vec![ParsedPortfolioKeyPoint {
                 portfolio_project_index: 0,
                 key_point: "Built stuff".to_string(),
+                active: true,
             }],
             portfolio_technologies: vec![],
             languages: vec![],
@@ -1496,6 +1582,7 @@ mod tests {
             video_url: Some("https://example.com/video.mp4".to_string()),
             description: None,
             display_order: None,
+            active: true,
         };
         assert_eq!(
             project.video_url.as_deref(),
@@ -1767,5 +1854,378 @@ mod tests {
         assert_eq!(fm.resume_id, Some(serde_json::json!(21)));
         assert_eq!(fm.company_name, Some(serde_json::json!("Acme")));
         assert_eq!(parsed.resume.name, "Jane Doe");
+    }
+
+    fn education_row(active: bool) -> domain::models::Education {
+        domain::models::Education {
+            id: 11,
+            resume_id: 7,
+            education_stage: "Bachelor's".to_string(),
+            institution_name: "University of ABC".to_string(),
+            degree: None,
+            start_date: NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+            end_date: Some(NaiveDate::from_ymd_opt(2024, 5, 1).unwrap()),
+            description: None,
+            display_order: Some(0),
+            created_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            active,
+            start_date_precision: "month".to_string(),
+            end_date_precision: Some("month".to_string()),
+        }
+    }
+
+    fn work_row(active: bool) -> domain::models::WorkExperience {
+        domain::models::WorkExperience {
+            id: 21,
+            resume_id: 7,
+            job_title: "Engineer".to_string(),
+            company_name: Some("Tech Corp".to_string()),
+            start_date: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+            end_date: None,
+            description: None,
+            display_order: Some(0),
+            created_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            active,
+            start_date_precision: "month".to_string(),
+            end_date_precision: None,
+        }
+    }
+
+    fn project_row(active: bool) -> domain::models::PortfolioProject {
+        domain::models::PortfolioProject {
+            id: 31,
+            resume_id: 7,
+            project_name: "My Project".to_string(),
+            image_url: None,
+            project_link: None,
+            source_code_link: None,
+            description: None,
+            display_order: Some(0),
+            created_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            active,
+            video_url: None,
+        }
+    }
+
+    fn ts() -> chrono::NaiveDateTime {
+        NaiveDate::from_ymd_opt(2020, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+    }
+
+    fn active_fixture(active: bool) -> FullResume {
+        let mut resume = full_resume(resume_row());
+        resume.education.push(education_row(active));
+        resume.education_key_points.insert(
+            11,
+            vec![domain::models::EducationKeyPoint {
+                id: 111,
+                education_id: 11,
+                key_point: "Graduated".to_string(),
+                display_order: None,
+                created_at: ts(),
+                active,
+            }],
+        );
+        resume.work_experiences.push(work_row(active));
+        resume.work_experience_key_points.insert(
+            21,
+            vec![domain::models::WorkExperienceKeyPoint {
+                id: 211,
+                work_experience_id: 21,
+                key_point: "Did work".to_string(),
+                display_order: None,
+                created_at: ts(),
+                active,
+            }],
+        );
+        resume.portfolio_projects.push(project_row(active));
+        resume.portfolio_key_points.insert(
+            31,
+            vec![domain::models::PortfolioKeyPoint {
+                id: 311,
+                portfolio_project_id: 31,
+                key_point: "Built stuff".to_string(),
+                display_order: None,
+                created_at: ts(),
+                active,
+            }],
+        );
+        resume.portfolio_technologies.insert(
+            31,
+            vec![
+                domain::models::PortfolioTechnology {
+                    id: 411,
+                    portfolio_project_id: 31,
+                    technology_name: "Rust".to_string(),
+                    display_order: None,
+                    created_at: ts(),
+                    active,
+                },
+                domain::models::PortfolioTechnology {
+                    id: 412,
+                    portfolio_project_id: 31,
+                    technology_name: "Rocket".to_string(),
+                    display_order: None,
+                    created_at: ts(),
+                    active: true,
+                },
+            ],
+        );
+        resume
+    }
+
+    #[test]
+    fn test_active_marker_on_education_heading() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education[0].active);
+        assert_eq!(parsed.education[0].institution_name, "University of ABC");
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: true]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(parsed.education[0].active);
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(parsed.education[0].active);
+    }
+
+    #[test]
+    fn test_active_marker_on_work_and_portfolio_headings() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present) [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.work_experiences[0].active);
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.portfolio_projects[0].active);
+    }
+
+    #[test]
+    fn test_active_marker_composes_with_order_either_order_on_headings() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [order: 3] [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education[0].active);
+        assert_eq!(parsed.education[0].display_order, Some(3));
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false] [order: 3]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education[0].active);
+        assert_eq!(parsed.education[0].display_order, Some(3));
+    }
+
+    #[test]
+    fn test_active_marker_on_key_point_bullets() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [active: false]\n- Honors\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present)\n- Led team [active: false]\n\n## Portfolio Projects\n\n### My Project\n- Built stuff [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education_key_points[0].active);
+        assert_eq!(parsed.education_key_points[0].key_point, "Graduated");
+        assert!(parsed.education_key_points[1].active);
+        assert!(!parsed.work_experience_key_points[0].active);
+        assert_eq!(parsed.work_experience_key_points[0].key_point, "Led team");
+        assert!(!parsed.portfolio_key_points[0].active);
+        assert_eq!(parsed.portfolio_key_points[0].key_point, "Built stuff");
+    }
+
+    #[test]
+    fn test_active_marker_per_technology_item() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust [active: false], Rocket, Diesel [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.portfolio_technologies.len(), 3);
+        assert_eq!(parsed.portfolio_technologies[0].technology_name, "Rust");
+        assert!(!parsed.portfolio_technologies[0].active);
+        assert_eq!(parsed.portfolio_technologies[1].technology_name, "Rocket");
+        assert!(parsed.portfolio_technologies[1].active);
+        assert_eq!(parsed.portfolio_technologies[2].technology_name, "Diesel");
+        assert!(!parsed.portfolio_technologies[2].active);
+    }
+
+    #[test]
+    fn test_order_marker_stays_literal_on_key_point_bullets() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [order: 2] [active: false]\n- Honors [active: false] [order: 2]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.education_key_points[0].key_point,
+            "Graduated [order: 2]"
+        );
+        assert!(!parsed.education_key_points[0].active);
+        // `[order:]` is not a marker on key-point bullets, so a preceding
+        // `[active:]` is not in token position and stays literal.
+        assert_eq!(
+            parsed.education_key_points[1].key_point,
+            "Honors [active: false] [order: 2]"
+        );
+        assert!(parsed.education_key_points[1].active);
+    }
+
+    #[test]
+    fn test_order_marker_stays_literal_on_technology_items() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust [order: 1] [active: false], Go [active: false] [order: 1]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.portfolio_technologies[0].technology_name,
+            "Rust [order: 1]"
+        );
+        assert!(!parsed.portfolio_technologies[0].active);
+        assert_eq!(
+            parsed.portfolio_technologies[1].technology_name,
+            "Go [active: false] [order: 1]"
+        );
+        assert!(parsed.portfolio_technologies[1].active);
+    }
+
+    #[test]
+    fn test_malformed_active_marker_is_error_on_every_position() {
+        for bad in [
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: banana]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active:]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: 2]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: TRUE]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false] [order: 1] [active: yes]",
+        ] {
+            let markdown = format!(
+                "# Resume\n\n- Email: test@example.com\n\n## Education\n\n{}\n",
+                bad
+            );
+            assert!(
+                markdown_to_resume(&markdown).is_err(),
+                "expected error for {}",
+                bad
+            );
+        }
+
+        // Malformed values error on markerless entities too.
+        let markdown =
+            "# Resume\n\n- Email: test@example.com\n\n## Skills\n\n- Rust - 90% [active: banana]\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown = "# Resume\n\n- Email: test@example.com [active: banana]\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown = "# Resume [active: banana]\n\n- Email: test@example.com\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown =
+            "# Resume\n\n- Email: test@example.com\n\n## Skills [active: banana]\n\n- Rust - 90%\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust [active: nope]\n";
+        assert!(markdown_to_resume(markdown).is_err());
+    }
+
+    #[test]
+    fn test_unclosed_active_marker_stays_literal() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [active: false\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.education_key_points[0].key_point,
+            "Graduated [active: false"
+        );
+        assert!(parsed.education_key_points[0].active);
+    }
+
+    #[test]
+    fn test_stray_active_marker_stripped_on_markerless_positions() {
+        let markdown = "# Jane [active: false]\n\n- Email: jane@example.com [active: false]\n- Public: true [active: false]\n\n## Skills [active: false]\n\n- Rust - 90% [active: false]\n- Go - 80% [active: false] [order: 3]\n- C - 70% [order: 1] [active: false]\n\n## Languages & Frameworks\n\n### Rust [active: false]\n- Rocket [active: false]\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Degree: BSc [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.name, "Jane");
+        assert_eq!(parsed.email, "jane@example.com");
+        assert!(parsed.is_public);
+        assert_eq!(parsed.skills.len(), 3);
+        assert_eq!(parsed.skills[0].skill_name, "Rust");
+        assert_eq!(parsed.skills[0].confidence_percentage, 90);
+        assert_eq!(parsed.skills[1].skill_name, "Go");
+        assert_eq!(parsed.skills[1].display_order, Some(3));
+        assert_eq!(parsed.skills[2].skill_name, "C");
+        assert_eq!(parsed.skills[2].display_order, Some(1));
+        assert_eq!(parsed.languages[0].language_name, "Rust");
+        assert_eq!(parsed.frameworks[0].framework_name, "Rocket");
+        assert_eq!(parsed.education[0].degree.as_deref(), Some("BSc"));
+        assert!(parsed.education_key_points.is_empty());
+    }
+
+    #[test]
+    fn test_active_marker_literal_in_summary_body() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Summary\n\nEngineer [active: false] at large.\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.executive_summary.as_deref(),
+            Some("Engineer [active: false] at large.")
+        );
+    }
+
+    #[test]
+    fn test_mid_line_active_marker_stays_literal() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [active: false] with honors\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.education_key_points[0].key_point,
+            "Graduated [active: false] with honors"
+        );
+        assert!(parsed.education_key_points[0].active);
+    }
+
+    #[test]
+    fn test_marker_only_key_point_bullet_strips_to_empty() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.education_key_points.len(), 1);
+        assert_eq!(parsed.education_key_points[0].key_point, "");
+        assert!(!parsed.education_key_points[0].active);
+    }
+
+    #[test]
+    fn test_marker_only_technology_item_is_dropped() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust, [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.portfolio_technologies.len(), 1);
+        assert_eq!(parsed.portfolio_technologies[0].technology_name, "Rust");
+        assert!(parsed.portfolio_technologies[0].active);
+    }
+
+    #[test]
+    fn test_export_emits_active_false_markers() {
+        let output = resume_to_markdown(&active_fixture(false), true);
+        assert!(output.contains("[order: 0] [active: false]"), "{}", output);
+        assert!(output.contains("- Graduated [active: false]"), "{}", output);
+        assert!(output.contains("- Did work [active: false]"), "{}", output);
+        assert!(
+            output.contains("- Built stuff [active: false]"),
+            "{}",
+            output
+        );
+        assert!(
+            output.contains("- Technologies: Rust [active: false], Rocket"),
+            "{}",
+            output
+        );
+        assert!(!output.contains("[active: true]"), "{}", output);
+    }
+
+    #[test]
+    fn test_export_emits_no_active_marker_on_active_rows() {
+        let output = resume_to_markdown(&active_fixture(true), true);
+        assert!(!output.contains("[active:"), "{}", output);
+    }
+
+    #[test]
+    fn test_active_marker_export_parse_round_trip() {
+        let output = resume_to_markdown(&active_fixture(false), true);
+        let parsed = markdown_to_resume(&output).expect("reparse ok");
+        assert!(!parsed.education[0].active);
+        assert!(!parsed.education_key_points[0].active);
+        assert!(!parsed.work_experiences[0].active);
+        assert!(!parsed.work_experience_key_points[0].active);
+        assert!(!parsed.portfolio_projects[0].active);
+        assert!(!parsed.portfolio_key_points[0].active);
+        assert!(!parsed.portfolio_technologies[0].active);
+        assert!(parsed.portfolio_technologies[1].active);
     }
 }

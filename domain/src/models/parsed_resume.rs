@@ -32,12 +32,14 @@ pub struct ParsedEducation {
     pub end_date: Option<PartialDate>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedEducationKeyPoint {
     pub education_index: usize,
     pub key_point: String,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,12 +57,14 @@ pub struct ParsedWorkExperience {
     pub end_date: Option<PartialDate>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedWorkExperienceKeyPoint {
     pub work_experience_index: usize,
     pub key_point: String,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,18 +76,21 @@ pub struct ParsedPortfolioProject {
     pub video_url: Option<String>,
     pub description: Option<String>,
     pub display_order: Option<i32>,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedPortfolioKeyPoint {
     pub portfolio_project_index: usize,
     pub key_point: String,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedPortfolioTechnology {
     pub portfolio_project_index: usize,
     pub technology_name: String,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

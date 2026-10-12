@@ -1975,3 +1975,373 @@ fn test_portfolio_url_bullets_too_long_rejected() {
         );
     }
 }
+
+/// GETs a JSON list endpoint as the fixture's owner and returns the `body`
+/// array.
+fn get_list(fixture: &support::Fixture, url: String) -> Vec<Value> {
+    let response = fixture
+        .client()
+        .get(&url)
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok, "GET {} failed", url);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("list body")).expect("valid json");
+    json["body"].as_array().expect("list array").clone()
+}
+
+/// PUTs `{"active": false}` on a single entity by id.
+fn set_inactive(fixture: &support::Fixture, url: String) {
+    let response = fixture
+        .client()
+        .put(url.clone())
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(r#"{"active": false}"#)
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok, "PUT {} failed", url);
+}
+
+#[test]
+fn test_active_markdown_round_trip() {
+    let mut fixture = support::Fixture::new(9_227_080);
+    let (resume_id, _email) = create_full_resume(&mut fixture, 9_227_080);
+
+    let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
+    let education_id = education[0]["id"].as_i64().expect("education id") as i32;
+    let edu_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/education/{}/key_points",
+            resume_id, education_id
+        ),
+    );
+    let work = get_list(
+        &fixture,
+        format!("/api/resume/{}/work_experiences", resume_id),
+    );
+    let work_id = work[0]["id"].as_i64().expect("work id") as i32;
+    let work_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/work_experiences/{}/key_points",
+            resume_id, work_id
+        ),
+    );
+    let projects = get_list(
+        &fixture,
+        format!("/api/resume/{}/portfolio_projects", resume_id),
+    );
+    let project_id = projects[0]["id"].as_i64().expect("project id") as i32;
+    let proj_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/key_points",
+            resume_id, project_id
+        ),
+    );
+    let techs = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/technologies",
+            resume_id, project_id
+        ),
+    );
+
+    // Deactivate all seven active-bearing entities, then export+re-import.
+    for url in [
+        format!("/api/education/{}", education_id),
+        format!(
+            "/api/education_key_points/{}",
+            edu_kps[0]["id"].as_i64().expect("edu kp id")
+        ),
+        format!("/api/work_experiences/{}", work_id),
+        format!(
+            "/api/work_experience_key_points/{}",
+            work_kps[0]["id"].as_i64().expect("work kp id")
+        ),
+        format!("/api/portfolio_projects/{}", project_id),
+        format!(
+            "/api/portfolio_key_points/{}",
+            proj_kps[0]["id"].as_i64().expect("project kp id")
+        ),
+        format!(
+            "/api/portfolio_technologies/{}",
+            techs[0]["id"].as_i64().expect("tech id")
+        ),
+    ] {
+        set_inactive(&fixture, url);
+    }
+
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", resume_id))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(export_response.status(), Status::Ok);
+    let markdown = export_response.into_string().expect("markdown body");
+    assert!(
+        markdown.contains("[active: false]"),
+        "export should mark inactive rows: {}",
+        markdown
+    );
+
+    // Keep the front-matter `resume_id` marker so the import rewrites the same
+    // resume — this is the owner export→import round-trip.
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Ok);
+
+    // The import deletes and reinserts all children, so every entity id is
+    // new — fetch the fresh parent ids from the post-import lists.
+    let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
+    assert_eq!(education.len(), 1);
+    assert_eq!(education[0]["active"], false);
+    let new_education_id = education[0]["id"].as_i64().expect("education id") as i32;
+    let edu_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/education/{}/key_points",
+            resume_id, new_education_id
+        ),
+    );
+    assert_eq!(edu_kps[0]["active"], false);
+
+    let work = get_list(
+        &fixture,
+        format!("/api/resume/{}/work_experiences", resume_id),
+    );
+    assert_eq!(work[0]["active"], false);
+    let new_work_id = work[0]["id"].as_i64().expect("work id") as i32;
+    let work_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/work_experiences/{}/key_points",
+            resume_id, new_work_id
+        ),
+    );
+    assert_eq!(work_kps[0]["active"], false);
+
+    let projects = get_list(
+        &fixture,
+        format!("/api/resume/{}/portfolio_projects", resume_id),
+    );
+    assert_eq!(projects[0]["active"], false);
+    let new_project_id = projects[0]["id"].as_i64().expect("project id") as i32;
+    let proj_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/key_points",
+            resume_id, new_project_id
+        ),
+    );
+    assert_eq!(proj_kps[0]["active"], false);
+    let techs = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/technologies",
+            resume_id, new_project_id
+        ),
+    );
+    assert_eq!(techs[0]["active"], false);
+}
+
+#[test]
+fn test_import_markdown_active_markers() {
+    let fixture = support::Fixture::new(9_227_081);
+    let unique_email = unique_markdown_email(9_227_081);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n- Public: true\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false]\n- Graduated [active: false]\n- Honors\n\n## Skills\n\n- Rust - 90%\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present) [active: false]\n- Led team [active: false]\n\n## Portfolio Projects\n\n### My Project [active: false]\n- Technologies: Rust [active: false], Rocket\n- Built stuff [active: false]\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+    let import_json: Value =
+        serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+
+    let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
+    assert_eq!(education[0]["active"], false);
+    let edu_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/education/{}/key_points",
+            resume_id,
+            education[0]["id"].as_i64().expect("edu id") as i32
+        ),
+    );
+    assert_eq!(edu_kps[0]["active"], false);
+    assert_eq!(edu_kps[1]["active"], true);
+
+    let work = get_list(
+        &fixture,
+        format!("/api/resume/{}/work_experiences", resume_id),
+    );
+    assert_eq!(work[0]["active"], false);
+    let work_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/work_experiences/{}/key_points",
+            resume_id,
+            work[0]["id"].as_i64().expect("work id") as i32
+        ),
+    );
+    assert_eq!(work_kps[0]["active"], false);
+
+    let projects = get_list(
+        &fixture,
+        format!("/api/resume/{}/portfolio_projects", resume_id),
+    );
+    assert_eq!(projects[0]["active"], false);
+    let project_id = projects[0]["id"].as_i64().expect("project id") as i32;
+    let proj_kps = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/key_points",
+            resume_id, project_id
+        ),
+    );
+    assert_eq!(proj_kps[0]["active"], false);
+    let techs = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/technologies",
+            resume_id, project_id
+        ),
+    );
+    assert_eq!(techs[0]["active"], false);
+    assert_eq!(techs[1]["active"], true);
+}
+
+#[test]
+fn test_import_malformed_active_marker_returns_400() {
+    let fixture = support::Fixture::new(9_227_082);
+    let unique_email = unique_markdown_email(9_227_082);
+    for bad_line in [
+        "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: banana]",
+        "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active:]",
+    ] {
+        let markdown = format!(
+            "# Jane Doe\n\n- Email: {}\n\n## Education\n\n{}\n",
+            unique_email, bad_line
+        );
+        let response = fixture
+            .client()
+            .post("/api/resume/import/markdown")
+            .header(fixture.auth_header())
+            .header(markdown_content_type())
+            .body(markdown)
+            .dispatch();
+        assert_eq!(
+            response.status(),
+            Status::BadRequest,
+            "expected 400 for {}",
+            bad_line
+        );
+    }
+}
+
+#[test]
+fn test_import_active_marker_either_order_on_headings() {
+    let fixture = support::Fixture::new(9_227_083);
+    let unique_email = unique_markdown_email(9_227_083);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false] [order: 3]\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present) [order: 2] [active: false]\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+    let import_json: Value =
+        serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+
+    let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
+    assert_eq!(education[0]["active"], false);
+    assert_eq!(education[0]["display_order"], 3);
+    let work = get_list(
+        &fixture,
+        format!("/api/resume/{}/work_experiences", resume_id),
+    );
+    assert_eq!(work[0]["active"], false);
+    assert_eq!(work[0]["display_order"], 2);
+}
+
+#[test]
+fn test_import_stray_active_marker_stripped_on_markerless_lines() {
+    let fixture = support::Fixture::new(9_227_084);
+    let unique_email = unique_markdown_email(9_227_084);
+    let markdown = format!(
+        "# Jane [active: false]\n\n- Email: {} [active: false]\n- Public: true [active: false]\n\n## Skills\n\n- Rust - 90% [active: false]\n- Go - 80% [active: false] [order: 2]\n\n## Languages & Frameworks\n\n### Rust [active: false]\n- Rocket [active: false]\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+    let import_json: Value =
+        serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+    assert_eq!(import_json["body"]["name"], "Jane");
+    assert_eq!(import_json["body"]["email"], unique_email);
+    assert_eq!(import_json["body"]["is_public"], true);
+
+    let skills = get_list(&fixture, format!("/api/resume/{}/skills", resume_id));
+    assert_eq!(skills[0]["skill_name"], "Rust");
+    assert_eq!(skills[0]["confidence_percentage"], 90);
+    assert_eq!(skills[1]["skill_name"], "Go");
+    assert_eq!(skills[1]["display_order"], 2);
+
+    let languages = get_list(&fixture, format!("/api/resume/{}/languages", resume_id));
+    assert_eq!(languages[0]["language_name"], "Rust");
+    let frameworks = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/languages/{}/frameworks",
+            resume_id,
+            languages[0]["id"].as_i64().expect("language id") as i32
+        ),
+    );
+    assert_eq!(frameworks[0]["framework_name"], "Rocket");
+}
+
+#[test]
+fn test_import_malformed_active_marker_on_markerless_entity_returns_400() {
+    let fixture = support::Fixture::new(9_227_085);
+    let unique_email = unique_markdown_email(9_227_085);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Skills\n\n- Rust - 90% [active: banana]\n",
+        unique_email
+    );
+    let response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(response.status(), Status::BadRequest);
+}
