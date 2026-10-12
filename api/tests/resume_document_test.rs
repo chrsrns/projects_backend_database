@@ -510,3 +510,61 @@ fn test_convert_malformed_front_matter_is_400() {
 
     assert_eq!(response.status(), Status::BadRequest);
 }
+
+#[test]
+fn test_convert_emits_parsed_active_flags() {
+    let markdown = "# Jane Doe\n\n- Email: jane.doe@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false]\n- Graduated [active: false]\n- Honors\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present) [active: false]\n- Led team [active: false]\n\n## Portfolio Projects\n\n### My Project [active: false]\n- Technologies: Rust [active: false], Rocket\n- Built stuff [active: false]\n";
+    let client = client();
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("convert body")).expect("valid json");
+    let document = &json["body"]["document"];
+
+    assert_eq!(document["education"][0]["active"], false);
+    let edu_kps = &document["education_key_points"]["1"];
+    assert_eq!(edu_kps[0]["active"], false);
+    assert_eq!(edu_kps[1]["active"], true);
+    assert_eq!(document["work_experiences"][0]["active"], false);
+    assert_eq!(document["work_experience_key_points"]["1"][0]["active"], false);
+    assert_eq!(document["portfolio_projects"][0]["active"], false);
+    assert_eq!(document["portfolio_key_points"]["1"][0]["active"], false);
+    let techs = &document["portfolio_technologies"]["1"];
+    assert_eq!(techs[0]["active"], false);
+    assert_eq!(techs[1]["active"], true);
+    assert!(document["skills"].is_null() || document["skills"][0].get("active").is_none());
+}
+
+#[test]
+fn test_convert_malformed_active_marker_is_400() {
+    let markdown = "# Jane Doe\n\n- Email: jane.doe@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: banana]\n";
+    let client = client();
+    let response = client
+        .post("/api/resume/convert/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(response.status(), Status::BadRequest);
+}
+
+#[test]
+fn test_validate_malformed_active_marker_is_invalid() {
+    let markdown = "# Jane Doe\n\n- Email: jane.doe@example.com\n\n## Skills\n\n- Rust - 90% [active: banana]\n";
+    let client = client();
+    let response = client
+        .post("/api/resume/validate/markdown")
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+    let json: Value =
+        serde_json::from_str(&response.into_string().expect("validate body")).expect("valid json");
+    assert_eq!(json["body"]["valid"], false);
+    assert_eq!(json["body"]["errors"].as_array().expect("errors").len(), 1);
+}

@@ -2252,3 +2252,96 @@ fn test_import_malformed_active_marker_returns_400() {
         );
     }
 }
+
+#[test]
+fn test_import_active_marker_either_order_on_headings() {
+    let fixture = support::Fixture::new(9_227_083);
+    let unique_email = unique_markdown_email(9_227_083);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false] [order: 3]\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present) [order: 2] [active: false]\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+    let import_json: Value =
+        serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+
+    let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
+    assert_eq!(education[0]["active"], false);
+    assert_eq!(education[0]["display_order"], 3);
+    let work = get_list(
+        &fixture,
+        format!("/api/resume/{}/work_experiences", resume_id),
+    );
+    assert_eq!(work[0]["active"], false);
+    assert_eq!(work[0]["display_order"], 2);
+}
+
+#[test]
+fn test_import_stray_active_marker_stripped_on_markerless_lines() {
+    let fixture = support::Fixture::new(9_227_084);
+    let unique_email = unique_markdown_email(9_227_084);
+    let markdown = format!(
+        "# Jane [active: false]\n\n- Email: {} [active: false]\n- Public: true [active: false]\n\n## Skills\n\n- Rust - 90% [active: false]\n- Go - 80% [active: false] [order: 2]\n\n## Languages & Frameworks\n\n### Rust [active: false]\n- Rocket [active: false]\n",
+        unique_email
+    );
+
+    let import_response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(import_response.status(), Status::Created);
+    let import_json: Value =
+        serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
+    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+    assert_eq!(import_json["body"]["name"], "Jane");
+    assert_eq!(import_json["body"]["email"], unique_email);
+    assert_eq!(import_json["body"]["is_public"], true);
+
+    let skills = get_list(&fixture, format!("/api/resume/{}/skills", resume_id));
+    assert_eq!(skills[0]["skill_name"], "Rust");
+    assert_eq!(skills[0]["confidence_percentage"], 90);
+    assert_eq!(skills[1]["skill_name"], "Go");
+    assert_eq!(skills[1]["display_order"], 2);
+
+    let languages = get_list(&fixture, format!("/api/resume/{}/languages", resume_id));
+    assert_eq!(languages[0]["language_name"], "Rust");
+    let frameworks = get_list(
+        &fixture,
+        format!(
+            "/api/resume/{}/languages/{}/frameworks",
+            resume_id,
+            languages[0]["id"].as_i64().expect("language id") as i32
+        ),
+    );
+    assert_eq!(frameworks[0]["framework_name"], "Rocket");
+}
+
+#[test]
+fn test_import_malformed_active_marker_on_markerless_entity_returns_400() {
+    let fixture = support::Fixture::new(9_227_085);
+    let unique_email = unique_markdown_email(9_227_085);
+    let markdown = format!(
+        "# Jane Doe\n\n- Email: {}\n\n## Skills\n\n- Rust - 90% [active: banana]\n",
+        unique_email
+    );
+    let response = fixture
+        .client()
+        .post("/api/resume/import/markdown")
+        .header(fixture.auth_header())
+        .header(markdown_content_type())
+        .body(markdown)
+        .dispatch();
+    assert_eq!(response.status(), Status::BadRequest);
+}

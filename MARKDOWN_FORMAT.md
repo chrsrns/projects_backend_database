@@ -93,6 +93,7 @@ Systems engineer with distributed-systems experience.
 - The final parenthesized segment must be a valid date range (see [Dates](#dates) for syntax).
 - If the institution name itself contains parentheses, the last parenthesized segment is still parsed as the date range (e.g. `University of (ABC) (Sep 2020 - May 2024)`).
 - `[order: <number>]` is optional and controls display order.
+- `[active: true|false]` is optional on the heading and on key-point bullets (see [Active flag](#active-flag)).
 - Bullets:
   - `Degree:` sets the degree field.
   - `Description:` sets the description field.
@@ -127,6 +128,7 @@ Systems engineer with distributed-systems experience.
 - The company name and its ` - ` separator are optional.
 - The final parenthesized segment must be a valid date range (see [Dates](#dates) for syntax).
 - `[order: <number>]` is optional.
+- `[active: true|false]` is optional on the heading and on key-point bullets (see [Active flag](#active-flag)).
 - Bullets:
   - `Description:` sets the description field.
   - All other bullets are work-experience key points.
@@ -147,12 +149,13 @@ Systems engineer with distributed-systems experience.
 
 - H3 heading format: `### <Project Name> [order: <number>]`
 - `[order: <number>]` is optional.
+- `[active: true|false]` is optional on the heading and on key-point bullets (see [Active flag](#active-flag)).
 - Bullets:
   - `Live:` project link URL. Limited to 500 characters. An empty or whitespace-only value is stored as `NULL`. A Markdown link is flattened to `text (url)` and stored as plain text.
   - `Source:` source-code link URL. Limited to 500 characters. An empty or whitespace-only value is stored as `NULL`. A Markdown link is flattened to `text (url)` and stored as plain text.
   - `Image:` image URL. Limited to 500 characters. An empty or whitespace-only value is stored as `NULL`. A Markdown link is flattened to `text (url)` and stored as plain text.
   - `Video:` video URL or free text. Limited to 500 characters. Markdown link form is not supported and is ignored.
-  - `Technologies:` comma-separated list of technology names.
+  - `Technologies:` comma-separated list of technology names; each item accepts an `[active: true|false]` suffix.
   - `Description:` sets the description field.
   - All other bullets are project key points.
 
@@ -207,6 +210,22 @@ Invalid date ranges:
 ## Display order
 
 Append `[order: <integer>]` to any H3 heading or skill bullet to override display order. Lower numbers appear first. If omitted, items appear in document order.
+
+## Active flag
+
+Education entries and their key points, work experiences and their key points, and portfolio projects with their key points and technologies carry an `active` flag. Append `[active: false]` to mark an entity inactive on import; `[active: true]` is also accepted. If the marker is absent the entity is imported as active.
+
+```markdown
+### Bachelor's - University of ABC (Sep 2020 - May 2024) [order: 0] [active: false]
+- Graduated [active: false]
+```
+
+- **Positions**: the marker is a trailing suffix on the H3 headings of `Education`, `Work Experience`, and `Portfolio Projects`, on bare key-point bullets in those sections, and on each comma-separated item of a `Technologies:` bullet (e.g. `Rust [active: false], Rocket`).
+- **Value**: the text inside the brackets is trimmed and must be exactly `true` or `false` (case-sensitive). `[active:]`, `[active: banana]`, and other values are rejected as a parse error — on import and convert this is a `400`, on validate it is reported in the `errors` array.
+- **Composition**: where `[order:]` is defined (H3 headings, skill bullets) the two markers may appear in either order. On key-point bullets and `Technologies:` items `[order:]` is not a marker, so it stays literal text and does not unlock a preceding `[active:]` token.
+- **Export**: the serializer emits `[active: false]` for inactive rows only, always after `[order: <n>]` when both apply (`[order: 0] [active: false]`). `[active: true]` is never emitted. A non-owner export contains active rows only, so re-importing it deletes the inactive rows entirely.
+- **Markerless positions**: a well-formed `[active: ...]` token on a line that carries no `active` flag — header bullets, `Degree:`/`Description:`/`Live:`/`Source:`/`Image:`/`Video:` bullets, skill bullets, language H3 headings, framework bullets, the H1 title, and H2 section headings — is stripped and ignored. A malformed value still errors. Body text such as the `## Summary` paragraph is never scanned for markers and keeps the text literally.
+- **Edge cases**: a literal `[active: false]` cannot be expressed in a name or field value at a token position (key-point text, skill/technology names, labeled-field and header values, headings) — it is always read as the marker. A bullet that contains only the marker imports as an empty key point; a marker-only `Technologies:` item is silently dropped. An unclosed `[active` stays literal text. The marker needs no separating space (`Graduated[active: false]` parses). Where `[order:]` is not defined the marker order matters: `# Jane [order: 1] [active: false]` strips the active marker only, while `# Jane [active: false] [order: 1]` keeps both as literal text.
 
 ## Validation limits
 
