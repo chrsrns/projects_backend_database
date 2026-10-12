@@ -1768,4 +1768,366 @@ mod tests {
         assert_eq!(fm.company_name, Some(serde_json::json!("Acme")));
         assert_eq!(parsed.resume.name, "Jane Doe");
     }
+
+    fn education_row(active: bool) -> domain::models::Education {
+        domain::models::Education {
+            id: 11,
+            resume_id: 7,
+            education_stage: "Bachelor's".to_string(),
+            institution_name: "University of ABC".to_string(),
+            degree: None,
+            start_date: NaiveDate::from_ymd_opt(2020, 9, 1).unwrap(),
+            end_date: Some(NaiveDate::from_ymd_opt(2024, 5, 1).unwrap()),
+            description: None,
+            display_order: Some(0),
+            created_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            active,
+            start_date_precision: "month".to_string(),
+            end_date_precision: Some("month".to_string()),
+        }
+    }
+
+    fn work_row(active: bool) -> domain::models::WorkExperience {
+        domain::models::WorkExperience {
+            id: 21,
+            resume_id: 7,
+            job_title: "Engineer".to_string(),
+            company_name: Some("Tech Corp".to_string()),
+            start_date: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+            end_date: None,
+            description: None,
+            display_order: Some(0),
+            created_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            active,
+            start_date_precision: "month".to_string(),
+            end_date_precision: None,
+        }
+    }
+
+    fn project_row(active: bool) -> domain::models::PortfolioProject {
+        domain::models::PortfolioProject {
+            id: 31,
+            resume_id: 7,
+            project_name: "My Project".to_string(),
+            image_url: None,
+            project_link: None,
+            source_code_link: None,
+            description: None,
+            display_order: Some(0),
+            created_at: NaiveDate::from_ymd_opt(2020, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+            active,
+            video_url: None,
+        }
+    }
+
+    fn ts() -> chrono::NaiveDateTime {
+        NaiveDate::from_ymd_opt(2020, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+    }
+
+    fn active_fixture(active: bool) -> FullResume {
+        let mut resume = full_resume(resume_row());
+        resume.education.push(education_row(active));
+        resume.education_key_points.insert(
+            11,
+            vec![domain::models::EducationKeyPoint {
+                id: 111,
+                education_id: 11,
+                key_point: "Graduated".to_string(),
+                display_order: None,
+                created_at: ts(),
+                active,
+            }],
+        );
+        resume.work_experiences.push(work_row(active));
+        resume.work_experience_key_points.insert(
+            21,
+            vec![domain::models::WorkExperienceKeyPoint {
+                id: 211,
+                work_experience_id: 21,
+                key_point: "Did work".to_string(),
+                display_order: None,
+                created_at: ts(),
+                active,
+            }],
+        );
+        resume.portfolio_projects.push(project_row(active));
+        resume.portfolio_key_points.insert(
+            31,
+            vec![domain::models::PortfolioKeyPoint {
+                id: 311,
+                portfolio_project_id: 31,
+                key_point: "Built stuff".to_string(),
+                display_order: None,
+                created_at: ts(),
+                active,
+            }],
+        );
+        resume.portfolio_technologies.insert(
+            31,
+            vec![
+                domain::models::PortfolioTechnology {
+                    id: 411,
+                    portfolio_project_id: 31,
+                    technology_name: "Rust".to_string(),
+                    display_order: None,
+                    created_at: ts(),
+                    active,
+                },
+                domain::models::PortfolioTechnology {
+                    id: 412,
+                    portfolio_project_id: 31,
+                    technology_name: "Rocket".to_string(),
+                    display_order: None,
+                    created_at: ts(),
+                    active: true,
+                },
+            ],
+        );
+        resume
+    }
+
+    #[test]
+    fn test_active_marker_on_education_heading() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education[0].active);
+        assert_eq!(parsed.education[0].institution_name, "University of ABC");
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: true]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(parsed.education[0].active);
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(parsed.education[0].active);
+    }
+
+    #[test]
+    fn test_active_marker_on_work_and_portfolio_headings() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present) [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.work_experiences[0].active);
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.portfolio_projects[0].active);
+    }
+
+    #[test]
+    fn test_active_marker_composes_with_order_either_order_on_headings() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [order: 3] [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education[0].active);
+        assert_eq!(parsed.education[0].display_order, Some(3));
+
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false] [order: 3]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education[0].active);
+        assert_eq!(parsed.education[0].display_order, Some(3));
+    }
+
+    #[test]
+    fn test_active_marker_on_key_point_bullets() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [active: false]\n- Honors\n\n## Work Experience\n\n### Engineer - Tech Corp (Jan 2020 - Present)\n- Led team [active: false]\n\n## Portfolio Projects\n\n### My Project\n- Built stuff [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert!(!parsed.education_key_points[0].active);
+        assert_eq!(parsed.education_key_points[0].key_point, "Graduated");
+        assert!(parsed.education_key_points[1].active);
+        assert!(!parsed.work_experience_key_points[0].active);
+        assert_eq!(parsed.work_experience_key_points[0].key_point, "Led team");
+        assert!(!parsed.portfolio_key_points[0].active);
+        assert_eq!(parsed.portfolio_key_points[0].key_point, "Built stuff");
+    }
+
+    #[test]
+    fn test_active_marker_per_technology_item() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust [active: false], Rocket, Diesel [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.portfolio_technologies.len(), 3);
+        assert_eq!(parsed.portfolio_technologies[0].technology_name, "Rust");
+        assert!(!parsed.portfolio_technologies[0].active);
+        assert_eq!(parsed.portfolio_technologies[1].technology_name, "Rocket");
+        assert!(parsed.portfolio_technologies[1].active);
+        assert_eq!(parsed.portfolio_technologies[2].technology_name, "Diesel");
+        assert!(!parsed.portfolio_technologies[2].active);
+    }
+
+    #[test]
+    fn test_order_marker_stays_literal_on_key_point_bullets() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [order: 2] [active: false]\n- Honors [active: false] [order: 2]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.education_key_points[0].key_point, "Graduated [order: 2]");
+        assert!(!parsed.education_key_points[0].active);
+        // `[order:]` is not a marker on key-point bullets, so a preceding
+        // `[active:]` is not in token position and stays literal.
+        assert_eq!(
+            parsed.education_key_points[1].key_point,
+            "Honors [active: false] [order: 2]"
+        );
+        assert!(parsed.education_key_points[1].active);
+    }
+
+    #[test]
+    fn test_order_marker_stays_literal_on_technology_items() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust [order: 1] [active: false], Go [active: false] [order: 1]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.portfolio_technologies[0].technology_name,
+            "Rust [order: 1]"
+        );
+        assert!(!parsed.portfolio_technologies[0].active);
+        assert_eq!(
+            parsed.portfolio_technologies[1].technology_name,
+            "Go [active: false] [order: 1]"
+        );
+        assert!(parsed.portfolio_technologies[1].active);
+    }
+
+    #[test]
+    fn test_malformed_active_marker_is_error_on_every_position() {
+        for bad in [
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: banana]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active:]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: 2]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: TRUE]",
+            "### Bachelor's - University of ABC (Sep 2020 - May 2024) [active: false] [order: 1] [active: yes]",
+        ] {
+            let markdown =
+                format!("# Resume\n\n- Email: test@example.com\n\n## Education\n\n{}\n", bad);
+            assert!(
+                markdown_to_resume(&markdown).is_err(),
+                "expected error for {}",
+                bad
+            );
+        }
+
+        // Malformed values error on markerless entities too.
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Skills\n\n- Rust - 90% [active: banana]\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown = "# Resume\n\n- Email: test@example.com [active: banana]\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown = "# Resume [active: banana]\n\n- Email: test@example.com\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Skills [active: banana]\n\n- Rust - 90%\n";
+        assert!(markdown_to_resume(markdown).is_err());
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust [active: nope]\n";
+        assert!(markdown_to_resume(markdown).is_err());
+    }
+
+    #[test]
+    fn test_unclosed_active_marker_stays_literal() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [active: false\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.education_key_points[0].key_point,
+            "Graduated [active: false"
+        );
+        assert!(parsed.education_key_points[0].active);
+    }
+
+    #[test]
+    fn test_stray_active_marker_stripped_on_markerless_positions() {
+        let markdown = "# Jane [active: false]\n\n- Email: jane@example.com [active: false]\n- Public: true [active: false]\n\n## Skills [active: false]\n\n- Rust - 90% [active: false]\n- Go - 80% [active: false] [order: 3]\n- C - 70% [order: 1] [active: false]\n\n## Languages & Frameworks\n\n### Rust [active: false]\n- Rocket [active: false]\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Degree: BSc [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.name, "Jane");
+        assert_eq!(parsed.email, "jane@example.com");
+        assert!(parsed.is_public);
+        assert_eq!(parsed.skills.len(), 3);
+        assert_eq!(parsed.skills[0].skill_name, "Rust");
+        assert_eq!(parsed.skills[0].confidence_percentage, 90);
+        assert_eq!(parsed.skills[1].skill_name, "Go");
+        assert_eq!(parsed.skills[1].display_order, Some(3));
+        assert_eq!(parsed.skills[2].skill_name, "C");
+        assert_eq!(parsed.skills[2].display_order, Some(1));
+        assert_eq!(parsed.languages[0].language_name, "Rust");
+        assert_eq!(parsed.frameworks[0].framework_name, "Rocket");
+        assert_eq!(parsed.education[0].degree.as_deref(), Some("BSc"));
+        assert!(parsed.education_key_points.is_empty());
+    }
+
+    #[test]
+    fn test_active_marker_literal_in_summary_body() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Summary\n\nEngineer [active: false] at large.\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.executive_summary.as_deref(),
+            Some("Engineer [active: false] at large.")
+        );
+    }
+
+    #[test]
+    fn test_mid_line_active_marker_stays_literal() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- Graduated [active: false] with honors\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(
+            parsed.education_key_points[0].key_point,
+            "Graduated [active: false] with honors"
+        );
+        assert!(parsed.education_key_points[0].active);
+    }
+
+    #[test]
+    fn test_marker_only_key_point_bullet_strips_to_empty() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Education\n\n### Bachelor's - University of ABC (Sep 2020 - May 2024)\n- [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.education_key_points.len(), 1);
+        assert_eq!(parsed.education_key_points[0].key_point, "");
+        assert!(!parsed.education_key_points[0].active);
+    }
+
+    #[test]
+    fn test_marker_only_technology_item_is_dropped() {
+        let markdown = "# Resume\n\n- Email: test@example.com\n\n## Portfolio Projects\n\n### My Project\n- Technologies: Rust, [active: false]\n";
+        let parsed = markdown_to_resume(markdown).expect("parse ok");
+        assert_eq!(parsed.portfolio_technologies.len(), 1);
+        assert_eq!(parsed.portfolio_technologies[0].technology_name, "Rust");
+        assert!(parsed.portfolio_technologies[0].active);
+    }
+
+    #[test]
+    fn test_export_emits_active_false_markers() {
+        let output = resume_to_markdown(&active_fixture(false), true);
+        assert!(output.contains("[order: 0] [active: false]"), "{}", output);
+        assert!(output.contains("- Graduated [active: false]"), "{}", output);
+        assert!(output.contains("- Did work [active: false]"), "{}", output);
+        assert!(output.contains("- Built stuff [active: false]"), "{}", output);
+        assert!(
+            output.contains("- Technologies: Rust [active: false], Rocket"),
+            "{}",
+            output
+        );
+        assert!(!output.contains("[active: true]"), "{}", output);
+    }
+
+    #[test]
+    fn test_export_emits_no_active_marker_on_active_rows() {
+        let output = resume_to_markdown(&active_fixture(true), true);
+        assert!(!output.contains("[active:"), "{}", output);
+    }
+
+    #[test]
+    fn test_active_marker_export_parse_round_trip() {
+        let output = resume_to_markdown(&active_fixture(false), true);
+        let parsed = markdown_to_resume(&output).expect("reparse ok");
+        assert!(!parsed.education[0].active);
+        assert!(!parsed.education_key_points[0].active);
+        assert!(!parsed.work_experiences[0].active);
+        assert!(!parsed.work_experience_key_points[0].active);
+        assert!(!parsed.portfolio_projects[0].active);
+        assert!(!parsed.portfolio_key_points[0].active);
+        assert!(!parsed.portfolio_technologies[0].active);
+        assert!(parsed.portfolio_technologies[1].active);
+    }
 }
