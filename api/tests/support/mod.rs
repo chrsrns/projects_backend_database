@@ -2,7 +2,7 @@
 use api::realtime::Hub;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use infrastructure::establish_connection;
+use infrastructure::establish_dedicated_connection;
 use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 use serde_json::Value;
@@ -96,7 +96,8 @@ impl Fixture {
     pub fn new(lock_key: i64) -> Self {
         infrastructure::run_migrations_once().expect("run pending migrations");
 
-        let mut lock_connection = establish_connection();
+        let mut lock_connection =
+            establish_dedicated_connection().expect("dedicated advisory-lock connection");
         diesel::sql_query(format!("SELECT pg_advisory_lock({})", lock_key))
             .execute(&mut lock_connection)
             .expect("acquire advisory lock");

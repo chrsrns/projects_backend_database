@@ -4,12 +4,14 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn delete_language(
     user_id_value: i32,
     language_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::languages;
 
@@ -35,6 +37,10 @@ pub fn delete_language(
                     language_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    existing.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Languages),
+                );
                 Ok(existing.resume_id)
             }
         }

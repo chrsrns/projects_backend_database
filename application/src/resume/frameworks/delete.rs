@@ -4,12 +4,14 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn delete_framework(
     user_id_value: i32,
     framework_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::frameworks;
     use domain::schema::languages;
@@ -44,6 +46,10 @@ pub fn delete_framework(
                     framework_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    language.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Frameworks),
+                );
                 Ok(language.resume_id)
             }
         }

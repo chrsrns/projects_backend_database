@@ -96,6 +96,15 @@ pub fn validate_video(video: Option<String>) -> Result<Option<String>, Applicati
     validate_optional_url(video, "Video")
 }
 
+/// Same tri-state normalization as `validate_optional_text_update` with the
+/// 500-character URL limit shared by every URL-class patch field.
+pub fn validate_optional_url_update(
+    value: Option<Option<String>>,
+    field_name: &str,
+) -> Result<Option<Option<String>>, ApplicationError> {
+    validate_optional_text_update(value, field_name, 500)
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct VariantMetadata {
     pub company_name: Option<String>,
@@ -262,6 +271,58 @@ mod tests {
     #[test]
     fn test_validate_optional_url_passes_none() {
         assert_eq!(validate_optional_url(None, "Video URL").unwrap(), None);
+    }
+
+    #[test]
+    fn test_validate_optional_url_update_absent_means_no_change() {
+        assert_eq!(
+            validate_optional_url_update(None, "Video URL").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_validate_optional_url_update_null_stores_null() {
+        assert_eq!(
+            validate_optional_url_update(Some(None), "Video URL").unwrap(),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn test_validate_optional_url_update_empty_string_means_no_change() {
+        assert_eq!(
+            validate_optional_url_update(Some(Some("".to_string())), "Video URL").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_validate_optional_url_update_blank_text_stores_null() {
+        assert_eq!(
+            validate_optional_url_update(Some(Some("   ".to_string())), "Video URL").unwrap(),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn test_validate_optional_url_update_rejects_over_500() {
+        let long = "x".repeat(501);
+        match validate_optional_url_update(Some(Some(long)), "Video URL") {
+            Err(ApplicationError::BadRequest(msg)) => {
+                assert_eq!(msg, "Video URL must be at most 500 characters");
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_optional_url_update_accepts_value() {
+        let url = "https://example.com/p.png".to_string();
+        assert_eq!(
+            validate_optional_url_update(Some(Some(url.clone())), "Image URL").unwrap(),
+            Some(Some(url))
+        );
     }
 
     #[test]

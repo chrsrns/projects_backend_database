@@ -3,25 +3,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum SectionType {
-    PersonalInfo,
-    Education,
-    Frameworks,
-    Languages,
-    Projects,
-    Skills,
-    Experience,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum ResumeChangedAction {
-    Created,
-    Updated(SectionType),
-    Deleted,
-}
+pub use application::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct ResumeChangedEvent {
@@ -90,6 +72,12 @@ impl Hub {
             resume_id,
             action,
         });
+    }
+}
+
+impl ResumeChangePublisher for Hub {
+    fn resume_changed(&self, resume_id: i32, action: ResumeChangedAction) {
+        self.publish_resume_changed(resume_id, action);
     }
 }
 

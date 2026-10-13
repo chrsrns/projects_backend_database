@@ -11,6 +11,7 @@ use domain::models::{
 use infrastructure::run_in_transaction;
 
 use crate::error::ApplicationError;
+use crate::realtime::{ResumeChangePublisher, ResumeChangedAction};
 use crate::resume::common::{
     app_err_from_diesel_err, find_accessible_resume, find_resume, partial_date_to_columns,
     require_owner, validate_variant_metadata, viewer_is_owner,
@@ -54,6 +55,7 @@ pub fn create_variant(
     user_id_value: i32,
     base_id: i32,
     request: NewVariantRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
     let base = find_resume(base_id)?;
 
@@ -302,6 +304,9 @@ pub fn create_variant(
 
         Ok(resume)
     })
-    .map(|resume| ResumeView::from_resume(resume, true, true))
+    .map(|resume| {
+        publisher.resume_changed(resume.id, ResumeChangedAction::Created);
+        ResumeView::from_resume(resume, true, true)
+    })
     .map_err(app_err_from_diesel_err)
 }

@@ -4,10 +4,15 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
-pub fn delete_skill(user_id_value: i32, skill_id_value: i32) -> Result<i32, ApplicationError> {
+pub fn delete_skill(
+    user_id_value: i32,
+    skill_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
+) -> Result<i32, ApplicationError> {
     use domain::schema::skills;
 
     let existing: Skill = match skills::table
@@ -30,6 +35,10 @@ pub fn delete_skill(user_id_value: i32, skill_id_value: i32) -> Result<i32, Appl
                     skill_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    existing.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Skills),
+                );
                 Ok(existing.resume_id)
             }
         }

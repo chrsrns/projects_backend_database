@@ -7,6 +7,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
@@ -25,6 +26,7 @@ pub fn create_work_experience(
     user_id_value: i32,
     resume_id_value: i32,
     payload: NewWorkExperienceRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<WorkExperience, ApplicationError> {
     use domain::schema::work_experiences;
 
@@ -64,7 +66,13 @@ pub fn create_work_experience(
         .values(&new_item)
         .get_result::<WorkExperience>(&mut establish_connection())
     {
-        Ok(item) => Ok(item),
+        Ok(item) => {
+            publisher.resume_changed(
+                resume_id_value,
+                ResumeChangedAction::Updated(SectionType::Experience),
+            );
+            Ok(item)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
@@ -74,6 +82,7 @@ pub fn create_work_experience_key_point(
     resume_id_value: i32,
     work_id_value: i32,
     payload: NewWorkExperienceKeyPointRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<WorkExperienceKeyPoint, ApplicationError> {
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences::dsl as work_dsl;
@@ -102,7 +111,13 @@ pub fn create_work_experience_key_point(
         .values(&new_kp)
         .get_result::<WorkExperienceKeyPoint>(&mut establish_connection())
     {
-        Ok(item) => Ok(item),
+        Ok(item) => {
+            publisher.resume_changed(
+                resume_id_value,
+                ResumeChangedAction::Updated(SectionType::Experience),
+            );
+            Ok(item)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

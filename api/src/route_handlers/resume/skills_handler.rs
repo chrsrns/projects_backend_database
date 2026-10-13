@@ -9,7 +9,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::Hub;
 
 #[utoipa::path(
     get,
@@ -61,17 +61,11 @@ pub fn create_skill_handler(
     resume_id: i32,
     payload: Json<NewSkillRequest>,
 ) -> CustomJsonResult<Skill> {
-    match skills::create_skill(auth.user_id, resume_id, payload.into_inner()) {
-        Ok(skill) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Skills),
-            );
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: skill }),
-            ))
-        }
+    match skills::create_skill(auth.user_id, resume_id, payload.into_inner(), hub.inner()) {
+        Ok(skill) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: skill }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -99,14 +93,8 @@ pub fn update_skill_handler(
     skill_id: i32,
     payload: Json<UpdateSkill>,
 ) -> JsonResult<Skill> {
-    match skills::update_skill(auth.user_id, skill_id, payload.into_inner()) {
-        Ok(skill) => {
-            hub.publish_resume_changed(
-                skill.resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Skills),
-            );
-            Ok(Json(Response { body: skill }))
-        }
+    match skills::update_skill(auth.user_id, skill_id, payload.into_inner(), hub.inner()) {
+        Ok(skill) => Ok(Json(Response { body: skill })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -128,14 +116,8 @@ pub fn update_skill_handler(
 )]
 #[rocket_delete("/skills/<skill_id>")]
 pub fn delete_skill_handler(auth: AuthSession, hub: &State<Hub>, skill_id: i32) -> NoContentResult {
-    match skills::delete_skill(auth.user_id, skill_id) {
-        Ok(resume_id) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Skills),
-            );
-            Ok(NoContent)
-        }
+    match skills::delete_skill(auth.user_id, skill_id, hub.inner()) {
+        Ok(_resume_id) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

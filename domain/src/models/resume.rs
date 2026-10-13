@@ -10,24 +10,8 @@ use utoipa::ToSchema;
 use super::{
     Education, EducationKeyPoint, Framework, Language, PartialDate, PortfolioKeyPoint,
     PortfolioProject, PortfolioTechnology, Skill, WorkExperience, WorkExperienceKeyPoint,
+    deserialize_optional_nullable_string,
 };
-
-fn deserialize_optional_nullable_string<'de, D>(
-    deserializer: D,
-) -> Result<Option<Option<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = JsonValue::deserialize(deserializer)?;
-    match value {
-        JsonValue::Null => Ok(Some(None)),
-        JsonValue::String(value) => Ok(Some(Some(value))),
-        other => Err(DeError::custom(format!(
-            "expected string or null, got {}",
-            other
-        ))),
-    }
-}
 
 fn deserialize_optional_nullable_target_date<'de, D>(
     deserializer: D,
@@ -151,6 +135,29 @@ pub struct UpdateResume {
     #[schema(value_type = Option<PartialDate>)]
     pub target_date: Option<Option<PartialDate>>,
     pub show_variant_tag: Option<bool>,
+}
+
+impl UpdateResume {
+    /// True when every patch field is absent — the payload carries no
+    /// change. Must be called after normalization so fields normalized
+    /// to absent (e.g. an empty string) count as no change.
+    pub fn is_noop(&self) -> bool {
+        self.name.is_none()
+            && self.profile_image_url.is_none()
+            && self.location.is_none()
+            && self.email.is_none()
+            && self.github_url.is_none()
+            && self.mobile_number.is_none()
+            && self.executive_summary.is_none()
+            && self.video.is_none()
+            && self.is_public.is_none()
+            && self.company_name.is_none()
+            && self.role_title.is_none()
+            && self.variant_label.is_none()
+            && self.job_description.is_none()
+            && self.target_date.is_none()
+            && self.show_variant_tag.is_none()
+    }
 }
 
 #[derive(AsChangeset, Debug)]

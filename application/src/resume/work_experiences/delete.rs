@@ -4,12 +4,14 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn delete_work_experience(
     user_id_value: i32,
     work_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::work_experiences;
 
@@ -35,6 +37,10 @@ pub fn delete_work_experience(
                     work_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    existing.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Experience),
+                );
                 Ok(existing.resume_id)
             }
         }
@@ -45,6 +51,7 @@ pub fn delete_work_experience(
 pub fn delete_work_experience_key_point(
     user_id_value: i32,
     kp_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
@@ -79,6 +86,10 @@ pub fn delete_work_experience_key_point(
                     kp_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    work.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Experience),
+                );
                 Ok(work.resume_id)
             }
         }

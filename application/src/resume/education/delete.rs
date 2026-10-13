@@ -4,12 +4,14 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn delete_education(
     user_id_value: i32,
     education_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::education;
 
@@ -35,6 +37,10 @@ pub fn delete_education(
                     education_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    existing.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Education),
+                );
                 Ok(existing.resume_id)
             }
         }
@@ -45,6 +51,7 @@ pub fn delete_education(
 pub fn delete_education_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
@@ -90,6 +97,10 @@ pub fn delete_education_key_point(
                     key_point_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    edu.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Education),
+                );
                 Ok(edu.resume_id)
             }
         }

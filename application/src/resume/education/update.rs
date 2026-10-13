@@ -7,6 +7,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
@@ -14,6 +15,7 @@ pub fn update_education(
     user_id_value: i32,
     education_id_value: i32,
     request: UpdateEducationRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<Education, ApplicationError> {
     use domain::schema::education;
 
@@ -80,7 +82,13 @@ pub fn update_education(
         .set(&payload)
         .get_result::<Education>(&mut establish_connection())
     {
-        Ok(updated) => Ok(updated),
+        Ok(updated) => {
+            publisher.resume_changed(
+                updated.resume_id,
+                ResumeChangedAction::Updated(SectionType::Education),
+            );
+            Ok(updated)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
@@ -89,6 +97,7 @@ pub fn update_education_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
     payload: UpdateEducationKeyPoint,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<(EducationKeyPoint, i32), ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
@@ -121,7 +130,13 @@ pub fn update_education_key_point(
         .set(&payload)
         .get_result::<EducationKeyPoint>(&mut establish_connection())
     {
-        Ok(updated) => Ok((updated, edu.resume_id)),
+        Ok(updated) => {
+            publisher.resume_changed(
+                edu.resume_id,
+                ResumeChangedAction::Updated(SectionType::Education),
+            );
+            Ok((updated, edu.resume_id))
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

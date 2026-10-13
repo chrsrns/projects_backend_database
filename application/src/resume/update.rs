@@ -4,15 +4,17 @@ use domain::schema::resumes;
 use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
+use crate::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
 use crate::resume::common::{
     app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
-    validate_executive_summary, validate_optional_text_update, validate_video,
+    validate_executive_summary, validate_optional_text_update, validate_optional_url_update,
 };
 
 pub fn update_resume(
     user_id_value: i32,
     resume_id: i32,
     mut resume: UpdateResume,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
     let existing = find_resume(resume_id)?;
 
@@ -49,31 +51,15 @@ pub fn update_resume(
         .map(validate_executive_summary)
         .transpose()?;
 
-    resume.video = match resume.video {
-        None => None,
-        Some(None) => Some(None),
-        Some(Some(ref v)) if v.is_empty() => None,
-        Some(Some(v)) => Some(validate_video(Some(v))?),
-    };
+    resume.video = validate_optional_url_update(resume.video, "Video")?;
 
-    if resume.name.is_none()
-        && resume.profile_image_url.is_none()
-        && resume.location.is_none()
-        && resume.email.is_none()
-        && resume.github_url.is_none()
-        && resume.mobile_number.is_none()
-        && resume.executive_summary.is_none()
-        && resume.video.is_none()
-        && resume.is_public.is_none()
-        && resume.company_name.is_none()
-        && resume.role_title.is_none()
-        && resume.variant_label.is_none()
-        && resume.job_description.is_none()
-        && resume.target_date.is_none()
-        && resume.show_variant_tag.is_none()
-    {
+    if resume.is_noop() {
         // Only the owner reaches this point, and a variant's base is always
         // owned by the same user, so the base is reachable.
+        publisher.resume_changed(
+            resume_id,
+            ResumeChangedAction::Updated(SectionType::PersonalInfo),
+        );
         return Ok(ResumeView::from_resume(existing, true, true));
     }
 
@@ -104,7 +90,13 @@ pub fn update_resume(
         .set(&changeset)
         .get_result::<Resume>(&mut establish_connection())
     {
-        Ok(updated_resume) => Ok(ResumeView::from_resume(updated_resume, true, true)),
+        Ok(updated_resume) => {
+            publisher.resume_changed(
+                updated_resume.id,
+                ResumeChangedAction::Updated(SectionType::PersonalInfo),
+            );
+            Ok(ResumeView::from_resume(updated_resume, true, true))
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

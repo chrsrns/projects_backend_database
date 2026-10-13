@@ -1,27 +1,10 @@
 use crate::schema::{portfolio_key_points, portfolio_projects, portfolio_technologies};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use rocket::serde::de::{Deserializer, Error as DeError};
-use rocket::serde::json::Value as JsonValue;
 use rocket::serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-fn deserialize_optional_nullable_string<'de, D>(
-    deserializer: D,
-) -> Result<Option<Option<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = JsonValue::deserialize(deserializer)?;
-    match value {
-        JsonValue::Null => Ok(Some(None)),
-        JsonValue::String(v) => Ok(Some(Some(v))),
-        other => Err(DeError::custom(format!(
-            "expected string or null, got {}",
-            other
-        ))),
-    }
-}
+use super::deserialize_optional_nullable_string;
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct PortfolioProject {
@@ -102,6 +85,22 @@ pub struct UpdatePortfolioProject {
     pub description: Option<Option<String>>,
     pub display_order: Option<i32>,
     pub active: Option<bool>,
+}
+
+impl UpdatePortfolioProject {
+    /// True when every patch field is absent — the payload carries no
+    /// change. Must be called after normalization so fields normalized
+    /// to absent (e.g. an empty string) count as no change.
+    pub fn is_noop(&self) -> bool {
+        self.project_name.is_none()
+            && self.image_url.is_none()
+            && self.project_link.is_none()
+            && self.source_code_link.is_none()
+            && self.video_url.is_none()
+            && self.description.is_none()
+            && self.display_order.is_none()
+            && self.active.is_none()
+    }
 }
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]

@@ -8,6 +8,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner, validate_optional_url},
 };
 
@@ -15,6 +16,7 @@ pub fn create_portfolio_project(
     user_id_value: i32,
     resume_id_value: i32,
     payload: NewPortfolioProjectRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<PortfolioProject, ApplicationError> {
     use domain::schema::portfolio_projects;
 
@@ -38,7 +40,13 @@ pub fn create_portfolio_project(
         .values(&new_item)
         .get_result::<PortfolioProject>(&mut establish_connection())
     {
-        Ok(item) => Ok(item),
+        Ok(item) => {
+            publisher.resume_changed(
+                resume_id_value,
+                ResumeChangedAction::Updated(SectionType::Projects),
+            );
+            Ok(item)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
@@ -48,6 +56,7 @@ pub fn create_portfolio_key_point(
     resume_id_value: i32,
     project_id_value: i32,
     payload: NewPortfolioKeyPointRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<PortfolioKeyPoint, ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects::dsl as projects_dsl;
@@ -78,7 +87,13 @@ pub fn create_portfolio_key_point(
         .values(&new_item)
         .get_result::<PortfolioKeyPoint>(&mut establish_connection())
     {
-        Ok(item) => Ok(item),
+        Ok(item) => {
+            publisher.resume_changed(
+                resume_id_value,
+                ResumeChangedAction::Updated(SectionType::Projects),
+            );
+            Ok(item)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
@@ -88,6 +103,7 @@ pub fn create_portfolio_technology(
     resume_id_value: i32,
     project_id_value: i32,
     payload: NewPortfolioTechnologyRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<PortfolioTechnology, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
     use domain::schema::portfolio_technologies;
@@ -116,7 +132,13 @@ pub fn create_portfolio_technology(
         .values(&new_item)
         .get_result::<PortfolioTechnology>(&mut establish_connection())
     {
-        Ok(item) => Ok(item),
+        Ok(item) => {
+            publisher.resume_changed(
+                resume_id_value,
+                ResumeChangedAction::Updated(SectionType::Projects),
+            );
+            Ok(item)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

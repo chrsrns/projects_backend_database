@@ -19,7 +19,7 @@ use shared::resume_document::{
 
 use super::{CustomJsonResult, JsonResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::realtime::{Hub, ResumeChangedAction, SectionType};
+use crate::realtime::Hub;
 
 const MAX_MARKDOWN_SIZE: u64 = 1_048_576; // 1 MiB
 
@@ -159,18 +159,9 @@ pub fn import_resume_markdown(
     markdown: LimitedMarkdown,
     hub: &State<Hub>,
 ) -> CustomJsonResult<ResumeView> {
-    match markdown_import::import_resume_markdown(&markdown.0, auth.user_id, None) {
-        Ok((resume, true)) => {
-            hub.publish_resume_changed(resume.id, ResumeChangedAction::Created);
-            Ok(Custom(Status::Created, Json(Response { body: resume })))
-        }
-        Ok((resume, false)) => {
-            hub.publish_resume_changed(
-                resume.id,
-                ResumeChangedAction::Updated(SectionType::PersonalInfo),
-            );
-            Ok(Custom(Status::Ok, Json(Response { body: resume })))
-        }
+    match markdown_import::import_resume_markdown(&markdown.0, auth.user_id, None, hub.inner()) {
+        Ok((resume, true)) => Ok(Custom(Status::Created, Json(Response { body: resume }))),
+        Ok((resume, false)) => Ok(Custom(Status::Ok, Json(Response { body: resume }))),
         Err(err) => Err(map_markdown_error(err)),
     }
 }
@@ -204,14 +195,13 @@ pub fn import_resume_markdown_into(
     hub: &State<Hub>,
     resume_id: i32,
 ) -> CustomJsonResult<ResumeView> {
-    match markdown_import::import_resume_markdown(&markdown.0, auth.user_id, Some(resume_id)) {
-        Ok((resume, _)) => {
-            hub.publish_resume_changed(
-                resume.id,
-                ResumeChangedAction::Updated(SectionType::PersonalInfo),
-            );
-            Ok(Custom(Status::Ok, Json(Response { body: resume })))
-        }
+    match markdown_import::import_resume_markdown(
+        &markdown.0,
+        auth.user_id,
+        Some(resume_id),
+        hub.inner(),
+    ) {
+        Ok((resume, _)) => Ok(Custom(Status::Ok, Json(Response { body: resume }))),
         Err(err) => Err(map_markdown_error(err)),
     }
 }

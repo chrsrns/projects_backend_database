@@ -4,12 +4,14 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction},
     resume::common::{app_err_from_diesel_err, validate_executive_summary, validate_video},
 };
 
 pub fn create_resume(
     user_id_value: i32,
     resume: NewResumeRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
     use domain::schema::resumes;
 
@@ -40,7 +42,10 @@ pub fn create_resume(
     {
         // A resume created here is always a base, and its creator is the
         // caller, so no base-visibility lookup is needed.
-        Ok(resume) => Ok(ResumeView::from_resume(resume, false, true)),
+        Ok(resume) => {
+            publisher.resume_changed(resume.id, ResumeChangedAction::Created);
+            Ok(ResumeView::from_resume(resume, false, true))
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

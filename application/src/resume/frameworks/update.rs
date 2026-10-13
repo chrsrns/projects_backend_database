@@ -4,6 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
@@ -11,6 +12,7 @@ pub fn update_framework(
     user_id_value: i32,
     framework_id_value: i32,
     payload: UpdateFramework,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<(Framework, i32), ApplicationError> {
     use domain::schema::frameworks;
     use domain::schema::languages;
@@ -39,7 +41,13 @@ pub fn update_framework(
         .set(&payload)
         .get_result::<Framework>(&mut establish_connection())
     {
-        Ok(updated) => Ok((updated, language.resume_id)),
+        Ok(updated) => {
+            publisher.resume_changed(
+                language.resume_id,
+                ResumeChangedAction::Updated(SectionType::Frameworks),
+            );
+            Ok((updated, language.resume_id))
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }
