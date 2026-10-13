@@ -10,24 +10,8 @@ use utoipa::ToSchema;
 use super::{
     Education, EducationKeyPoint, Framework, Language, PartialDate, PortfolioKeyPoint,
     PortfolioProject, PortfolioTechnology, Skill, WorkExperience, WorkExperienceKeyPoint,
+    deserialize_optional_nullable_string,
 };
-
-fn deserialize_optional_nullable_string<'de, D>(
-    deserializer: D,
-) -> Result<Option<Option<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = JsonValue::deserialize(deserializer)?;
-    match value {
-        JsonValue::Null => Ok(Some(None)),
-        JsonValue::String(value) => Ok(Some(Some(value))),
-        other => Err(DeError::custom(format!(
-            "expected string or null, got {}",
-            other
-        ))),
-    }
-}
 
 fn deserialize_optional_nullable_target_date<'de, D>(
     deserializer: D,

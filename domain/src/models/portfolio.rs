@@ -1,27 +1,10 @@
 use crate::schema::{portfolio_key_points, portfolio_projects, portfolio_technologies};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use rocket::serde::de::{Deserializer, Error as DeError};
-use rocket::serde::json::Value as JsonValue;
 use rocket::serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-fn deserialize_optional_nullable_string<'de, D>(
-    deserializer: D,
-) -> Result<Option<Option<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = JsonValue::deserialize(deserializer)?;
-    match value {
-        JsonValue::Null => Ok(Some(None)),
-        JsonValue::String(v) => Ok(Some(Some(v))),
-        other => Err(DeError::custom(format!(
-            "expected string or null, got {}",
-            other
-        ))),
-    }
-}
+use super::deserialize_optional_nullable_string;
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct PortfolioProject {

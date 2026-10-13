@@ -1,32 +1,16 @@
 use crate::schema::{education, education_key_points};
 use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
-use rocket::serde::de::{Deserializer, Error as DeError};
-use rocket::serde::json::Value as JsonValue;
 use rocket::serde::{Deserialize, Serialize};
 use serde::Serializer;
 use serde::ser::SerializeStruct;
 use std::str::FromStr;
 use utoipa::ToSchema;
 
-use super::{DatePrecision, PartialDate, deserialize_optional_nullable_partial_date};
-
-fn deserialize_optional_nullable_string<'de, D>(
-    deserializer: D,
-) -> Result<Option<Option<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = JsonValue::deserialize(deserializer)?;
-    match value {
-        JsonValue::Null => Ok(Some(None)),
-        JsonValue::String(v) => Ok(Some(Some(v))),
-        other => Err(DeError::custom(format!(
-            "expected string or null, got {}",
-            other
-        ))),
-    }
-}
+use super::{
+    DatePrecision, PartialDate, deserialize_optional_nullable_partial_date,
+    deserialize_optional_nullable_string,
+};
 
 #[derive(Queryable, ToSchema, Ord, Eq, PartialEq, PartialOrd, Debug)]
 pub struct Education {
