@@ -9,6 +9,7 @@ use shared::markdown;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{
         app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
         validate_executive_summary, validate_optional_text, validate_optional_url, validate_video,
@@ -186,6 +187,7 @@ pub fn import_resume_markdown(
     markdown: &str,
     user_id_value: i32,
     explicit_id: Option<i32>,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<(ResumeView, bool), ApplicationError> {
     let explicit_target = match explicit_id {
         Some(resume_id) => {
@@ -613,6 +615,14 @@ pub fn import_resume_markdown(
     // user, so it is always reachable for this viewer.
     .map(|(resume, created)| {
         let base_accessible = resume.base_resume_id.is_some();
+        publisher.resume_changed(
+            resume.id,
+            if created {
+                ResumeChangedAction::Created
+            } else {
+                ResumeChangedAction::Updated(SectionType::PersonalInfo)
+            },
+        );
         (
             ResumeView::from_resume(resume, base_accessible, true),
             created,

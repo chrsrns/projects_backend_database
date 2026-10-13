@@ -4,10 +4,15 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction},
     resume::common::{app_err_from_diesel_err, require_owner},
 };
 
-pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), ApplicationError> {
+pub fn delete_resume(
+    user_id_value: i32,
+    resume_id: i32,
+    publisher: &dyn ResumeChangePublisher,
+) -> Result<(), ApplicationError> {
     use domain::schema::resumes;
 
     let existing: Resume = match resumes::table
@@ -46,6 +51,7 @@ pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), Applicati
                     resume_id
                 )))
             } else {
+                publisher.resume_changed(resume_id, ResumeChangedAction::Deleted);
                 Ok(())
             }
         }

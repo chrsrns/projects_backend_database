@@ -4,6 +4,7 @@ use domain::schema::resumes;
 use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
+use crate::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
 use crate::resume::common::{
     app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
     validate_executive_summary, validate_optional_text_update, validate_optional_url_update,
@@ -13,6 +14,7 @@ pub fn update_resume(
     user_id_value: i32,
     resume_id: i32,
     mut resume: UpdateResume,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
     let existing = find_resume(resume_id)?;
 
@@ -69,6 +71,10 @@ pub fn update_resume(
     {
         // Only the owner reaches this point, and a variant's base is always
         // owned by the same user, so the base is reachable.
+        publisher.resume_changed(
+            resume_id,
+            ResumeChangedAction::Updated(SectionType::PersonalInfo),
+        );
         return Ok(ResumeView::from_resume(existing, true, true));
     }
 
@@ -99,7 +105,13 @@ pub fn update_resume(
         .set(&changeset)
         .get_result::<Resume>(&mut establish_connection())
     {
-        Ok(updated_resume) => Ok(ResumeView::from_resume(updated_resume, true, true)),
+        Ok(updated_resume) => {
+            publisher.resume_changed(
+                updated_resume.id,
+                ResumeChangedAction::Updated(SectionType::PersonalInfo),
+            );
+            Ok(ResumeView::from_resume(updated_resume, true, true))
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

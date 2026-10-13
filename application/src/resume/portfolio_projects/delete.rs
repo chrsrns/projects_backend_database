@@ -4,12 +4,14 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn delete_portfolio_project(
     user_id_value: i32,
     project_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::portfolio_projects;
 
@@ -35,6 +37,10 @@ pub fn delete_portfolio_project(
                     project_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    existing.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Projects),
+                );
                 Ok(existing.resume_id)
             }
         }
@@ -45,6 +51,7 @@ pub fn delete_portfolio_project(
 pub fn delete_portfolio_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects;
@@ -90,6 +97,10 @@ pub fn delete_portfolio_key_point(
                     key_point_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    project.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Projects),
+                );
                 Ok(project.resume_id)
             }
         }
@@ -100,6 +111,7 @@ pub fn delete_portfolio_key_point(
 pub fn delete_portfolio_technology(
     user_id_value: i32,
     tech_id_value: i32,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<i32, ApplicationError> {
     use domain::schema::portfolio_projects;
     use domain::schema::portfolio_technologies;
@@ -145,6 +157,10 @@ pub fn delete_portfolio_technology(
                     tech_id_value
                 )))
             } else {
+                publisher.resume_changed(
+                    project.resume_id,
+                    ResumeChangedAction::Updated(SectionType::Projects),
+                );
                 Ok(project.resume_id)
             }
         }

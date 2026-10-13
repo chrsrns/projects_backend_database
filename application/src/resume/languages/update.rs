@@ -4,6 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
@@ -11,6 +12,7 @@ pub fn update_language(
     user_id_value: i32,
     language_id_value: i32,
     payload: UpdateLanguage,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<Language, ApplicationError> {
     use domain::schema::languages;
 
@@ -30,7 +32,13 @@ pub fn update_language(
         .set(&payload)
         .get_result::<Language>(&mut establish_connection())
     {
-        Ok(updated) => Ok(updated),
+        Ok(updated) => {
+            publisher.resume_changed(
+                updated.resume_id,
+                ResumeChangedAction::Updated(SectionType::Languages),
+            );
+            Ok(updated)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

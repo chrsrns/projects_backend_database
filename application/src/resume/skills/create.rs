@@ -4,6 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
@@ -11,6 +12,7 @@ pub fn create_skill(
     user_id_value: i32,
     resume_id_value: i32,
     payload: NewSkillRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<Skill, ApplicationError> {
     use domain::schema::skills;
 
@@ -29,7 +31,13 @@ pub fn create_skill(
         .values(&new_skill)
         .get_result::<Skill>(&mut establish_connection())
     {
-        Ok(skill) => Ok(skill),
+        Ok(skill) => {
+            publisher.resume_changed(
+                resume_id_value,
+                ResumeChangedAction::Updated(SectionType::Skills),
+            );
+            Ok(skill)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

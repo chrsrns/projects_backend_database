@@ -9,7 +9,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::Hub;
 
 #[utoipa::path(
     get,
@@ -68,14 +68,11 @@ pub fn create_resume_handler(
     hub: &State<Hub>,
     resume: Json<NewResumeRequest>,
 ) -> CustomJsonResult<ResumeView> {
-    match create::create_resume(auth.user_id, resume.into_inner()) {
-        Ok(resume) => {
-            hub.publish_resume_changed(resume.id, ResumeChangedAction::Created);
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: resume }),
-            ))
-        }
+    match create::create_resume(auth.user_id, resume.into_inner(), hub.inner()) {
+        Ok(resume) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: resume }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -103,14 +100,8 @@ pub fn update_resume_handler(
     resume_id: i32,
     resume: Json<UpdateResume>,
 ) -> JsonResult<ResumeView> {
-    match update::update_resume(auth.user_id, resume_id, resume.into_inner()) {
-        Ok(updated) => {
-            hub.publish_resume_changed(
-                updated.id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::PersonalInfo),
-            );
-            Ok(Json(Response { body: updated }))
-        }
+    match update::update_resume(auth.user_id, resume_id, resume.into_inner(), hub.inner()) {
+        Ok(updated) => Ok(Json(Response { body: updated })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -136,11 +127,8 @@ pub fn delete_resume_handler(
     hub: &State<Hub>,
     resume_id: i32,
 ) -> NoContentResult {
-    match delete::delete_resume(auth.user_id, resume_id) {
-        Ok(()) => {
-            hub.publish_resume_changed(resume_id, ResumeChangedAction::Deleted);
-            Ok(NoContent)
-        }
+    match delete::delete_resume(auth.user_id, resume_id, hub.inner()) {
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

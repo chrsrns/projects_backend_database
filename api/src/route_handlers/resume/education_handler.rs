@@ -12,7 +12,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::Hub;
 
 #[utoipa::path(
     get,
@@ -67,17 +67,11 @@ pub fn create_education_handler(
     resume_id: i32,
     payload: Json<NewEducationRequest>,
 ) -> CustomJsonResult<Education> {
-    match education::create_education(auth.user_id, resume_id, payload.into_inner()) {
-        Ok(item) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
-            );
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: item }),
-            ))
-        }
+    match education::create_education(auth.user_id, resume_id, payload.into_inner(), hub.inner()) {
+        Ok(item) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: item }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -109,14 +103,13 @@ pub fn update_education_handler(
     education_id: i32,
     payload: Json<UpdateEducationRequest>,
 ) -> JsonResult<Education> {
-    match education::update_education(auth.user_id, education_id, payload.into_inner()) {
-        Ok(item) => {
-            hub.publish_resume_changed(
-                item.resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
-            );
-            Ok(Json(Response { body: item }))
-        }
+    match education::update_education(
+        auth.user_id,
+        education_id,
+        payload.into_inner(),
+        hub.inner(),
+    ) {
+        Ok(item) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -142,14 +135,8 @@ pub fn delete_education_handler(
     hub: &State<Hub>,
     education_id: i32,
 ) -> NoContentResult {
-    match education::delete_education(auth.user_id, education_id) {
-        Ok(resume_id) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
-            );
-            Ok(NoContent)
-        }
+    match education::delete_education(auth.user_id, education_id, hub.inner()) {
+        Ok(_resume_id) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -216,17 +203,12 @@ pub fn create_education_key_point_handler(
         resume_id,
         education_id,
         payload.into_inner(),
+        hub.inner(),
     ) {
-        Ok(item) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
-            );
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: item }),
-            ))
-        }
+        Ok(item) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: item }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -258,14 +240,13 @@ pub fn update_education_key_point_handler(
     key_point_id: i32,
     payload: Json<UpdateEducationKeyPoint>,
 ) -> JsonResult<EducationKeyPoint> {
-    match education::update_education_key_point(auth.user_id, key_point_id, payload.into_inner()) {
-        Ok((item, resume_id)) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
-            );
-            Ok(Json(Response { body: item }))
-        }
+    match education::update_education_key_point(
+        auth.user_id,
+        key_point_id,
+        payload.into_inner(),
+        hub.inner(),
+    ) {
+        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -291,14 +272,8 @@ pub fn delete_education_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
 ) -> NoContentResult {
-    match education::delete_education_key_point(auth.user_id, key_point_id) {
-        Ok(resume_id) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Education),
-            );
-            Ok(NoContent)
-        }
+    match education::delete_education_key_point(auth.user_id, key_point_id, hub.inner()) {
+        Ok(_resume_id) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

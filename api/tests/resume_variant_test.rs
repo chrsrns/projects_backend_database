@@ -328,7 +328,7 @@ fn variant_clone_preserves_child_display_order_and_active() {
     let base_education = get_json(&fixture, &format!("/api/resume/{}/education", base_id));
     assert_eq!(base_education["body"][0]["active"], Value::Bool(false));
 
-    let variant = create_variant(fixture.user_id(), base_id, clone_request()).expect("clone");
+    let variant = create_variant(fixture.user_id(), base_id, clone_request(), &fixture.hub).expect("clone");
     fixture.track_resume_id(variant.id);
 
     let cloned_education = get_json(&fixture, &format!("/api/resume/{}/education", variant.id));
@@ -350,10 +350,10 @@ fn variant_create_nesting_returns_400() {
     let mut fixture = support::Fixture::new(9_241_003);
     let base_id = import_base(&mut fixture, 9_241_003);
 
-    let variant = create_variant(fixture.user_id(), base_id, clone_request()).expect("clone");
+    let variant = create_variant(fixture.user_id(), base_id, clone_request(), &fixture.hub).expect("clone");
     fixture.track_resume_id(variant.id);
 
-    match create_variant(fixture.user_id(), variant.id, clone_request()) {
+    match create_variant(fixture.user_id(), variant.id, clone_request(), &fixture.hub) {
         Err(application::error::ApplicationError::BadRequest(message)) => {
             assert!(
                 message.contains("variant"),
@@ -371,14 +371,14 @@ fn variant_create_non_owner_403_precedes_nesting_400() {
     let mut fixture = support::Fixture::new(9_241_004);
     let base_id = import_base(&mut fixture, 9_241_004);
 
-    let variant = create_variant(fixture.user_id(), base_id, clone_request()).expect("clone");
+    let variant = create_variant(fixture.user_id(), base_id, clone_request(), &fixture.hub).expect("clone");
     fixture.track_resume_id(variant.id);
 
     let other = support::register_and_login(fixture.client(), "variant.other");
     fixture.track_user_id(other.user_id);
     fixture.track_session_id(other.token.clone());
 
-    match create_variant(other.user_id, variant.id, clone_request()) {
+    match create_variant(other.user_id, variant.id, clone_request(), &fixture.hub) {
         Err(application::error::ApplicationError::Forbidden) => {}
         Err(other) => panic!("expected Forbidden, got {:?}", other),
         Ok(_) => panic!("expected Forbidden, but the clone succeeded"),
@@ -390,7 +390,7 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
     let mut fixture = support::Fixture::new(9_241_005);
     let base_id = import_base(&mut fixture, 9_241_005);
 
-    let variant = create_variant(fixture.user_id(), base_id, clone_request()).expect("clone");
+    let variant = create_variant(fixture.user_id(), base_id, clone_request(), &fixture.hub).expect("clone");
     fixture.track_resume_id(variant.id);
 
     assert!(variant.is_public, "base is public, so the clone is public");
@@ -407,7 +407,7 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
     let mut hidden = clone_request();
     hidden.is_public = Some(false);
     hidden.show_variant_tag = Some(false);
-    let private = create_variant(fixture.user_id(), base_id, hidden).expect("clone private");
+    let private = create_variant(fixture.user_id(), base_id, hidden, &fixture.hub).expect("clone private");
     fixture.track_resume_id(private.id);
 
     assert!(!private.is_public, "explicit is_public wins over the base");
@@ -1081,13 +1081,13 @@ fn variant_list_visibility_owner_vs_public() {
     let base_id = import_base(&mut fixture, 9_241_006);
 
     let public_variant =
-        create_variant(fixture.user_id(), base_id, clone_request()).expect("clone public");
+        create_variant(fixture.user_id(), base_id, clone_request(), &fixture.hub).expect("clone public");
     fixture.track_resume_id(public_variant.id);
 
     let mut hidden_request = clone_request();
     hidden_request.is_public = Some(false);
     let private_variant =
-        create_variant(fixture.user_id(), base_id, hidden_request).expect("clone private");
+        create_variant(fixture.user_id(), base_id, hidden_request, &fixture.hub).expect("clone private");
     fixture.track_resume_id(private_variant.id);
 
     let owner_view = list_variants(base_id, Some(fixture.user_id())).expect("owner listing");
@@ -1119,7 +1119,7 @@ fn variant_list_private_base_hidden_from_non_owner() {
     let mut fixture = support::Fixture::new(9_241_007);
     let base_id = import_base_with_visibility(&mut fixture, 9_241_007, false);
 
-    let variant = create_variant(fixture.user_id(), base_id, clone_request()).expect("clone");
+    let variant = create_variant(fixture.user_id(), base_id, clone_request(), &fixture.hub).expect("clone");
     fixture.track_resume_id(variant.id);
 
     let other = support::register_and_login(fixture.client(), "variant.other.private");

@@ -9,7 +9,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::Hub;
 
 #[utoipa::path(
     get,
@@ -68,17 +68,17 @@ pub fn create_framework_handler(
     language_id: i32,
     payload: Json<NewFrameworkRequest>,
 ) -> CustomJsonResult<Framework> {
-    match frameworks::create_framework(auth.user_id, resume_id, language_id, payload.into_inner()) {
-        Ok(framework) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Frameworks),
-            );
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: framework }),
-            ))
-        }
+    match frameworks::create_framework(
+        auth.user_id,
+        resume_id,
+        language_id,
+        payload.into_inner(),
+        hub.inner(),
+    ) {
+        Ok(framework) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: framework }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -110,14 +110,13 @@ pub fn update_framework_handler(
     framework_id: i32,
     payload: Json<UpdateFramework>,
 ) -> JsonResult<Framework> {
-    match frameworks::update_framework(auth.user_id, framework_id, payload.into_inner()) {
-        Ok((framework, resume_id)) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Frameworks),
-            );
-            Ok(Json(Response { body: framework }))
-        }
+    match frameworks::update_framework(
+        auth.user_id,
+        framework_id,
+        payload.into_inner(),
+        hub.inner(),
+    ) {
+        Ok((framework, _resume_id)) => Ok(Json(Response { body: framework })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -143,14 +142,8 @@ pub fn delete_framework_handler(
     hub: &State<Hub>,
     framework_id: i32,
 ) -> NoContentResult {
-    match frameworks::delete_framework(auth.user_id, framework_id) {
-        Ok(resume_id) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Frameworks),
-            );
-            Ok(NoContent)
-        }
+    match frameworks::delete_framework(auth.user_id, framework_id, hub.inner()) {
+        Ok(_resume_id) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

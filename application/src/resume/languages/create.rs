@@ -4,6 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
+    realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
@@ -11,6 +12,7 @@ pub fn create_language(
     user_id_value: i32,
     resume_id_value: i32,
     payload: NewLanguageRequest,
+    publisher: &dyn ResumeChangePublisher,
 ) -> Result<Language, ApplicationError> {
     use domain::schema::languages;
 
@@ -28,7 +30,13 @@ pub fn create_language(
         .values(&new_language)
         .get_result::<Language>(&mut establish_connection())
     {
-        Ok(language) => Ok(language),
+        Ok(language) => {
+            publisher.resume_changed(
+                resume_id_value,
+                ResumeChangedAction::Updated(SectionType::Languages),
+            );
+            Ok(language)
+        }
         Err(err) => Err(app_err_from_diesel_err(err)),
     }
 }

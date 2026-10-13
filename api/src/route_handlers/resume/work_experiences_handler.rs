@@ -12,7 +12,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::Hub;
 
 #[utoipa::path(
     get,
@@ -67,17 +67,16 @@ pub fn create_work_experience_handler(
     resume_id: i32,
     payload: Json<NewWorkExperienceRequest>,
 ) -> CustomJsonResult<WorkExperience> {
-    match work_experiences::create_work_experience(auth.user_id, resume_id, payload.into_inner()) {
-        Ok(item) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
-            );
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: item }),
-            ))
-        }
+    match work_experiences::create_work_experience(
+        auth.user_id,
+        resume_id,
+        payload.into_inner(),
+        hub.inner(),
+    ) {
+        Ok(item) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: item }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -109,14 +108,13 @@ pub fn update_work_experience_handler(
     work_id: i32,
     payload: Json<UpdateWorkExperienceRequest>,
 ) -> JsonResult<WorkExperience> {
-    match work_experiences::update_work_experience(auth.user_id, work_id, payload.into_inner()) {
-        Ok(item) => {
-            hub.publish_resume_changed(
-                item.resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
-            );
-            Ok(Json(Response { body: item }))
-        }
+    match work_experiences::update_work_experience(
+        auth.user_id,
+        work_id,
+        payload.into_inner(),
+        hub.inner(),
+    ) {
+        Ok(item) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -142,14 +140,8 @@ pub fn delete_work_experience_handler(
     hub: &State<Hub>,
     work_id: i32,
 ) -> NoContentResult {
-    match work_experiences::delete_work_experience(auth.user_id, work_id) {
-        Ok(resume_id) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
-            );
-            Ok(NoContent)
-        }
+    match work_experiences::delete_work_experience(auth.user_id, work_id, hub.inner()) {
+        Ok(_resume_id) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -216,17 +208,12 @@ pub fn create_work_experience_key_point_handler(
         resume_id,
         work_id,
         payload.into_inner(),
+        hub.inner(),
     ) {
-        Ok(item) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
-            );
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: item }),
-            ))
-        }
+        Ok(item) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: item }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -262,14 +249,9 @@ pub fn update_work_experience_key_point_handler(
         auth.user_id,
         key_point_id,
         payload.into_inner(),
+        hub.inner(),
     ) {
-        Ok((item, resume_id)) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
-            );
-            Ok(Json(Response { body: item }))
-        }
+        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -295,14 +277,12 @@ pub fn delete_work_experience_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
 ) -> NoContentResult {
-    match work_experiences::delete_work_experience_key_point(auth.user_id, key_point_id) {
-        Ok(resume_id) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Experience),
-            );
-            Ok(NoContent)
-        }
+    match work_experiences::delete_work_experience_key_point(
+        auth.user_id,
+        key_point_id,
+        hub.inner(),
+    ) {
+        Ok(_resume_id) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

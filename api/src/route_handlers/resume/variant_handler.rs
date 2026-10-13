@@ -10,7 +10,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::Hub;
 
 #[utoipa::path(
     post,
@@ -40,11 +40,8 @@ pub fn create_variant_handler(
     resume_id: i32,
     request: Json<NewVariantRequest>,
 ) -> CustomJsonResult<ResumeView> {
-    match variant::create_variant(auth.user_id, resume_id, request.into_inner()) {
-        Ok(created) => {
-            hub.publish_resume_changed(created.id, ResumeChangedAction::Created);
-            Ok(Custom(Status::Created, Json(Response { body: created })))
-        }
+    match variant::create_variant(auth.user_id, resume_id, request.into_inner(), hub.inner()) {
+        Ok(created) => Ok(Custom(Status::Created, Json(Response { body: created }))),
         Err(err) => Err(map_application_error(err)),
     }
 }

@@ -9,7 +9,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::error::map_application_error;
-use crate::realtime::{Hub, ResumeChangedAction};
+use crate::realtime::Hub;
 
 #[utoipa::path(
     get,
@@ -64,17 +64,11 @@ pub fn create_language_handler(
     resume_id: i32,
     payload: Json<NewLanguageRequest>,
 ) -> CustomJsonResult<Language> {
-    match languages::create_language(auth.user_id, resume_id, payload.into_inner()) {
-        Ok(language) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Languages),
-            );
-            Ok(Custom(
-                rocket::http::Status::Created,
-                Json(Response { body: language }),
-            ))
-        }
+    match languages::create_language(auth.user_id, resume_id, payload.into_inner(), hub.inner()) {
+        Ok(language) => Ok(Custom(
+            rocket::http::Status::Created,
+            Json(Response { body: language }),
+        )),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -106,14 +100,8 @@ pub fn update_language_handler(
     language_id: i32,
     payload: Json<UpdateLanguage>,
 ) -> JsonResult<Language> {
-    match languages::update_language(auth.user_id, language_id, payload.into_inner()) {
-        Ok(language) => {
-            hub.publish_resume_changed(
-                language.resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Languages),
-            );
-            Ok(Json(Response { body: language }))
-        }
+    match languages::update_language(auth.user_id, language_id, payload.into_inner(), hub.inner()) {
+        Ok(language) => Ok(Json(Response { body: language })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -139,14 +127,8 @@ pub fn delete_language_handler(
     hub: &State<Hub>,
     language_id: i32,
 ) -> NoContentResult {
-    match languages::delete_language(auth.user_id, language_id) {
-        Ok(resume_id) => {
-            hub.publish_resume_changed(
-                resume_id,
-                ResumeChangedAction::Updated(crate::realtime::SectionType::Languages),
-            );
-            Ok(NoContent)
-        }
+    match languages::delete_language(auth.user_id, language_id, hub.inner()) {
+        Ok(_resume_id) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }
