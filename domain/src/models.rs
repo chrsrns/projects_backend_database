@@ -45,3 +45,33 @@ where
         ))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::UpdateResume;
+
+    #[test]
+    fn patch_string_field_null_decodes_to_explicit_null() {
+        let dto: UpdateResume = serde_json::from_str(r#"{"video": null}"#).unwrap();
+        assert_eq!(dto.video, Some(None));
+    }
+
+    #[test]
+    fn patch_string_field_string_decodes_to_value() {
+        let dto: UpdateResume = serde_json::from_str(r#"{"video": "https://x/v.mp4"}"#).unwrap();
+        assert_eq!(dto.video, Some(Some("https://x/v.mp4".to_string())));
+    }
+
+    #[test]
+    fn patch_string_field_non_string_is_rejected() {
+        let result = serde_json::from_str::<UpdateResume>(r#"{"video": 5}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn patch_string_field_absent_decodes_to_no_change() {
+        let dto: UpdateResume = serde_json::from_str(r#"{}"#).unwrap();
+        assert_eq!(dto.video, None);
+        assert_eq!(dto.company_name, None);
+    }
+}
