@@ -96,6 +96,15 @@ pub fn validate_video(video: Option<String>) -> Result<Option<String>, Applicati
     validate_optional_url(video, "Video")
 }
 
+/// Same tri-state normalization as `validate_optional_text_update` with the
+/// 500-character URL limit shared by every URL-class patch field.
+pub fn validate_optional_url_update(
+    value: Option<Option<String>>,
+    field_name: &str,
+) -> Result<Option<Option<String>>, ApplicationError> {
+    validate_optional_text_update(value, field_name, 500)
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct VariantMetadata {
     pub company_name: Option<String>,
@@ -263,6 +272,11 @@ mod tests {
     fn test_validate_optional_url_passes_none() {
         assert_eq!(validate_optional_url(None, "Video URL").unwrap(), None);
     }
+
+
+
+
+
 
     #[test]
     fn test_foreign_key_violation_maps_to_conflict() {

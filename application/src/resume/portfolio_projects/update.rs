@@ -7,7 +7,9 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner, validate_optional_url},
+    resume::common::{
+        app_err_from_diesel_err, find_resume, require_owner, validate_optional_url_update,
+    },
 };
 
 pub fn update_portfolio_project(
@@ -29,33 +31,11 @@ pub fn update_portfolio_project(
 
     require_owner(&resume, user_id_value)?;
 
-    payload.video_url = match payload.video_url {
-        None => None,
-        Some(None) => Some(None),
-        Some(Some(ref v)) if v.is_empty() => None,
-        Some(Some(v)) => Some(validate_optional_url(Some(v), "Video URL")?),
-    };
-
-    payload.image_url = match payload.image_url {
-        None => None,
-        Some(None) => Some(None),
-        Some(Some(ref v)) if v.is_empty() => None,
-        Some(Some(v)) => Some(validate_optional_url(Some(v), "Image URL")?),
-    };
-
-    payload.project_link = match payload.project_link {
-        None => None,
-        Some(None) => Some(None),
-        Some(Some(ref v)) if v.is_empty() => None,
-        Some(Some(v)) => Some(validate_optional_url(Some(v), "Project Link")?),
-    };
-
-    payload.source_code_link = match payload.source_code_link {
-        None => None,
-        Some(None) => Some(None),
-        Some(Some(ref v)) if v.is_empty() => None,
-        Some(Some(v)) => Some(validate_optional_url(Some(v), "Source Code Link")?),
-    };
+    payload.video_url = validate_optional_url_update(payload.video_url, "Video URL")?;
+    payload.image_url = validate_optional_url_update(payload.image_url, "Image URL")?;
+    payload.project_link = validate_optional_url_update(payload.project_link, "Project Link")?;
+    payload.source_code_link =
+        validate_optional_url_update(payload.source_code_link, "Source Code Link")?;
 
     if payload.project_name.is_none()
         && payload.image_url.is_none()

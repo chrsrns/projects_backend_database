@@ -6,7 +6,7 @@ use infrastructure::establish_connection;
 use crate::error::ApplicationError;
 use crate::resume::common::{
     app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
-    validate_executive_summary, validate_optional_text_update, validate_video,
+    validate_executive_summary, validate_optional_text_update, validate_optional_url_update,
 };
 
 pub fn update_resume(
@@ -49,12 +49,7 @@ pub fn update_resume(
         .map(validate_executive_summary)
         .transpose()?;
 
-    resume.video = match resume.video {
-        None => None,
-        Some(None) => Some(None),
-        Some(Some(ref v)) if v.is_empty() => None,
-        Some(Some(v)) => Some(validate_video(Some(v))?),
-    };
+    resume.video = validate_optional_url_update(resume.video, "Video")?;
 
     if resume.name.is_none()
         && resume.profile_image_url.is_none()
