@@ -10,8 +10,9 @@ use shared::markdown;
 use crate::{
     error::ApplicationError,
     resume::common::{
-        app_err_from_diesel_err, find_resume, partial_date_to_columns, validate_executive_summary,
-        validate_optional_text, validate_optional_url, validate_video,
+        app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
+        validate_executive_summary, validate_optional_text, validate_optional_url, validate_video,
+        viewer_is_owner,
     },
 };
 
@@ -189,10 +190,7 @@ pub fn import_resume_markdown(
     let explicit_target = match explicit_id {
         Some(resume_id) => {
             let row = find_resume(resume_id)?;
-            match row.created_by {
-                Some(owner) if owner == user_id_value => {}
-                _ => return Err(ApplicationError::Forbidden),
-            }
+            require_owner(&row, user_id_value)?;
             Some(row)
         }
         None => None,
@@ -307,7 +305,7 @@ pub fn import_resume_markdown(
                     .optional()
                     .map_err(app_err_from_diesel_err)?;
                 match row {
-                    Some(r) if r.created_by == Some(user_id_value) => Some(r),
+                    Some(r) if viewer_is_owner(&r, Some(user_id_value)) => Some(r),
                     Some(_) => return Err(ApplicationError::Forbidden),
                     None => {
                         return Err(ApplicationError::NotFound(format!(
@@ -330,7 +328,7 @@ pub fn import_resume_markdown(
                     .optional()
                     .map_err(app_err_from_diesel_err)?;
                 match existing {
-                    Some(r) if r.created_by == Some(user_id_value) => Some(r),
+                    Some(r) if viewer_is_owner(&r, Some(user_id_value)) => Some(r),
                     Some(_) => return Err(ApplicationError::Forbidden),
                     None => None,
                 }

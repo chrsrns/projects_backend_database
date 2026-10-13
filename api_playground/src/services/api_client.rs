@@ -108,7 +108,7 @@ pub async fn execute_request(
     let status = response.status();
     let status_text = response.status_text();
 
-    let headers = response.headers().entries().map(|(k, v)| (k, v)).collect();
+    let headers = response.headers().entries().collect();
 
     let body = response
         .text()
@@ -243,17 +243,17 @@ fn resolve_schema_ref_inner(
 
     if let Some(obj) = result.as_object_mut() {
         // Resolve each property schema
-        if let Some(properties) = obj.get("properties").cloned() {
-            if let Some(props_map) = properties.as_object() {
-                let resolved_props: serde_json::Map<String, serde_json::Value> = props_map
-                    .iter()
-                    .map(|(k, v)| (k.clone(), resolve_schema_ref_inner(v, components, visiting)))
-                    .collect();
-                obj.insert(
-                    "properties".to_string(),
-                    serde_json::Value::Object(resolved_props),
-                );
-            }
+        if let Some(properties) = obj.get("properties").cloned()
+            && let Some(props_map) = properties.as_object()
+        {
+            let resolved_props: serde_json::Map<String, serde_json::Value> = props_map
+                .iter()
+                .map(|(k, v)| (k.clone(), resolve_schema_ref_inner(v, components, visiting)))
+                .collect();
+            obj.insert(
+                "properties".to_string(),
+                serde_json::Value::Object(resolved_props),
+            );
         }
 
         // Resolve array items schema
@@ -266,14 +266,14 @@ fn resolve_schema_ref_inner(
 
         // Resolve anyOf / oneOf / allOf entries
         for keyword in ["anyOf", "oneOf", "allOf"] {
-            if let Some(arr) = obj.get(keyword).cloned() {
-                if let Some(variants) = arr.as_array() {
-                    let resolved: Vec<serde_json::Value> = variants
-                        .iter()
-                        .map(|v| resolve_schema_ref_inner(v, components, visiting))
-                        .collect();
-                    obj.insert(keyword.to_string(), serde_json::Value::Array(resolved));
-                }
+            if let Some(arr) = obj.get(keyword).cloned()
+                && let Some(variants) = arr.as_array()
+            {
+                let resolved: Vec<serde_json::Value> = variants
+                    .iter()
+                    .map(|v| resolve_schema_ref_inner(v, components, visiting))
+                    .collect();
+                obj.insert(keyword.to_string(), serde_json::Value::Array(resolved));
             }
         }
     }

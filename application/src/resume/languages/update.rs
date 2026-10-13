@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume},
+    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn update_language(
@@ -24,12 +24,7 @@ pub fn update_language(
 
     let resume: Resume = find_resume(existing.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     match diesel::update(languages::table.find(language_id_value))
         .set(&payload)

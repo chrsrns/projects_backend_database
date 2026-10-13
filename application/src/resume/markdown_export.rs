@@ -9,8 +9,8 @@ use shared::markdown;
 use crate::{
     error::ApplicationError,
     resume::{
-        common::find_accessible_resume, education, frameworks, languages, portfolio_projects,
-        skills, work_experiences,
+        common::{find_accessible_resume, viewer_is_owner},
+        education, frameworks, languages, portfolio_projects, skills, work_experiences,
     },
 };
 
@@ -69,7 +69,7 @@ pub fn export_resume_markdown(
 
     // `show_variant_tag` is owner-only output; the front-matter marker is
     // always emitted so a re-import can target this exact row.
-    let viewer_is_owner = resume.created_by.is_some() && resume.created_by == user_id_value;
+    let is_owner = viewer_is_owner(&resume, user_id_value);
 
     let full_resume = FullResume {
         resume,
@@ -85,5 +85,5 @@ pub fn export_resume_markdown(
         frameworks,
     };
 
-    Ok(markdown::resume_to_markdown(&full_resume, viewer_is_owner))
+    Ok(markdown::resume_to_markdown(&full_resume, is_owner))
 }

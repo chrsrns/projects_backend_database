@@ -7,7 +7,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume},
+    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 fn normalize_optional_string_change(value: Option<Option<String>>) -> Option<Option<String>> {
@@ -40,12 +40,7 @@ pub fn update_work_experience(
 
     let resume: Resume = find_resume(existing.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     let new_start = request
         .start_date
@@ -125,12 +120,7 @@ pub fn update_work_experience_key_point(
 
     let resume: Resume = find_resume(work.resume_id)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     match diesel::update(work_experience_key_points::table.find(kp_id_value))
         .set(&payload)

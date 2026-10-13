@@ -7,7 +7,7 @@ use domain::schema::resumes;
 use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
-use crate::resume::common::app_err_from_diesel_err;
+use crate::resume::common::{app_err_from_diesel_err, viewer_is_owner};
 
 alias!(resumes as base_resume: BaseResume, resumes as joined_resume: JoinedResume);
 
@@ -86,7 +86,7 @@ fn build_views(
     Ok(items
         .into_iter()
         .map(|resume| {
-            let is_owner = viewer.is_some() && resume.created_by == viewer;
+            let is_owner = viewer_is_owner(&resume, viewer);
             let base_reachable = resume
                 .base_resume_id
                 .and_then(|base_id| accessibility.get(&base_id).copied())
@@ -127,7 +127,7 @@ pub fn views_for_known_accessible_base(
     items
         .into_iter()
         .map(|resume| {
-            let is_owner = viewer.is_some() && resume.created_by == viewer;
+            let is_owner = viewer_is_owner(&resume, viewer);
             ResumeView::from_resume(resume, base_reachable, is_owner)
         })
         .collect()

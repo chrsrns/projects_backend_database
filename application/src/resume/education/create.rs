@@ -7,7 +7,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_resume},
+    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
 };
 
 pub fn create_education(
@@ -19,12 +19,7 @@ pub fn create_education(
 
     let resume: Resume = find_resume(resume_id_value)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     if let Some(ref end) = payload.end_date
         && payload.start_date.canonical_start_date() > end.canonical_end_date()
@@ -74,12 +69,7 @@ pub fn create_education_key_point(
 
     let resume: Resume = find_resume(resume_id_value)?;
 
-    match resume.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&resume, user_id_value)?;
 
     let _education: Education = match education_dsl::education
         .filter(education_dsl::id.eq(education_id_value))

@@ -2,7 +2,10 @@ use diesel::prelude::*;
 use domain::models::Resume;
 use infrastructure::establish_connection;
 
-use crate::{error::ApplicationError, resume::common::app_err_from_diesel_err};
+use crate::{
+    error::ApplicationError,
+    resume::common::{app_err_from_diesel_err, require_owner},
+};
 
 pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), ApplicationError> {
     use domain::schema::resumes;
@@ -17,12 +20,7 @@ pub fn delete_resume(user_id_value: i32, resume_id: i32) -> Result<(), Applicati
         }
     };
 
-    match existing.created_by {
-        Some(owner) if owner == user_id_value => {}
-        Some(_) | None => {
-            return Err(ApplicationError::Forbidden);
-        }
-    }
+    require_owner(&existing, user_id_value)?;
 
     let variant_count: i64 = match resumes::table
         .filter(resumes::base_resume_id.eq(resume_id))

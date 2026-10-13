@@ -46,6 +46,17 @@ pub fn find_accessible_resume(
     }
 }
 
+pub fn require_owner(resume: &Resume, user_id: i32) -> Result<(), ApplicationError> {
+    match resume.created_by {
+        Some(owner) if owner == user_id => Ok(()),
+        _ => Err(ApplicationError::Forbidden),
+    }
+}
+
+pub fn viewer_is_owner(resume: &Resume, viewer: Option<i32>) -> bool {
+    resume.created_by == viewer
+}
+
 pub fn validate_executive_summary(
     summary: Option<String>,
 ) -> Result<Option<String>, ApplicationError> {
@@ -151,6 +162,74 @@ pub fn app_err_from_diesel_err(err: diesel::result::Error) -> ApplicationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
+
+    fn resume_with_owner(owner: Option<i32>) -> Resume {
+        Resume {
+            id: 1,
+            name: "n".to_string(),
+            profile_image_url: None,
+            location: None,
+            email: "e@x.com".to_string(),
+            github_url: None,
+            mobile_number: None,
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+            created_by: owner,
+            is_public: false,
+            executive_summary: None,
+            video: None,
+            base_resume_id: None,
+            company_name: None,
+            role_title: None,
+            target_date: None,
+            target_date_precision: None,
+            job_description: None,
+            variant_label: None,
+            show_variant_tag: true,
+        }
+    }
+
+    #[test]
+    fn test_require_owner_accepts_owner() {
+        assert!(require_owner(&resume_with_owner(Some(7)), 7).is_ok());
+    }
+
+    #[test]
+    fn test_require_owner_rejects_non_owner() {
+        assert_eq!(
+            require_owner(&resume_with_owner(Some(7)), 8),
+            Err(ApplicationError::Forbidden)
+        );
+    }
+
+    #[test]
+    fn test_require_owner_rejects_unowned_row() {
+        assert_eq!(
+            require_owner(&resume_with_owner(None), 7),
+            Err(ApplicationError::Forbidden)
+        );
+    }
+
+    #[test]
+    fn test_viewer_is_owner_matching() {
+        assert!(viewer_is_owner(&resume_with_owner(Some(7)), Some(7)));
+    }
+
+    #[test]
+    fn test_viewer_is_owner_mismatch() {
+        assert!(!viewer_is_owner(&resume_with_owner(Some(7)), Some(8)));
+    }
+
+    #[test]
+    fn test_viewer_is_owner_anonymous() {
+        assert!(!viewer_is_owner(&resume_with_owner(Some(7)), None));
+    }
+
+    #[test]
+    fn test_viewer_is_owner_unowned_row() {
+        assert!(!viewer_is_owner(&resume_with_owner(None), Some(7)));
+    }
 
     #[test]
     fn test_validate_optional_url_accepts_valid_url() {
