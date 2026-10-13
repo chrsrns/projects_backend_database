@@ -50,10 +50,7 @@ pub fn establish_dedicated_connection() -> ConnectionResult<PgConnection> {
     PgConnection::establish(&database_url())
 }
 
-pub fn run_in_transaction<T, F>(
-    conn: &mut DbConnection,
-    f: F,
-) -> Result<T, diesel::result::Error>
+pub fn run_in_transaction<T, F>(conn: &mut DbConnection, f: F) -> Result<T, diesel::result::Error>
 where
     F: FnOnce(&mut DbConnection) -> Result<T, diesel::result::Error>,
 {
