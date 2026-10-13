@@ -53,22 +53,7 @@ pub fn update_resume(
 
     resume.video = validate_optional_url_update(resume.video, "Video")?;
 
-    if resume.name.is_none()
-        && resume.profile_image_url.is_none()
-        && resume.location.is_none()
-        && resume.email.is_none()
-        && resume.github_url.is_none()
-        && resume.mobile_number.is_none()
-        && resume.executive_summary.is_none()
-        && resume.video.is_none()
-        && resume.is_public.is_none()
-        && resume.company_name.is_none()
-        && resume.role_title.is_none()
-        && resume.variant_label.is_none()
-        && resume.job_description.is_none()
-        && resume.target_date.is_none()
-        && resume.show_variant_tag.is_none()
-    {
+    if resume.is_noop() {
         // Only the owner reaches this point, and a variant's base is always
         // owned by the same user, so the base is reachable.
         publisher.resume_changed(

@@ -39,15 +39,11 @@ pub fn update_portfolio_project(
     payload.source_code_link =
         validate_optional_url_update(payload.source_code_link, "Source Code Link")?;
 
-    if payload.project_name.is_none()
-        && payload.image_url.is_none()
-        && payload.project_link.is_none()
-        && payload.source_code_link.is_none()
-        && payload.video_url.is_none()
-        && payload.description.is_none()
-        && payload.display_order.is_none()
-        && payload.active.is_none()
-    {
+    if payload.is_noop() {
+        publisher.resume_changed(
+            existing.resume_id,
+            ResumeChangedAction::Updated(SectionType::Projects),
+        );
         return Ok(existing);
     }
 

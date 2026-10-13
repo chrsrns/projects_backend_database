@@ -137,6 +137,29 @@ pub struct UpdateResume {
     pub show_variant_tag: Option<bool>,
 }
 
+impl UpdateResume {
+    /// True when every patch field is absent — the payload carries no
+    /// change. Must be called after normalization so fields normalized
+    /// to absent (e.g. an empty string) count as no change.
+    pub fn is_noop(&self) -> bool {
+        self.name.is_none()
+            && self.profile_image_url.is_none()
+            && self.location.is_none()
+            && self.email.is_none()
+            && self.github_url.is_none()
+            && self.mobile_number.is_none()
+            && self.executive_summary.is_none()
+            && self.video.is_none()
+            && self.is_public.is_none()
+            && self.company_name.is_none()
+            && self.role_title.is_none()
+            && self.variant_label.is_none()
+            && self.job_description.is_none()
+            && self.target_date.is_none()
+            && self.show_variant_tag.is_none()
+    }
+}
+
 #[derive(AsChangeset, Debug)]
 #[diesel(table_name = resumes)]
 pub struct UpdateResumeChangeset {
