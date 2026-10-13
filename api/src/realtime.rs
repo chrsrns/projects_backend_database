@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-pub use application::realtime::{ResumeChangedAction, ResumeChangePublisher, SectionType};
+pub use application::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct ResumeChangedEvent {

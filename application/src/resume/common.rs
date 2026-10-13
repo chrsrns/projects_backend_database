@@ -275,7 +275,10 @@ mod tests {
 
     #[test]
     fn test_validate_optional_url_update_absent_means_no_change() {
-        assert_eq!(validate_optional_url_update(None, "Video URL").unwrap(), None);
+        assert_eq!(
+            validate_optional_url_update(None, "Video URL").unwrap(),
+            None
+        );
     }
 
     #[test]

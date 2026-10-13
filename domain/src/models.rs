@@ -1,6 +1,6 @@
+use rocket::serde::Deserialize;
 use rocket::serde::de::{Deserializer, Error as DeError};
 use rocket::serde::json::Value as JsonValue;
-use rocket::serde::Deserialize;
 
 mod auth;
 mod education;
