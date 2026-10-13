@@ -680,7 +680,3 @@ pub fn import_resume_markdown(
     .map_err(app_err_from_diesel_err)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-}
