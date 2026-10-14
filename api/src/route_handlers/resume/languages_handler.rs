@@ -128,7 +128,7 @@ pub fn delete_language_handler(
     language_id: i32,
 ) -> NoContentResult {
     match languages::delete_language(auth.user_id, language_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

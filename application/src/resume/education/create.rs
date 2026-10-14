@@ -3,12 +3,11 @@ use domain::models::{
     Education, EducationKeyPoint, NewEducation, NewEducationKeyPoint, NewEducationKeyPointRequest,
     NewEducationRequest,
 };
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
+    resume::common::{first_or_404, require_owned_resume, run_published},
 };
 
 pub fn create_education(
@@ -49,19 +48,18 @@ pub fn create_education(
         active: true,
     };
 
-    match diesel::insert_into(education::table)
-        .values(&new_education)
-        .get_result::<Education>(&mut establish_connection())
-    {
-        Ok(item) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Education),
-            );
-            Ok(item)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Education",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| {
+            diesel::insert_into(education::table)
+                .values(&new_education)
+                .get_result::<Education>(conn)
+        },
+    )
 }
 
 pub fn create_education_key_point(
@@ -91,17 +89,16 @@ pub fn create_education_key_point(
         active: true,
     };
 
-    match diesel::insert_into(education_key_points::table)
-        .values(&new_kp)
-        .get_result::<EducationKeyPoint>(&mut establish_connection())
-    {
-        Ok(item) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Education),
-            );
-            Ok(item)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Education key point",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| {
+            diesel::insert_into(education_key_points::table)
+                .values(&new_kp)
+                .get_result::<EducationKeyPoint>(conn)
+        },
+    )
 }

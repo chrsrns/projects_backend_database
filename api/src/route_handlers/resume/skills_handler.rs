@@ -117,7 +117,7 @@ pub fn update_skill_handler(
 #[rocket_delete("/skills/<skill_id>")]
 pub fn delete_skill_handler(auth: AuthSession, hub: &State<Hub>, skill_id: i32) -> NoContentResult {
     match skills::delete_skill(auth.user_id, skill_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

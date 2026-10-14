@@ -4,14 +4,11 @@ use domain::models::{
     NewPortfolioProjectRequest, NewPortfolioTechnology, NewPortfolioTechnologyRequest,
     PortfolioKeyPoint, PortfolioProject, PortfolioTechnology,
 };
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{
-        app_err_from_diesel_err, first_or_404, require_owned_resume, validate_optional_url,
-    },
+    resume::common::{first_or_404, require_owned_resume, run_published, validate_optional_url},
 };
 
 pub fn create_portfolio_project(
@@ -36,19 +33,18 @@ pub fn create_portfolio_project(
         active: true,
     };
 
-    match diesel::insert_into(portfolio_projects::table)
-        .values(&new_item)
-        .get_result::<PortfolioProject>(&mut establish_connection())
-    {
-        Ok(item) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Projects),
-            );
-            Ok(item)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Portfolio project",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Projects),
+        publisher,
+        |conn| {
+            diesel::insert_into(portfolio_projects::table)
+                .values(&new_item)
+                .get_result::<PortfolioProject>(conn)
+        },
+    )
 }
 
 pub fn create_portfolio_key_point(
@@ -78,19 +74,18 @@ pub fn create_portfolio_key_point(
         active: true,
     };
 
-    match diesel::insert_into(portfolio_key_points::table)
-        .values(&new_item)
-        .get_result::<PortfolioKeyPoint>(&mut establish_connection())
-    {
-        Ok(item) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Projects),
-            );
-            Ok(item)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Portfolio key point",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Projects),
+        publisher,
+        |conn| {
+            diesel::insert_into(portfolio_key_points::table)
+                .values(&new_item)
+                .get_result::<PortfolioKeyPoint>(conn)
+        },
+    )
 }
 
 pub fn create_portfolio_technology(
@@ -120,17 +115,16 @@ pub fn create_portfolio_technology(
         active: true,
     };
 
-    match diesel::insert_into(portfolio_technologies::table)
-        .values(&new_item)
-        .get_result::<PortfolioTechnology>(&mut establish_connection())
-    {
-        Ok(item) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Projects),
-            );
-            Ok(item)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Portfolio technology",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Projects),
+        publisher,
+        |conn| {
+            diesel::insert_into(portfolio_technologies::table)
+                .values(&new_item)
+                .get_result::<PortfolioTechnology>(conn)
+        },
+    )
 }

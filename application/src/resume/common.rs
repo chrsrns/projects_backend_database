@@ -6,7 +6,7 @@ use domain::models::{PartialDate, Resume};
 use infrastructure::{DbConnection, establish_connection};
 
 use crate::error::ApplicationError;
-use crate::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
+use crate::realtime::{ResumeChangePublisher, ResumeChangedAction};
 
 fn entity_not_found(entity: &str, id: i32) -> ApplicationError {
     ApplicationError::NotFound(format!("{entity} with id {id} not found"))
@@ -61,19 +61,19 @@ pub fn run_published<T>(
 
 /// Runs a delete `op` returning an affected row count on a pooled
 /// connection. Zero rows deleted → 404; otherwise publishes
-/// `resume_changed` `Updated(section)` for `resume_id`.
+/// `resume_changed` with `action` for `resume_id`.
 pub fn run_published_delete(
     entity: &str,
     id: i32,
     resume_id: i32,
-    section: SectionType,
+    action: ResumeChangedAction,
     publisher: &dyn ResumeChangePublisher,
     op: impl FnOnce(&mut DbConnection) -> diesel::result::QueryResult<usize>,
 ) -> Result<(), ApplicationError> {
     match op(&mut establish_connection()) {
         Ok(0) => Err(entity_not_found(entity, id)),
         Ok(_) => {
-            publisher.resume_changed(resume_id, ResumeChangedAction::Updated(section));
+            publisher.resume_changed(resume_id, action);
             Ok(())
         }
         Err(diesel::result::Error::NotFound) => Err(entity_not_found(entity, id)),

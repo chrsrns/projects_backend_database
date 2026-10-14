@@ -142,7 +142,7 @@ pub fn delete_portfolio_project_handler(
     project_id: i32,
 ) -> NoContentResult {
     match portfolio_projects::delete_portfolio_project(auth.user_id, project_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -252,7 +252,7 @@ pub fn update_portfolio_key_point_handler(
         payload.into_inner(),
         hub.inner(),
     ) {
-        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
+        Ok(item) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -279,7 +279,7 @@ pub fn delete_portfolio_key_point_handler(
     key_point_id: i32,
 ) -> NoContentResult {
     match portfolio_projects::delete_portfolio_key_point(auth.user_id, key_point_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -389,7 +389,7 @@ pub fn update_portfolio_technology_handler(
         payload.into_inner(),
         hub.inner(),
     ) {
-        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
+        Ok(item) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -417,7 +417,7 @@ pub fn delete_portfolio_technology_handler(
 ) -> NoContentResult {
     match portfolio_projects::delete_portfolio_technology(auth.user_id, technology_id, hub.inner())
     {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

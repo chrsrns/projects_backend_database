@@ -141,7 +141,7 @@ pub fn delete_work_experience_handler(
     work_id: i32,
 ) -> NoContentResult {
     match work_experiences::delete_work_experience(auth.user_id, work_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -251,7 +251,7 @@ pub fn update_work_experience_key_point_handler(
         payload.into_inner(),
         hub.inner(),
     ) {
-        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
+        Ok(item) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -282,7 +282,7 @@ pub fn delete_work_experience_key_point_handler(
         key_point_id,
         hub.inner(),
     ) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

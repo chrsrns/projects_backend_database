@@ -2,12 +2,11 @@ use diesel::prelude::*;
 use domain::models::{
     Education, EducationKeyPoint, UpdateEducation, UpdateEducationKeyPoint, UpdateEducationRequest,
 };
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
+    resume::common::{first_or_404, require_owned_resume, run_published},
 };
 
 pub fn update_education(
@@ -71,19 +70,18 @@ pub fn update_education(
         active: request.active,
     };
 
-    match diesel::update(education::table.find(education_id_value))
-        .set(&payload)
-        .get_result::<Education>(&mut establish_connection())
-    {
-        Ok(updated) => {
-            publisher.resume_changed(
-                updated.resume_id,
-                ResumeChangedAction::Updated(SectionType::Education),
-            );
-            Ok(updated)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Education",
+        education_id_value,
+        existing.resume_id,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| {
+            diesel::update(education::table.find(education_id_value))
+                .set(&payload)
+                .get_result::<Education>(conn)
+        },
+    )
 }
 
 pub fn update_education_key_point(
@@ -91,7 +89,7 @@ pub fn update_education_key_point(
     key_point_id_value: i32,
     payload: UpdateEducationKeyPoint,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<(EducationKeyPoint, i32), ApplicationError> {
+) -> Result<EducationKeyPoint, ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
 
@@ -109,17 +107,16 @@ pub fn update_education_key_point(
 
     require_owned_resume(user_id_value, edu.resume_id)?;
 
-    match diesel::update(education_key_points::table.find(key_point_id_value))
-        .set(&payload)
-        .get_result::<EducationKeyPoint>(&mut establish_connection())
-    {
-        Ok(updated) => {
-            publisher.resume_changed(
-                edu.resume_id,
-                ResumeChangedAction::Updated(SectionType::Education),
-            );
-            Ok((updated, edu.resume_id))
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Education key point",
+        key_point_id_value,
+        edu.resume_id,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| {
+            diesel::update(education_key_points::table.find(key_point_id_value))
+                .set(&payload)
+                .get_result::<EducationKeyPoint>(conn)
+        },
+    )
 }

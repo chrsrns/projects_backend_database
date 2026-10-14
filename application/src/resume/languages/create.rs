@@ -1,11 +1,10 @@
 use diesel::prelude::*;
 use domain::models::{Language, NewLanguage, NewLanguageRequest};
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, require_owned_resume},
+    resume::common::{require_owned_resume, run_published},
 };
 
 pub fn create_language(
@@ -24,17 +23,16 @@ pub fn create_language(
         display_order: payload.display_order,
     };
 
-    match diesel::insert_into(languages::table)
-        .values(&new_language)
-        .get_result::<Language>(&mut establish_connection())
-    {
-        Ok(language) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Languages),
-            );
-            Ok(language)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Language",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Languages),
+        publisher,
+        |conn| {
+            diesel::insert_into(languages::table)
+                .values(&new_language)
+                .get_result::<Language>(conn)
+        },
+    )
 }

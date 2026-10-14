@@ -1,18 +1,17 @@
 use diesel::prelude::*;
 use domain::models::{Education, EducationKeyPoint};
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
+    resume::common::{first_or_404, require_owned_resume, run_published_delete},
 };
 
 pub fn delete_education(
     user_id_value: i32,
     education_id_value: i32,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<i32, ApplicationError> {
+) -> Result<(), ApplicationError> {
     use domain::schema::education;
 
     let existing: Education = first_or_404(
@@ -23,32 +22,21 @@ pub fn delete_education(
 
     require_owned_resume(user_id_value, existing.resume_id)?;
 
-    match diesel::delete(education::table.find(education_id_value))
-        .execute(&mut establish_connection())
-    {
-        Ok(count) => {
-            if count == 0 {
-                Err(ApplicationError::NotFound(format!(
-                    "Education with id {} not found",
-                    education_id_value
-                )))
-            } else {
-                publisher.resume_changed(
-                    existing.resume_id,
-                    ResumeChangedAction::Updated(SectionType::Education),
-                );
-                Ok(existing.resume_id)
-            }
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published_delete(
+        "Education",
+        education_id_value,
+        existing.resume_id,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| diesel::delete(education::table.find(education_id_value)).execute(conn),
+    )
 }
 
 pub fn delete_education_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<i32, ApplicationError> {
+) -> Result<(), ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
 
@@ -66,23 +54,12 @@ pub fn delete_education_key_point(
 
     require_owned_resume(user_id_value, edu.resume_id)?;
 
-    match diesel::delete(education_key_points::table.find(key_point_id_value))
-        .execute(&mut establish_connection())
-    {
-        Ok(count) => {
-            if count == 0 {
-                Err(ApplicationError::NotFound(format!(
-                    "Education key point with id {} not found",
-                    key_point_id_value
-                )))
-            } else {
-                publisher.resume_changed(
-                    edu.resume_id,
-                    ResumeChangedAction::Updated(SectionType::Education),
-                );
-                Ok(edu.resume_id)
-            }
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published_delete(
+        "Education key point",
+        key_point_id_value,
+        edu.resume_id,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| diesel::delete(education_key_points::table.find(key_point_id_value)).execute(conn),
+    )
 }

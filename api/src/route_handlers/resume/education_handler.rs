@@ -136,7 +136,7 @@ pub fn delete_education_handler(
     education_id: i32,
 ) -> NoContentResult {
     match education::delete_education(auth.user_id, education_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -246,7 +246,7 @@ pub fn update_education_key_point_handler(
         payload.into_inner(),
         hub.inner(),
     ) {
-        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
+        Ok(item) => Ok(Json(Response { body: item })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -273,7 +273,7 @@ pub fn delete_education_key_point_handler(
     key_point_id: i32,
 ) -> NoContentResult {
     match education::delete_education_key_point(auth.user_id, key_point_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

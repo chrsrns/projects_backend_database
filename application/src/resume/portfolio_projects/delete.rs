@@ -1,18 +1,17 @@
 use diesel::prelude::*;
 use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology};
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
+    resume::common::{first_or_404, require_owned_resume, run_published_delete},
 };
 
 pub fn delete_portfolio_project(
     user_id_value: i32,
     project_id_value: i32,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<i32, ApplicationError> {
+) -> Result<(), ApplicationError> {
     use domain::schema::portfolio_projects;
 
     let existing: PortfolioProject = first_or_404(
@@ -23,32 +22,21 @@ pub fn delete_portfolio_project(
 
     require_owned_resume(user_id_value, existing.resume_id)?;
 
-    match diesel::delete(portfolio_projects::table.find(project_id_value))
-        .execute(&mut establish_connection())
-    {
-        Ok(count) => {
-            if count == 0 {
-                Err(ApplicationError::NotFound(format!(
-                    "Portfolio project with id {} not found",
-                    project_id_value
-                )))
-            } else {
-                publisher.resume_changed(
-                    existing.resume_id,
-                    ResumeChangedAction::Updated(SectionType::Projects),
-                );
-                Ok(existing.resume_id)
-            }
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published_delete(
+        "Portfolio project",
+        project_id_value,
+        existing.resume_id,
+        ResumeChangedAction::Updated(SectionType::Projects),
+        publisher,
+        |conn| diesel::delete(portfolio_projects::table.find(project_id_value)).execute(conn),
+    )
 }
 
 pub fn delete_portfolio_key_point(
     user_id_value: i32,
     key_point_id_value: i32,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<i32, ApplicationError> {
+) -> Result<(), ApplicationError> {
     use domain::schema::portfolio_key_points;
     use domain::schema::portfolio_projects;
 
@@ -66,32 +54,21 @@ pub fn delete_portfolio_key_point(
 
     require_owned_resume(user_id_value, project.resume_id)?;
 
-    match diesel::delete(portfolio_key_points::table.find(key_point_id_value))
-        .execute(&mut establish_connection())
-    {
-        Ok(count) => {
-            if count == 0 {
-                Err(ApplicationError::NotFound(format!(
-                    "Portfolio key point with id {} not found",
-                    key_point_id_value
-                )))
-            } else {
-                publisher.resume_changed(
-                    project.resume_id,
-                    ResumeChangedAction::Updated(SectionType::Projects),
-                );
-                Ok(project.resume_id)
-            }
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published_delete(
+        "Portfolio key point",
+        key_point_id_value,
+        project.resume_id,
+        ResumeChangedAction::Updated(SectionType::Projects),
+        publisher,
+        |conn| diesel::delete(portfolio_key_points::table.find(key_point_id_value)).execute(conn),
+    )
 }
 
 pub fn delete_portfolio_technology(
     user_id_value: i32,
     tech_id_value: i32,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<i32, ApplicationError> {
+) -> Result<(), ApplicationError> {
     use domain::schema::portfolio_projects;
     use domain::schema::portfolio_technologies;
 
@@ -109,23 +86,12 @@ pub fn delete_portfolio_technology(
 
     require_owned_resume(user_id_value, project.resume_id)?;
 
-    match diesel::delete(portfolio_technologies::table.find(tech_id_value))
-        .execute(&mut establish_connection())
-    {
-        Ok(count) => {
-            if count == 0 {
-                Err(ApplicationError::NotFound(format!(
-                    "Portfolio technology with id {} not found",
-                    tech_id_value
-                )))
-            } else {
-                publisher.resume_changed(
-                    project.resume_id,
-                    ResumeChangedAction::Updated(SectionType::Projects),
-                );
-                Ok(project.resume_id)
-            }
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published_delete(
+        "Portfolio technology",
+        tech_id_value,
+        project.resume_id,
+        ResumeChangedAction::Updated(SectionType::Projects),
+        publisher,
+        |conn| diesel::delete(portfolio_technologies::table.find(tech_id_value)).execute(conn),
+    )
 }

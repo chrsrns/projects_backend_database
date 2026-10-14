@@ -116,7 +116,7 @@ pub fn update_framework_handler(
         payload.into_inner(),
         hub.inner(),
     ) {
-        Ok((framework, _resume_id)) => Ok(Json(Response { body: framework })),
+        Ok(framework) => Ok(Json(Response { body: framework })),
         Err(err) => Err(map_application_error(err)),
     }
 }
@@ -143,7 +143,7 @@ pub fn delete_framework_handler(
     framework_id: i32,
 ) -> NoContentResult {
     match frameworks::delete_framework(auth.user_id, framework_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
+        Ok(()) => Ok(NoContent),
         Err(err) => Err(map_application_error(err)),
     }
 }

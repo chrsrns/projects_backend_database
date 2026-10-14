@@ -1,11 +1,10 @@
 use diesel::prelude::*;
 use domain::models::{Framework, Language, NewFramework, NewFrameworkRequest};
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
+    resume::common::{first_or_404, require_owned_resume, run_published},
 };
 
 pub fn create_framework(
@@ -34,17 +33,16 @@ pub fn create_framework(
         display_order: payload.display_order,
     };
 
-    match diesel::insert_into(frameworks::table)
-        .values(&new_framework)
-        .get_result::<Framework>(&mut establish_connection())
-    {
-        Ok(framework) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Frameworks),
-            );
-            Ok(framework)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Framework",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Frameworks),
+        publisher,
+        |conn| {
+            diesel::insert_into(frameworks::table)
+                .values(&new_framework)
+                .get_result::<Framework>(conn)
+        },
+    )
 }
