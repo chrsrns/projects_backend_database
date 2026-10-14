@@ -4,7 +4,9 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_accessible_resume, viewer_is_owner},
+    resume::common::{
+        app_err_from_diesel_err, find_accessible_resume, first_or_404, viewer_is_owner,
+    },
 };
 
 pub fn list_educations(
@@ -53,12 +55,7 @@ pub fn list_education_key_points(
         education_query = education_query.filter(education_dsl::active.eq(true));
     }
 
-    let _education: Education = match education_query.first(&mut establish_connection()) {
-        Ok(e) => e,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
+    let _education: Education = first_or_404("Education", education_id_value, education_query)?;
 
     let mut kp_query = key_points_dsl::education_key_points.into_boxed();
     kp_query = kp_query.filter(key_points_dsl::education_id.eq(education_id_value));

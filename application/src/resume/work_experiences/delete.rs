@@ -1,11 +1,11 @@
 use diesel::prelude::*;
-use domain::models::{Resume, WorkExperience, WorkExperienceKeyPoint};
+use domain::models::{WorkExperience, WorkExperienceKeyPoint};
 use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
 };
 
 pub fn delete_work_experience(
@@ -15,17 +15,13 @@ pub fn delete_work_experience(
 ) -> Result<i32, ApplicationError> {
     use domain::schema::work_experiences;
 
-    let existing: WorkExperience = match work_experiences::table
-        .find(work_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: WorkExperience = first_or_404(
+        "Work experience",
+        work_id_value,
+        work_experiences::table.find(work_id_value),
+    )?;
 
-    let resume: Resume = find_resume(existing.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, existing.resume_id)?;
 
     match diesel::delete(work_experiences::table.find(work_id_value))
         .execute(&mut establish_connection())
@@ -56,25 +52,19 @@ pub fn delete_work_experience_key_point(
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
 
-    let existing: WorkExperienceKeyPoint = match work_experience_key_points::table
-        .find(kp_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: WorkExperienceKeyPoint = first_or_404(
+        "Work experience key point",
+        kp_id_value,
+        work_experience_key_points::table.find(kp_id_value),
+    )?;
 
-    let work: WorkExperience = match work_experiences::table
-        .find(existing.work_experience_id)
-        .first(&mut establish_connection())
-    {
-        Ok(w) => w,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let work: WorkExperience = first_or_404(
+        "Work experience",
+        existing.work_experience_id,
+        work_experiences::table.find(existing.work_experience_id),
+    )?;
 
-    let resume: Resume = find_resume(work.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, work.resume_id)?;
 
     match diesel::delete(work_experience_key_points::table.find(kp_id_value))
         .execute(&mut establish_connection())

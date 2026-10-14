@@ -1,11 +1,11 @@
 use diesel::prelude::*;
-use domain::models::{Framework, Language, Resume, UpdateFramework};
+use domain::models::{Framework, Language, UpdateFramework};
 use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
 };
 
 pub fn update_framework(
@@ -17,25 +17,19 @@ pub fn update_framework(
     use domain::schema::frameworks;
     use domain::schema::languages;
 
-    let existing: Framework = match frameworks::table
-        .find(framework_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(r) => r,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: Framework = first_or_404(
+        "Framework",
+        framework_id_value,
+        frameworks::table.find(framework_id_value),
+    )?;
 
-    let language: Language = match languages::table
-        .find(existing.language_id)
-        .first(&mut establish_connection())
-    {
-        Ok(l) => l,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let language: Language = first_or_404(
+        "Language",
+        existing.language_id,
+        languages::table.find(existing.language_id),
+    )?;
 
-    let resume: Resume = find_resume(language.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, language.resume_id)?;
 
     match diesel::update(frameworks::table.find(framework_id_value))
         .set(&payload)

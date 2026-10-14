@@ -1,11 +1,11 @@
 use diesel::prelude::*;
-use domain::models::{Resume, Skill, UpdateSkill};
+use domain::models::{Skill, UpdateSkill};
 use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
 };
 
 pub fn update_skill(
@@ -16,23 +16,10 @@ pub fn update_skill(
 ) -> Result<Skill, ApplicationError> {
     use domain::schema::skills;
 
-    let existing: Skill = match skills::table
-        .find(skill_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(r) => r,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(format!(
-                "Skill with id {} not found",
-                skill_id_value
-            )));
-        }
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: Skill =
+        first_or_404("Skill", skill_id_value, skills::table.find(skill_id_value))?;
 
-    let resume: Resume = find_resume(existing.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, existing.resume_id)?;
 
     match diesel::update(skills::table.find(skill_id_value))
         .set(&payload)

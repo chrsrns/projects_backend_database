@@ -1,11 +1,11 @@
 use diesel::prelude::*;
-use domain::models::{NewSkill, NewSkillRequest, Resume, Skill};
+use domain::models::{NewSkill, NewSkillRequest, Skill};
 use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{app_err_from_diesel_err, require_owned_resume},
 };
 
 pub fn create_skill(
@@ -16,9 +16,7 @@ pub fn create_skill(
 ) -> Result<Skill, ApplicationError> {
     use domain::schema::skills;
 
-    let existing_resume: Resume = find_resume(resume_id_value)?;
-
-    require_owner(&existing_resume, user_id_value)?;
+    require_owned_resume(user_id_value, resume_id_value)?;
 
     let new_skill = NewSkill {
         resume_id: resume_id_value,

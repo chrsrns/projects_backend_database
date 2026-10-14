@@ -1,11 +1,11 @@
 use diesel::prelude::*;
-use domain::models::{Language, Resume};
+use domain::models::Language;
 use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
 };
 
 pub fn delete_language(
@@ -15,17 +15,13 @@ pub fn delete_language(
 ) -> Result<i32, ApplicationError> {
     use domain::schema::languages;
 
-    let existing: Language = match languages::table
-        .find(language_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(r) => r,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: Language = first_or_404(
+        "Language",
+        language_id_value,
+        languages::table.find(language_id_value),
+    )?;
 
-    let resume: Resume = find_resume(existing.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, existing.resume_id)?;
 
     match diesel::delete(languages::table.find(language_id_value))
         .execute(&mut establish_connection())

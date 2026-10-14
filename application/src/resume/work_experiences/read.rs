@@ -4,7 +4,9 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_accessible_resume, viewer_is_owner},
+    resume::common::{
+        app_err_from_diesel_err, find_accessible_resume, first_or_404, viewer_is_owner,
+    },
 };
 
 pub fn list_work_experiences(
@@ -54,15 +56,7 @@ pub fn list_work_experience_key_points(
         work_query = work_query.filter(work_dsl::active.eq(true));
     }
 
-    let _work: WorkExperience = match work_query.first(&mut establish_connection()) {
-        Ok(w) => w,
-        Err(diesel::result::Error::NotFound) => {
-            return Err(ApplicationError::NotFound(
-                "Work experience not found".to_string(),
-            ));
-        }
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let _work: WorkExperience = first_or_404("Work experience", work_id_value, work_query)?;
 
     let mut kp_query = kps_dsl::work_experience_key_points.into_boxed();
     kp_query = kp_query.filter(kps_dsl::work_experience_id.eq(work_id_value));

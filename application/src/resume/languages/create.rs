@@ -1,11 +1,11 @@
 use diesel::prelude::*;
-use domain::models::{Language, NewLanguage, NewLanguageRequest, Resume};
+use domain::models::{Language, NewLanguage, NewLanguageRequest};
 use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{app_err_from_diesel_err, require_owned_resume},
 };
 
 pub fn create_language(
@@ -16,9 +16,7 @@ pub fn create_language(
 ) -> Result<Language, ApplicationError> {
     use domain::schema::languages;
 
-    let existing_resume: Resume = find_resume(resume_id_value)?;
-
-    require_owner(&existing_resume, user_id_value)?;
+    require_owned_resume(user_id_value, resume_id_value)?;
 
     let new_language = NewLanguage {
         resume_id: resume_id_value,

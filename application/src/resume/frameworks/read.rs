@@ -4,7 +4,7 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_accessible_resume},
+    resume::common::{app_err_from_diesel_err, find_accessible_resume, first_or_404},
 };
 
 pub fn list_frameworks(
@@ -17,16 +17,13 @@ pub fn list_frameworks(
 
     find_accessible_resume(resume_id_value, user_id_value)?;
 
-    let language: Language = match languages_dsl::languages
-        .filter(languages_dsl::id.eq(language_id_value))
-        .filter(languages_dsl::resume_id.eq(resume_id_value))
-        .first(&mut establish_connection())
-    {
-        Ok(l) => l,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
+    let language: Language = first_or_404(
+        "Language",
+        language_id_value,
+        languages_dsl::languages
+            .filter(languages_dsl::id.eq(language_id_value))
+            .filter(languages_dsl::resume_id.eq(resume_id_value)),
+    )?;
 
     let mut items: Vec<Framework> = match frameworks_dsl::frameworks
         .filter(frameworks_dsl::language_id.eq(language.id))

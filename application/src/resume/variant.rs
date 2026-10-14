@@ -13,8 +13,8 @@ use infrastructure::run_in_transaction;
 use crate::error::ApplicationError;
 use crate::realtime::{ResumeChangePublisher, ResumeChangedAction};
 use crate::resume::common::{
-    app_err_from_diesel_err, find_accessible_resume, find_resume, partial_date_to_columns,
-    require_owner, validate_variant_metadata, viewer_is_owner,
+    app_err_from_diesel_err, find_accessible_resume, partial_date_to_columns, require_owned_resume,
+    validate_variant_metadata, viewer_is_owner,
 };
 use crate::resume::view;
 
@@ -57,9 +57,7 @@ pub fn create_variant(
     request: NewVariantRequest,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
-    let base = find_resume(base_id)?;
-
-    require_owner(&base, user_id_value)?;
+    let base = require_owned_resume(user_id_value, base_id)?;
 
     if base.base_resume_id.is_some() {
         return Err(ApplicationError::BadRequest(

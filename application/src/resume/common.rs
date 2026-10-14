@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use diesel::prelude::{BoolExpressionMethods, ExpressionMethods, QueryDsl};
-use diesel::query_dsl::methods::LimitDsl;
 use diesel::query_dsl::LoadQuery;
+use diesel::query_dsl::methods::LimitDsl;
 use domain::models::{PartialDate, Resume};
 use infrastructure::{DbConnection, establish_connection};
 
@@ -29,10 +29,7 @@ where
 
 /// Loads the resume by id (404 when absent) then requires `user_id` to own
 /// it (403 when foreign), in that order.
-pub fn require_owned_resume(
-    user_id: i32,
-    resume_id: i32,
-) -> Result<Resume, ApplicationError> {
+pub fn require_owned_resume(user_id: i32, resume_id: i32) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes;
 
     let resume = first_or_404("Resume", resume_id, resumes::table.find(resume_id))?;

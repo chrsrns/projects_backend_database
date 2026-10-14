@@ -6,7 +6,7 @@ use infrastructure::establish_connection;
 use crate::error::ApplicationError;
 use crate::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
 use crate::resume::common::{
-    app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
+    app_err_from_diesel_err, partial_date_to_columns, require_owned_resume,
     validate_executive_summary, validate_optional_text_update, validate_optional_url_update,
 };
 
@@ -16,9 +16,7 @@ pub fn update_resume(
     mut resume: UpdateResume,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
-    let existing = find_resume(resume_id)?;
-
-    require_owner(&existing, user_id_value)?;
+    let existing = require_owned_resume(user_id_value, resume_id)?;
 
     if existing.base_resume_id.is_some() && resume.email.is_some() {
         return Err(ApplicationError::BadRequest(

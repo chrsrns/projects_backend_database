@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 use domain::models::{
-    Resume, UpdateWorkExperience, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest,
+    UpdateWorkExperience, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest,
     WorkExperience, WorkExperienceKeyPoint,
 };
 use infrastructure::establish_connection;
@@ -8,7 +8,7 @@ use infrastructure::establish_connection;
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{app_err_from_diesel_err, first_or_404, require_owned_resume},
 };
 
 fn normalize_optional_string_change(value: Option<Option<String>>) -> Option<Option<String>> {
@@ -32,17 +32,13 @@ pub fn update_work_experience(
 ) -> Result<WorkExperience, ApplicationError> {
     use domain::schema::work_experiences;
 
-    let existing: WorkExperience = match work_experiences::table
-        .find(work_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: WorkExperience = first_or_404(
+        "Work experience",
+        work_id_value,
+        work_experiences::table.find(work_id_value),
+    )?;
 
-    let resume: Resume = find_resume(existing.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, existing.resume_id)?;
 
     let new_start = request
         .start_date
@@ -111,25 +107,19 @@ pub fn update_work_experience_key_point(
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
 
-    let existing: WorkExperienceKeyPoint = match work_experience_key_points::table
-        .find(kp_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: WorkExperienceKeyPoint = first_or_404(
+        "Work experience key point",
+        kp_id_value,
+        work_experience_key_points::table.find(kp_id_value),
+    )?;
 
-    let work: WorkExperience = match work_experiences::table
-        .find(existing.work_experience_id)
-        .first(&mut establish_connection())
-    {
-        Ok(w) => w,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let work: WorkExperience = first_or_404(
+        "Work experience",
+        existing.work_experience_id,
+        work_experiences::table.find(existing.work_experience_id),
+    )?;
 
-    let resume: Resume = find_resume(work.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, work.resume_id)?;
 
     match diesel::update(work_experience_key_points::table.find(kp_id_value))
         .set(&payload)
