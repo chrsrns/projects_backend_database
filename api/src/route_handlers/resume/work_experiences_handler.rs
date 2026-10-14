@@ -11,7 +11,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
+use crate::error::ApiError;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -36,7 +36,7 @@ pub fn list_work_experiences_handler(
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match work_experiences::list_work_experiences(resume_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -77,7 +77,7 @@ pub fn create_work_experience_handler(
             rocket::http::Status::Created,
             Json(Response { body: item }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -115,7 +115,7 @@ pub fn update_work_experience_handler(
         hub.inner(),
     ) {
         Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -142,7 +142,7 @@ pub fn delete_work_experience_handler(
 ) -> NoContentResult {
     match work_experiences::delete_work_experience(auth.user_id, work_id, hub.inner()) {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -170,7 +170,7 @@ pub fn list_work_experience_key_points_handler(
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match work_experiences::list_work_experience_key_points(resume_id, work_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -214,7 +214,7 @@ pub fn create_work_experience_key_point_handler(
             rocket::http::Status::Created,
             Json(Response { body: item }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -252,7 +252,7 @@ pub fn update_work_experience_key_point_handler(
         hub.inner(),
     ) {
         Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -283,6 +283,6 @@ pub fn delete_work_experience_key_point_handler(
         hub.inner(),
     ) {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }

@@ -8,7 +8,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
+use crate::error::ApiError;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -35,7 +35,7 @@ pub fn list_frameworks_handler(
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match frameworks::list_frameworks(resume_id, language_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -79,7 +79,7 @@ pub fn create_framework_handler(
             rocket::http::Status::Created,
             Json(Response { body: framework }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -117,7 +117,7 @@ pub fn update_framework_handler(
         hub.inner(),
     ) {
         Ok(framework) => Ok(Json(Response { body: framework })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -144,6 +144,6 @@ pub fn delete_framework_handler(
 ) -> NoContentResult {
     match frameworks::delete_framework(auth.user_id, framework_id, hub.inner()) {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }

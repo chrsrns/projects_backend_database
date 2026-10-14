@@ -1,34 +1,16 @@
-pub type JsonResult<T> = Result<
-    rocket::serde::json::Json<shared::response_models::Response<T>>,
-    rocket::response::status::Custom<
-        rocket::serde::json::Json<shared::response_models::Response<String>>,
-    >,
->;
+use crate::error::ApiError;
+
+pub type JsonResult<T> =
+    Result<rocket::serde::json::Json<shared::response_models::Response<T>>, ApiError>;
 
 pub type CustomJsonResult<T> = Result<
     rocket::response::status::Custom<
         rocket::serde::json::Json<shared::response_models::Response<T>>,
     >,
-    rocket::response::status::Custom<
-        rocket::serde::json::Json<shared::response_models::Response<String>>,
-    >,
+    ApiError,
 >;
 
-pub type ConflictJsonResult<T> = Result<
-    rocket::response::status::Custom<
-        rocket::serde::json::Json<shared::response_models::Response<T>>,
-    >,
-    rocket::response::status::Conflict<
-        rocket::serde::json::Json<shared::response_models::Response<String>>,
-    >,
->;
-
-pub type NoContentResult = Result<
-    rocket::response::status::NoContent,
-    rocket::response::status::Custom<
-        rocket::serde::json::Json<shared::response_models::Response<String>>,
-    >,
->;
+pub type NoContentResult = Result<rocket::response::status::NoContent, ApiError>;
 
 pub type UnauthorizedJsonResult<T> = Result<
     rocket::serde::json::Json<shared::response_models::Response<T>>,

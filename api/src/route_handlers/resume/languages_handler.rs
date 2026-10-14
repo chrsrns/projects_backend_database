@@ -8,7 +8,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
+use crate::error::ApiError;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -33,7 +33,7 @@ pub fn list_languages_handler(
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match languages::list_languages(resume_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -69,7 +69,7 @@ pub fn create_language_handler(
             rocket::http::Status::Created,
             Json(Response { body: language }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -102,7 +102,7 @@ pub fn update_language_handler(
 ) -> JsonResult<Language> {
     match languages::update_language(auth.user_id, language_id, payload.into_inner(), hub.inner()) {
         Ok(language) => Ok(Json(Response { body: language })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -129,6 +129,6 @@ pub fn delete_language_handler(
 ) -> NoContentResult {
     match languages::delete_language(auth.user_id, language_id, hub.inner()) {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }

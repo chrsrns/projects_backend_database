@@ -8,7 +8,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
+use crate::error::ApiError;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -30,7 +30,7 @@ pub fn list_skills_handler(resume_id: i32, maybe_auth: MaybeAuthSession) -> Json
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match skills::list_skills(resume_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -66,7 +66,7 @@ pub fn create_skill_handler(
             rocket::http::Status::Created,
             Json(Response { body: skill }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -95,7 +95,7 @@ pub fn update_skill_handler(
 ) -> JsonResult<Skill> {
     match skills::update_skill(auth.user_id, skill_id, payload.into_inner(), hub.inner()) {
         Ok(skill) => Ok(Json(Response { body: skill })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -118,6 +118,6 @@ pub fn update_skill_handler(
 pub fn delete_skill_handler(auth: AuthSession, hub: &State<Hub>, skill_id: i32) -> NoContentResult {
     match skills::delete_skill(auth.user_id, skill_id, hub.inner()) {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }

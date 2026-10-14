@@ -10,7 +10,7 @@ use rocket::{State, post};
 use shared::response_models::Response;
 
 use super::CustomJsonResult;
-use crate::error::map_application_error;
+use crate::error::ApiError;
 
 #[utoipa::path(
     post,
@@ -31,30 +31,30 @@ pub async fn generate_handler(
     let payload = match payload {
         Ok(payload) => payload,
         Err(err) => {
-            return Err(Custom(
+            return Err(ApiError(Custom(
                 Status::BadRequest,
                 Json(Response {
                     body: format!("Invalid request body: {err}"),
                 }),
-            ));
+            )));
         }
     };
 
     let request: GenerateContentRequest = match serde_json::from_value(payload.into_inner()) {
         Ok(request) => request,
         Err(err) => {
-            return Err(Custom(
+            return Err(ApiError(Custom(
                 Status::BadRequest,
                 Json(Response {
                     body: format!("Invalid request body: {err}"),
                 }),
-            ));
+            )));
         }
     };
 
     let client_ref: &dyn LlmClient = client.inner().as_ref();
     match generate_content(client_ref, request).await {
         Ok(response) => Ok(Custom(Status::Ok, Json(Response { body: response }))),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }

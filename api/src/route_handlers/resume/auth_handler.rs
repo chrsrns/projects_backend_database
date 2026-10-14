@@ -6,7 +6,7 @@ use rocket::serde::json::Json;
 use rocket::{get, post};
 use shared::response_models::{AuthTokenResponse, Response};
 
-use crate::error::map_application_error;
+use crate::error::ApiError;
 
 #[utoipa::path(
     post,
@@ -25,7 +25,7 @@ pub fn register_handler(payload: Json<AuthRegisterRequest>) -> CustomJsonResult<
             rocket::http::Status::Created,
             Json(Response { body: user }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 

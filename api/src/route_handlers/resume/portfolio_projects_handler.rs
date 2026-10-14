@@ -12,7 +12,7 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
+use crate::error::ApiError;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -37,7 +37,7 @@ pub fn list_portfolio_projects_handler(
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match portfolio_projects::list_portfolio_projects(resume_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -78,7 +78,7 @@ pub fn create_portfolio_project_handler(
             rocket::http::Status::Created,
             Json(Response { body: item }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -116,7 +116,7 @@ pub fn update_portfolio_project_handler(
         hub.inner(),
     ) {
         Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -143,7 +143,7 @@ pub fn delete_portfolio_project_handler(
 ) -> NoContentResult {
     match portfolio_projects::delete_portfolio_project(auth.user_id, project_id, hub.inner()) {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -171,7 +171,7 @@ pub fn list_portfolio_key_points_handler(
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match portfolio_projects::list_portfolio_key_points(resume_id, project_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -215,7 +215,7 @@ pub fn create_portfolio_key_point_handler(
             rocket::http::Status::Created,
             Json(Response { body: item }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -253,7 +253,7 @@ pub fn update_portfolio_key_point_handler(
         hub.inner(),
     ) {
         Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -280,7 +280,7 @@ pub fn delete_portfolio_key_point_handler(
 ) -> NoContentResult {
     match portfolio_projects::delete_portfolio_key_point(auth.user_id, key_point_id, hub.inner()) {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -308,7 +308,7 @@ pub fn list_portfolio_technologies_handler(
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     match portfolio_projects::list_portfolio_technologies(resume_id, project_id, user_id_value) {
         Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -352,7 +352,7 @@ pub fn create_portfolio_technology_handler(
             rocket::http::Status::Created,
             Json(Response { body: item }),
         )),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -390,7 +390,7 @@ pub fn update_portfolio_technology_handler(
         hub.inner(),
     ) {
         Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
 
@@ -418,6 +418,6 @@ pub fn delete_portfolio_technology_handler(
     match portfolio_projects::delete_portfolio_technology(auth.user_id, technology_id, hub.inner())
     {
         Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
+        Err(err) => Err(ApiError::from(err)),
     }
 }
