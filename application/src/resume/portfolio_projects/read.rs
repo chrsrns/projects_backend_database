@@ -4,7 +4,9 @@ use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
-    resume::common::{app_err_from_diesel_err, find_accessible_resume, viewer_is_owner},
+    resume::common::{
+        app_err_from_diesel_err, find_accessible_resume, first_or_404, viewer_is_owner,
+    },
 };
 
 pub fn list_portfolio_projects(
@@ -54,10 +56,8 @@ pub fn list_portfolio_key_points(
         project_query = project_query.filter(projects_dsl::active.eq(true));
     }
 
-    let _project: PortfolioProject = match project_query.first(&mut establish_connection()) {
-        Ok(p) => p,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let _project: PortfolioProject =
+        first_or_404("Portfolio project", project_id_value, project_query)?;
 
     let mut kp_query = kps_dsl::portfolio_key_points.into_boxed();
     kp_query = kp_query.filter(kps_dsl::portfolio_project_id.eq(project_id_value));
@@ -96,10 +96,8 @@ pub fn list_portfolio_technologies(
         project_query = project_query.filter(projects_dsl::active.eq(true));
     }
 
-    let _project: PortfolioProject = match project_query.first(&mut establish_connection()) {
-        Ok(p) => p,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let _project: PortfolioProject =
+        first_or_404("Portfolio project", project_id_value, project_query)?;
 
     let mut tech_query = tech_dsl::portfolio_technologies.into_boxed();
     tech_query = tech_query.filter(tech_dsl::portfolio_project_id.eq(project_id_value));

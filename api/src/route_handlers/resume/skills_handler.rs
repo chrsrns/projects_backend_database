@@ -8,7 +8,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -28,10 +27,8 @@ use crate::realtime::Hub;
 #[get("/resume/<resume_id>/skills")]
 pub fn list_skills_handler(resume_id: i32, maybe_auth: MaybeAuthSession) -> JsonResult<Vec<Skill>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match skills::list_skills(resume_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let items = skills::list_skills(resume_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -61,13 +58,11 @@ pub fn create_skill_handler(
     resume_id: i32,
     payload: Json<NewSkillRequest>,
 ) -> CustomJsonResult<Skill> {
-    match skills::create_skill(auth.user_id, resume_id, payload.into_inner(), hub.inner()) {
-        Ok(skill) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: skill }),
-        )),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let skill = skills::create_skill(auth.user_id, resume_id, payload.into_inner(), hub.inner())?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: skill }),
+    ))
 }
 
 #[utoipa::path(
@@ -93,10 +88,8 @@ pub fn update_skill_handler(
     skill_id: i32,
     payload: Json<UpdateSkill>,
 ) -> JsonResult<Skill> {
-    match skills::update_skill(auth.user_id, skill_id, payload.into_inner(), hub.inner()) {
-        Ok(skill) => Ok(Json(Response { body: skill })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let skill = skills::update_skill(auth.user_id, skill_id, payload.into_inner(), hub.inner())?;
+    Ok(Json(Response { body: skill }))
 }
 
 #[utoipa::path(
@@ -116,8 +109,6 @@ pub fn update_skill_handler(
 )]
 #[rocket_delete("/skills/<skill_id>")]
 pub fn delete_skill_handler(auth: AuthSession, hub: &State<Hub>, skill_id: i32) -> NoContentResult {
-    match skills::delete_skill(auth.user_id, skill_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
-    }
+    skills::delete_skill(auth.user_id, skill_id, hub.inner())?;
+    Ok(NoContent)
 }

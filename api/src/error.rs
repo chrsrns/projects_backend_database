@@ -40,6 +40,25 @@ pub fn map_application_error(err: ApplicationError) -> Custom<Json<Response<Stri
     }
 }
 
+/// The error leg of every handler result alias. Wraps the
+/// `Custom<Json<Response<String>>>` produced by [`map_application_error`]
+/// so handlers can `?`-propagate `ApplicationError` through
+/// `From`, while direct-construction sites wrap their `Custom` in
+/// `ApiError(...)`.
+pub struct ApiError(pub Custom<Json<Response<String>>>);
+
+impl<'r> rocket::response::Responder<'r, 'static> for ApiError {
+    fn respond_to(self, req: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
+        self.0.respond_to(req)
+    }
+}
+
+impl From<ApplicationError> for ApiError {
+    fn from(err: ApplicationError) -> Self {
+        ApiError(map_application_error(err))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

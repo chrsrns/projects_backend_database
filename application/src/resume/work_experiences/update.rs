@@ -1,14 +1,13 @@
 use diesel::prelude::*;
 use domain::models::{
-    Resume, UpdateWorkExperience, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest,
+    UpdateWorkExperience, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest,
     WorkExperience, WorkExperienceKeyPoint,
 };
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{first_or_404, require_owned_resume, run_published},
 };
 
 fn normalize_optional_string_change(value: Option<Option<String>>) -> Option<Option<String>> {
@@ -32,17 +31,13 @@ pub fn update_work_experience(
 ) -> Result<WorkExperience, ApplicationError> {
     use domain::schema::work_experiences;
 
-    let existing: WorkExperience = match work_experiences::table
-        .find(work_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: WorkExperience = first_or_404(
+        "Work experience",
+        work_id_value,
+        work_experiences::table.find(work_id_value),
+    )?;
 
-    let resume: Resume = find_resume(existing.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, existing.resume_id)?;
 
     let new_start = request
         .start_date
@@ -87,19 +82,18 @@ pub fn update_work_experience(
         display_order: request.display_order,
         active: request.active,
     };
-    match diesel::update(work_experiences::table.find(work_id_value))
-        .set(&payload)
-        .get_result::<WorkExperience>(&mut establish_connection())
-    {
-        Ok(updated) => {
-            publisher.resume_changed(
-                updated.resume_id,
-                ResumeChangedAction::Updated(SectionType::Experience),
-            );
-            Ok(updated)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Work experience",
+        work_id_value,
+        existing.resume_id,
+        ResumeChangedAction::Updated(SectionType::Experience),
+        publisher,
+        |conn| {
+            diesel::update(work_experiences::table.find(work_id_value))
+                .set(&payload)
+                .get_result::<WorkExperience>(conn)
+        },
+    )
 }
 
 pub fn update_work_experience_key_point(
@@ -107,41 +101,34 @@ pub fn update_work_experience_key_point(
     kp_id_value: i32,
     payload: UpdateWorkExperienceKeyPoint,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<(WorkExperienceKeyPoint, i32), ApplicationError> {
+) -> Result<WorkExperienceKeyPoint, ApplicationError> {
     use domain::schema::work_experience_key_points;
     use domain::schema::work_experiences;
 
-    let existing: WorkExperienceKeyPoint = match work_experience_key_points::table
-        .find(kp_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let existing: WorkExperienceKeyPoint = first_or_404(
+        "Work experience key point",
+        kp_id_value,
+        work_experience_key_points::table.find(kp_id_value),
+    )?;
 
-    let work: WorkExperience = match work_experiences::table
-        .find(existing.work_experience_id)
-        .first(&mut establish_connection())
-    {
-        Ok(w) => w,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
+    let work: WorkExperience = first_or_404(
+        "Work experience",
+        existing.work_experience_id,
+        work_experiences::table.find(existing.work_experience_id),
+    )?;
 
-    let resume: Resume = find_resume(work.resume_id)?;
+    require_owned_resume(user_id_value, work.resume_id)?;
 
-    require_owner(&resume, user_id_value)?;
-
-    match diesel::update(work_experience_key_points::table.find(kp_id_value))
-        .set(&payload)
-        .get_result::<WorkExperienceKeyPoint>(&mut establish_connection())
-    {
-        Ok(updated) => {
-            publisher.resume_changed(
-                work.resume_id,
-                ResumeChangedAction::Updated(SectionType::Experience),
-            );
-            Ok((updated, work.resume_id))
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Work experience key point",
+        kp_id_value,
+        work.resume_id,
+        ResumeChangedAction::Updated(SectionType::Experience),
+        publisher,
+        |conn| {
+            diesel::update(work_experience_key_points::table.find(kp_id_value))
+                .set(&payload)
+                .get_result::<WorkExperienceKeyPoint>(conn)
+        },
+    )
 }

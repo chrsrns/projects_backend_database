@@ -172,67 +172,84 @@ pub struct MarkdownValidationError {
     pub message: String,
 }
 
+/// Mints deterministic 1-based sequential ids — `id` = position in
+/// `items` + 1 (not `display_order`); `build` supplies every remaining
+/// field.
+fn mint_seq<T, D>(items: &[T], build: impl Fn(&T, i32) -> D) -> Vec<D> {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| build(item, index as i32 + 1))
+        .collect()
+}
+
+/// Mints deterministic 1-based child ids across a whole child list and
+/// keys them by the *minted* parent id (parent source index + 1).
+/// `parent_index` reads the child's 0-based parent reference; a child
+/// whose parent index is out of bounds is skipped before an id is
+/// consumed.
+fn mint_child_map<T, D>(
+    items: &[T],
+    parent_count: usize,
+    parent_index: impl Fn(&T) -> usize,
+    build: impl Fn(&T, i32, i32) -> D,
+) -> BTreeMap<i32, Vec<D>> {
+    let mut map: BTreeMap<i32, Vec<D>> = BTreeMap::new();
+    let mut next_id: i32 = 1;
+    for item in items {
+        let parent_index = parent_index(item);
+        if parent_index >= parent_count {
+            continue;
+        }
+        let parent_id = parent_index as i32 + 1;
+        let id = next_id;
+        next_id += 1;
+        map.entry(parent_id)
+            .or_default()
+            .push(build(item, id, parent_id));
+    }
+    map
+}
+
 impl From<domain::models::ParsedResume> for ResumeDocument {
     fn from(parsed: domain::models::ParsedResume) -> Self {
-        let education: Vec<DocumentEducation> = parsed
-            .education
-            .iter()
-            .enumerate()
-            .map(|(index, edu)| DocumentEducation {
-                id: index as i32 + 1,
-                resume_id: 0,
-                education_stage: edu.education_stage.clone(),
-                institution_name: edu.institution_name.clone(),
-                degree: edu.degree.clone(),
-                start_date: edu.start_date,
-                end_date: edu.end_date,
-                description: edu.description.clone(),
-                display_order: edu.display_order,
-                active: edu.active,
-            })
-            .collect();
+        let education = mint_seq(&parsed.education, |edu, id| DocumentEducation {
+            id,
+            resume_id: 0,
+            education_stage: edu.education_stage.clone(),
+            institution_name: edu.institution_name.clone(),
+            degree: edu.degree.clone(),
+            start_date: edu.start_date,
+            end_date: edu.end_date,
+            description: edu.description.clone(),
+            display_order: edu.display_order,
+            active: edu.active,
+        });
 
-        let mut education_key_points: BTreeMap<i32, Vec<DocumentEducationKeyPoint>> =
-            BTreeMap::new();
-        let mut next_education_kp_id: i32 = 1;
-        for kp in parsed.education_key_points.iter() {
-            let parent_id = kp.education_index as i32 + 1;
-            if kp.education_index >= education.len() {
-                continue;
-            }
-            let id = next_education_kp_id;
-            next_education_kp_id += 1;
-            education_key_points
-                .entry(parent_id)
-                .or_default()
-                .push(DocumentEducationKeyPoint {
-                    id,
-                    education_id: parent_id,
-                    key_point: kp.key_point.clone(),
-                    display_order: None,
-                    active: kp.active,
-                });
-        }
+        let education_key_points = mint_child_map(
+            &parsed.education_key_points,
+            education.len(),
+            |kp| kp.education_index,
+            |kp, id, parent_id| DocumentEducationKeyPoint {
+                id,
+                education_id: parent_id,
+                key_point: kp.key_point.clone(),
+                display_order: None,
+                active: kp.active,
+            },
+        );
 
-        let skills: Vec<DocumentSkill> = parsed
-            .skills
-            .iter()
-            .enumerate()
-            .map(|(index, skill)| DocumentSkill {
-                id: index as i32 + 1,
-                resume_id: 0,
-                skill_name: skill.skill_name.clone(),
-                confidence_percentage: skill.confidence_percentage,
-                display_order: skill.display_order,
-            })
-            .collect();
+        let skills = mint_seq(&parsed.skills, |skill, id| DocumentSkill {
+            id,
+            resume_id: 0,
+            skill_name: skill.skill_name.clone(),
+            confidence_percentage: skill.confidence_percentage,
+            display_order: skill.display_order,
+        });
 
-        let work_experiences: Vec<DocumentWorkExperience> = parsed
-            .work_experiences
-            .iter()
-            .enumerate()
-            .map(|(index, work)| DocumentWorkExperience {
-                id: index as i32 + 1,
+        let work_experiences = mint_seq(&parsed.work_experiences, |work, id| {
+            DocumentWorkExperience {
+                id,
                 resume_id: 0,
                 job_title: work.job_title.clone(),
                 company_name: work.company_name.clone(),
@@ -241,37 +258,25 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                 description: work.description.clone(),
                 display_order: work.display_order,
                 active: work.active,
-            })
-            .collect();
-
-        let mut work_experience_key_points: BTreeMap<i32, Vec<DocumentWorkExperienceKeyPoint>> =
-            BTreeMap::new();
-        let mut next_work_kp_id: i32 = 1;
-        for kp in parsed.work_experience_key_points.iter() {
-            let parent_id = kp.work_experience_index as i32 + 1;
-            if kp.work_experience_index >= work_experiences.len() {
-                continue;
             }
-            let id = next_work_kp_id;
-            next_work_kp_id += 1;
-            work_experience_key_points
-                .entry(parent_id)
-                .or_default()
-                .push(DocumentWorkExperienceKeyPoint {
-                    id,
-                    work_experience_id: parent_id,
-                    key_point: kp.key_point.clone(),
-                    display_order: None,
-                    active: kp.active,
-                });
-        }
+        });
 
-        let portfolio_projects: Vec<DocumentPortfolioProject> = parsed
-            .portfolio_projects
-            .iter()
-            .enumerate()
-            .map(|(index, project)| DocumentPortfolioProject {
-                id: index as i32 + 1,
+        let work_experience_key_points = mint_child_map(
+            &parsed.work_experience_key_points,
+            work_experiences.len(),
+            |kp| kp.work_experience_index,
+            |kp, id, parent_id| DocumentWorkExperienceKeyPoint {
+                id,
+                work_experience_id: parent_id,
+                key_point: kp.key_point.clone(),
+                display_order: None,
+                active: kp.active,
+            },
+        );
+
+        let portfolio_projects = mint_seq(&parsed.portfolio_projects, |project, id| {
+            DocumentPortfolioProject {
+                id,
                 resume_id: 0,
                 project_name: project.project_name.clone(),
                 image_url: project.image_url.clone(),
@@ -281,83 +286,53 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                 display_order: project.display_order,
                 active: project.active,
                 video_url: project.video_url.clone(),
-            })
-            .collect();
-
-        let mut portfolio_key_points: BTreeMap<i32, Vec<DocumentPortfolioKeyPoint>> =
-            BTreeMap::new();
-        let mut next_portfolio_kp_id: i32 = 1;
-        for kp in parsed.portfolio_key_points.iter() {
-            let parent_id = kp.portfolio_project_index as i32 + 1;
-            if kp.portfolio_project_index >= portfolio_projects.len() {
-                continue;
             }
-            let id = next_portfolio_kp_id;
-            next_portfolio_kp_id += 1;
-            portfolio_key_points
-                .entry(parent_id)
-                .or_default()
-                .push(DocumentPortfolioKeyPoint {
-                    id,
-                    portfolio_project_id: parent_id,
-                    key_point: kp.key_point.clone(),
-                    display_order: None,
-                    active: kp.active,
-                });
-        }
+        });
 
-        let mut portfolio_technologies: BTreeMap<i32, Vec<DocumentPortfolioTechnology>> =
-            BTreeMap::new();
-        let mut next_technology_id: i32 = 1;
-        for tech in parsed.portfolio_technologies.iter() {
-            let parent_id = tech.portfolio_project_index as i32 + 1;
-            if tech.portfolio_project_index >= portfolio_projects.len() {
-                continue;
-            }
-            let id = next_technology_id;
-            next_technology_id += 1;
-            portfolio_technologies.entry(parent_id).or_default().push(
-                DocumentPortfolioTechnology {
-                    id,
-                    portfolio_project_id: parent_id,
-                    technology_name: tech.technology_name.clone(),
-                    display_order: None,
-                    active: tech.active,
-                },
-            );
-        }
+        let portfolio_key_points = mint_child_map(
+            &parsed.portfolio_key_points,
+            portfolio_projects.len(),
+            |kp| kp.portfolio_project_index,
+            |kp, id, parent_id| DocumentPortfolioKeyPoint {
+                id,
+                portfolio_project_id: parent_id,
+                key_point: kp.key_point.clone(),
+                display_order: None,
+                active: kp.active,
+            },
+        );
 
-        let languages: Vec<DocumentLanguage> = parsed
-            .languages
-            .iter()
-            .enumerate()
-            .map(|(index, language)| DocumentLanguage {
-                id: index as i32 + 1,
-                resume_id: 0,
-                language_name: language.language_name.clone(),
-                display_order: language.display_order,
-            })
-            .collect();
+        let portfolio_technologies = mint_child_map(
+            &parsed.portfolio_technologies,
+            portfolio_projects.len(),
+            |tech| tech.portfolio_project_index,
+            |tech, id, parent_id| DocumentPortfolioTechnology {
+                id,
+                portfolio_project_id: parent_id,
+                technology_name: tech.technology_name.clone(),
+                display_order: None,
+                active: tech.active,
+            },
+        );
 
-        let mut frameworks: BTreeMap<i32, Vec<DocumentFramework>> = BTreeMap::new();
-        let mut next_framework_id: i32 = 1;
-        for framework in parsed.frameworks.iter() {
-            let parent_id = framework.language_index as i32 + 1;
-            if framework.language_index >= languages.len() {
-                continue;
-            }
-            let id = next_framework_id;
-            next_framework_id += 1;
-            frameworks
-                .entry(parent_id)
-                .or_default()
-                .push(DocumentFramework {
-                    id,
-                    language_id: parent_id,
-                    framework_name: framework.framework_name.clone(),
-                    display_order: None,
-                });
-        }
+        let languages = mint_seq(&parsed.languages, |language, id| DocumentLanguage {
+            id,
+            resume_id: 0,
+            language_name: language.language_name.clone(),
+            display_order: language.display_order,
+        });
+
+        let frameworks = mint_child_map(
+            &parsed.frameworks,
+            languages.len(),
+            |framework| framework.language_index,
+            |framework, id, parent_id| DocumentFramework {
+                id,
+                language_id: parent_id,
+                framework_name: framework.framework_name.clone(),
+                display_order: None,
+            },
+        );
 
         ResumeDocument {
             resume: DocumentResume {

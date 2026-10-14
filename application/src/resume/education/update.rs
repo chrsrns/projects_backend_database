@@ -1,14 +1,12 @@
 use diesel::prelude::*;
 use domain::models::{
-    Education, EducationKeyPoint, Resume, UpdateEducation, UpdateEducationKeyPoint,
-    UpdateEducationRequest,
+    Education, EducationKeyPoint, UpdateEducation, UpdateEducationKeyPoint, UpdateEducationRequest,
 };
-use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{first_or_404, require_owned_resume, run_published},
 };
 
 pub fn update_education(
@@ -19,19 +17,13 @@ pub fn update_education(
 ) -> Result<Education, ApplicationError> {
     use domain::schema::education;
 
-    let existing: Education = match education::table
-        .find(education_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
+    let existing: Education = first_or_404(
+        "Education",
+        education_id_value,
+        education::table.find(education_id_value),
+    )?;
 
-    let resume: Resume = find_resume(existing.resume_id)?;
-
-    require_owner(&resume, user_id_value)?;
+    require_owned_resume(user_id_value, existing.resume_id)?;
 
     let new_start = request
         .start_date
@@ -78,19 +70,18 @@ pub fn update_education(
         active: request.active,
     };
 
-    match diesel::update(education::table.find(education_id_value))
-        .set(&payload)
-        .get_result::<Education>(&mut establish_connection())
-    {
-        Ok(updated) => {
-            publisher.resume_changed(
-                updated.resume_id,
-                ResumeChangedAction::Updated(SectionType::Education),
-            );
-            Ok(updated)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Education",
+        education_id_value,
+        existing.resume_id,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| {
+            diesel::update(education::table.find(education_id_value))
+                .set(&payload)
+                .get_result::<Education>(conn)
+        },
+    )
 }
 
 pub fn update_education_key_point(
@@ -98,45 +89,34 @@ pub fn update_education_key_point(
     key_point_id_value: i32,
     payload: UpdateEducationKeyPoint,
     publisher: &dyn ResumeChangePublisher,
-) -> Result<(EducationKeyPoint, i32), ApplicationError> {
+) -> Result<EducationKeyPoint, ApplicationError> {
     use domain::schema::education;
     use domain::schema::education_key_points;
 
-    let existing: EducationKeyPoint = match education_key_points::table
-        .find(key_point_id_value)
-        .first(&mut establish_connection())
-    {
-        Ok(v) => v,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
+    let existing: EducationKeyPoint = first_or_404(
+        "Education key point",
+        key_point_id_value,
+        education_key_points::table.find(key_point_id_value),
+    )?;
 
-    let edu: Education = match education::table
-        .find(existing.education_id)
-        .first(&mut establish_connection())
-    {
-        Ok(e) => e,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
+    let edu: Education = first_or_404(
+        "Education",
+        existing.education_id,
+        education::table.find(existing.education_id),
+    )?;
 
-    let resume: Resume = find_resume(edu.resume_id)?;
+    require_owned_resume(user_id_value, edu.resume_id)?;
 
-    require_owner(&resume, user_id_value)?;
-
-    match diesel::update(education_key_points::table.find(key_point_id_value))
-        .set(&payload)
-        .get_result::<EducationKeyPoint>(&mut establish_connection())
-    {
-        Ok(updated) => {
-            publisher.resume_changed(
-                edu.resume_id,
-                ResumeChangedAction::Updated(SectionType::Education),
-            );
-            Ok((updated, edu.resume_id))
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Education key point",
+        key_point_id_value,
+        edu.resume_id,
+        ResumeChangedAction::Updated(SectionType::Education),
+        publisher,
+        |conn| {
+            diesel::update(education_key_points::table.find(key_point_id_value))
+                .set(&payload)
+                .get_result::<EducationKeyPoint>(conn)
+        },
+    )
 }

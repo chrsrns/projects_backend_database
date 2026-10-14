@@ -1,22 +1,90 @@
 use chrono::NaiveDate;
-use diesel::prelude::{BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl};
+use diesel::prelude::{BoolExpressionMethods, ExpressionMethods, QueryDsl};
+use diesel::query_dsl::LoadQuery;
+use diesel::query_dsl::methods::LimitDsl;
 use domain::models::{PartialDate, Resume};
-use infrastructure::establish_connection;
+use infrastructure::{DbConnection, establish_connection};
 
 use crate::error::ApplicationError;
+use crate::realtime::{ResumeChangePublisher, ResumeChangedAction};
+
+fn entity_not_found(entity: &str, id: i32) -> ApplicationError {
+    ApplicationError::NotFound(format!("{entity} with id {id} not found"))
+}
+
+/// Runs `query.first` on a freshly checked-out pooled connection and maps a
+/// miss to a uniform "{entity} with id {id} not found" 404 body.
+pub fn first_or_404<'q, Q, T>(entity: &str, id: i32, query: Q) -> Result<T, ApplicationError>
+where
+    Q: LimitDsl + diesel::RunQueryDsl<DbConnection>,
+    <Q as LimitDsl>::Output: LoadQuery<'q, DbConnection, T>,
+{
+    query
+        .first(&mut establish_connection())
+        .map_err(|err| match err {
+            diesel::result::Error::NotFound => entity_not_found(entity, id),
+            err => app_err_from_diesel_err(err),
+        })
+}
+
+/// Loads the resume by id (404 when absent) then requires `user_id` to own
+/// it (403 when foreign), in that order.
+pub fn require_owned_resume(user_id: i32, resume_id: i32) -> Result<Resume, ApplicationError> {
+    use domain::schema::resumes;
+
+    let resume = first_or_404("Resume", resume_id, resumes::table.find(resume_id))?;
+    require_owner(&resume, user_id)?;
+    Ok(resume)
+}
+
+/// Runs `op` on a pooled connection. On success publishes `resume_changed`
+/// for `resume_id`; a `NotFound` miss produces the uniform
+/// "{entity} with id {id} not found" body; all other errors map through
+/// `app_err_from_diesel_err`.
+pub fn run_published<T>(
+    entity: &str,
+    id: i32,
+    resume_id: i32,
+    action: ResumeChangedAction,
+    publisher: &dyn ResumeChangePublisher,
+    op: impl FnOnce(&mut DbConnection) -> diesel::result::QueryResult<T>,
+) -> Result<T, ApplicationError> {
+    match op(&mut establish_connection()) {
+        Ok(item) => {
+            publisher.resume_changed(resume_id, action);
+            Ok(item)
+        }
+        Err(diesel::result::Error::NotFound) => Err(entity_not_found(entity, id)),
+        Err(err) => Err(app_err_from_diesel_err(err)),
+    }
+}
+
+/// Runs a delete `op` returning an affected row count on a pooled
+/// connection. Zero rows deleted → 404; otherwise publishes
+/// `resume_changed` with `action` for `resume_id`.
+pub fn run_published_delete(
+    entity: &str,
+    id: i32,
+    resume_id: i32,
+    action: ResumeChangedAction,
+    publisher: &dyn ResumeChangePublisher,
+    op: impl FnOnce(&mut DbConnection) -> diesel::result::QueryResult<usize>,
+) -> Result<(), ApplicationError> {
+    match op(&mut establish_connection()) {
+        Ok(0) => Err(entity_not_found(entity, id)),
+        Ok(_) => {
+            publisher.resume_changed(resume_id, action);
+            Ok(())
+        }
+        Err(diesel::result::Error::NotFound) => Err(entity_not_found(entity, id)),
+        Err(err) => Err(app_err_from_diesel_err(err)),
+    }
+}
 
 pub fn find_resume(resume_id: i32) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes;
-    use infrastructure::establish_connection;
 
-    let existing: Resume = match resumes::table
-        .find(resume_id)
-        .first(&mut establish_connection())
-    {
-        Ok(r) => r,
-        Err(err) => return Err(app_err_from_diesel_err(err)),
-    };
-    Ok(existing)
+    first_or_404("Resume", resume_id, resumes::table.find(resume_id))
 }
 
 pub fn find_accessible_resume(
@@ -36,14 +104,7 @@ pub fn find_accessible_resume(
         None => resume_query.filter(resumes_dsl::is_public.eq(true)),
     };
 
-    match resume_query.first(&mut establish_connection()) {
-        Ok(r) => Ok(r),
-        Err(diesel::result::Error::NotFound) => Err(ApplicationError::NotFound(format!(
-            "Resume with id {} not found",
-            resume_id_value
-        ))),
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    first_or_404("Resume", resume_id_value, resume_query)
 }
 
 pub fn require_owner(resume: &Resume, user_id: i32) -> Result<(), ApplicationError> {
@@ -197,6 +258,14 @@ mod tests {
             variant_label: None,
             show_variant_tag: true,
         }
+    }
+
+    #[test]
+    fn test_entity_not_found_formats_body() {
+        assert_eq!(
+            entity_not_found("Education", 42),
+            ApplicationError::NotFound("Education with id 42 not found".to_string())
+        );
     }
 
     #[test]

@@ -11,7 +11,7 @@ use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
     resume::common::{
-        app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
+        app_err_from_diesel_err, partial_date_to_columns, require_owned_resume,
         validate_executive_summary, validate_optional_text, validate_optional_url, validate_video,
         viewer_is_owner,
     },
@@ -196,8 +196,7 @@ fn resolve_explicit_target(
 ) -> Result<Option<Resume>, ApplicationError> {
     match explicit_id {
         Some(resume_id) => {
-            let row = find_resume(resume_id)?;
-            require_owner(&row, user_id_value)?;
+            let row = require_owned_resume(user_id_value, resume_id)?;
             Ok(Some(row))
         }
         None => Ok(None),
@@ -679,4 +678,3 @@ pub fn import_resume_markdown(
     })
     .map_err(app_err_from_diesel_err)
 }
-

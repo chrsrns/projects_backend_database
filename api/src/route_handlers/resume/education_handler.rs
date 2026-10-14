@@ -11,7 +11,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -34,10 +33,8 @@ pub fn list_educations_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<Education>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match education::list_educations(resume_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let items = education::list_educations(resume_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -67,13 +64,12 @@ pub fn create_education_handler(
     resume_id: i32,
     payload: Json<NewEducationRequest>,
 ) -> CustomJsonResult<Education> {
-    match education::create_education(auth.user_id, resume_id, payload.into_inner(), hub.inner()) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let item =
+        education::create_education(auth.user_id, resume_id, payload.into_inner(), hub.inner())?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: item }),
+    ))
 }
 
 #[utoipa::path(
@@ -103,15 +99,13 @@ pub fn update_education_handler(
     education_id: i32,
     payload: Json<UpdateEducationRequest>,
 ) -> JsonResult<Education> {
-    match education::update_education(
+    let item = education::update_education(
         auth.user_id,
         education_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    )?;
+    Ok(Json(Response { body: item }))
 }
 
 #[utoipa::path(
@@ -135,10 +129,8 @@ pub fn delete_education_handler(
     hub: &State<Hub>,
     education_id: i32,
 ) -> NoContentResult {
-    match education::delete_education(auth.user_id, education_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
-    }
+    education::delete_education(auth.user_id, education_id, hub.inner())?;
+    Ok(NoContent)
 }
 
 #[utoipa::path(
@@ -163,10 +155,8 @@ pub fn list_education_key_points_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<EducationKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match education::list_education_key_points(resume_id, education_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let items = education::list_education_key_points(resume_id, education_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -198,19 +188,17 @@ pub fn create_education_key_point_handler(
     education_id: i32,
     payload: Json<NewEducationKeyPointRequest>,
 ) -> CustomJsonResult<EducationKeyPoint> {
-    match education::create_education_key_point(
+    let item = education::create_education_key_point(
         auth.user_id,
         resume_id,
         education_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
-        Err(err) => Err(map_application_error(err)),
-    }
+    )?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: item }),
+    ))
 }
 
 #[utoipa::path(
@@ -240,15 +228,13 @@ pub fn update_education_key_point_handler(
     key_point_id: i32,
     payload: Json<UpdateEducationKeyPoint>,
 ) -> JsonResult<EducationKeyPoint> {
-    match education::update_education_key_point(
+    let item = education::update_education_key_point(
         auth.user_id,
         key_point_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    )?;
+    Ok(Json(Response { body: item }))
 }
 
 #[utoipa::path(
@@ -272,8 +258,6 @@ pub fn delete_education_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
 ) -> NoContentResult {
-    match education::delete_education_key_point(auth.user_id, key_point_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
-    }
+    education::delete_education_key_point(auth.user_id, key_point_id, hub.inner())?;
+    Ok(NoContent)
 }

@@ -387,9 +387,9 @@ fn test_handlers_take_only_markdown_argument() {
     match convert_resume_markdown(LimitedMarkdown("## Nope".to_string())) {
         Ok(_) => panic!("convert should fail"),
         Err(err) => {
-            assert_eq!(err.0, Status::BadRequest);
+            assert_eq!(err.0.0, Status::BadRequest);
             assert_eq!(
-                err.1.0.body,
+                err.0.1.0.body,
                 "Unknown section 'Nope'. Expected one of: Education, Skills, Work Experience, Portfolio Projects, Languages & Frameworks, Summary"
             );
         }

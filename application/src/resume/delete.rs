@@ -1,11 +1,10 @@
 use diesel::prelude::*;
-use domain::models::Resume;
 use infrastructure::establish_connection;
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction},
-    resume::common::{app_err_from_diesel_err, require_owner},
+    resume::common::{app_err_from_diesel_err, require_owned_resume, run_published_delete},
 };
 
 pub fn delete_resume(
@@ -15,17 +14,7 @@ pub fn delete_resume(
 ) -> Result<(), ApplicationError> {
     use domain::schema::resumes;
 
-    let existing: Resume = match resumes::table
-        .find(resume_id)
-        .first(&mut establish_connection())
-    {
-        Ok(r) => r,
-        Err(err) => {
-            return Err(app_err_from_diesel_err(err));
-        }
-    };
-
-    require_owner(&existing, user_id_value)?;
+    require_owned_resume(user_id_value, resume_id)?;
 
     let variant_count: i64 = match resumes::table
         .filter(resumes::base_resume_id.eq(resume_id))
@@ -43,18 +32,12 @@ pub fn delete_resume(
         )));
     }
 
-    match diesel::delete(resumes::table.find(resume_id)).execute(&mut establish_connection()) {
-        Ok(count) => {
-            if count == 0 {
-                Err(ApplicationError::NotFound(format!(
-                    "Resume with id {} not found",
-                    resume_id
-                )))
-            } else {
-                publisher.resume_changed(resume_id, ResumeChangedAction::Deleted);
-                Ok(())
-            }
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published_delete(
+        "Resume",
+        resume_id,
+        resume_id,
+        ResumeChangedAction::Deleted,
+        publisher,
+        |conn| diesel::delete(resumes::table.find(resume_id)).execute(conn),
+    )
 }

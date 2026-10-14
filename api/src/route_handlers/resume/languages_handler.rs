@@ -8,7 +8,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -31,10 +30,8 @@ pub fn list_languages_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<Language>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match languages::list_languages(resume_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let items = languages::list_languages(resume_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -64,13 +61,12 @@ pub fn create_language_handler(
     resume_id: i32,
     payload: Json<NewLanguageRequest>,
 ) -> CustomJsonResult<Language> {
-    match languages::create_language(auth.user_id, resume_id, payload.into_inner(), hub.inner()) {
-        Ok(language) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: language }),
-        )),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let language =
+        languages::create_language(auth.user_id, resume_id, payload.into_inner(), hub.inner())?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: language }),
+    ))
 }
 
 #[utoipa::path(
@@ -100,10 +96,9 @@ pub fn update_language_handler(
     language_id: i32,
     payload: Json<UpdateLanguage>,
 ) -> JsonResult<Language> {
-    match languages::update_language(auth.user_id, language_id, payload.into_inner(), hub.inner()) {
-        Ok(language) => Ok(Json(Response { body: language })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let language =
+        languages::update_language(auth.user_id, language_id, payload.into_inner(), hub.inner())?;
+    Ok(Json(Response { body: language }))
 }
 
 #[utoipa::path(
@@ -127,8 +122,6 @@ pub fn delete_language_handler(
     hub: &State<Hub>,
     language_id: i32,
 ) -> NoContentResult {
-    match languages::delete_language(auth.user_id, language_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
-    }
+    languages::delete_language(auth.user_id, language_id, hub.inner())?;
+    Ok(NoContent)
 }

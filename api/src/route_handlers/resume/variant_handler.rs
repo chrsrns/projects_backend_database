@@ -9,7 +9,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -40,10 +39,9 @@ pub fn create_variant_handler(
     resume_id: i32,
     request: Json<NewVariantRequest>,
 ) -> CustomJsonResult<ResumeView> {
-    match variant::create_variant(auth.user_id, resume_id, request.into_inner(), hub.inner()) {
-        Ok(created) => Ok(Custom(Status::Created, Json(Response { body: created }))),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let created =
+        variant::create_variant(auth.user_id, resume_id, request.into_inner(), hub.inner())?;
+    Ok(Custom(Status::Created, Json(Response { body: created })))
 }
 
 #[utoipa::path(
@@ -64,8 +62,6 @@ pub fn list_variants_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<ResumeView>> {
     let user_id_value = maybe_auth.0.map(|auth| auth.user_id);
-    match variant::list_variants(resume_id, user_id_value) {
-        Ok(variants) => Ok(Json(Response { body: variants })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let variants = variant::list_variants(resume_id, user_id_value)?;
+    Ok(Json(Response { body: variants }))
 }

@@ -1,6 +1,5 @@
 use std::io::Cursor;
 
-use application::error::ApplicationError;
 use application::resume::{markdown_export, markdown_import};
 use domain::models::ResumeView;
 use rocket::data::{self, FromData, ToByteUnit};
@@ -19,6 +18,7 @@ use shared::resume_document::{
 
 use super::{CustomJsonResult, JsonResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::error::ApiError;
 use crate::realtime::Hub;
 
 const MAX_MARKDOWN_SIZE: u64 = 1_048_576; // 1 MiB
@@ -47,7 +47,7 @@ impl<'r> FromData<'r> for LimitedMarkdown {
 
 pub struct MarkdownResponse(String);
 
-type MarkdownResult = Result<MarkdownResponse, Custom<Json<Response<String>>>>;
+type MarkdownResult = Result<MarkdownResponse, ApiError>;
 
 impl<'r> Responder<'r, 'static> for MarkdownResponse {
     fn respond_to(self, _req: &'r Request<'_>) -> rocket::response::Result<'static> {
@@ -55,60 +55,6 @@ impl<'r> Responder<'r, 'static> for MarkdownResponse {
         builder.status(Status::Ok);
         builder.raw_header("Content-Type", "text/markdown; charset=utf-8");
         builder.sized_body(self.0.len(), Cursor::new(self.0)).ok()
-    }
-}
-
-fn map_markdown_error(err: ApplicationError) -> Custom<Json<Response<String>>> {
-    match err {
-        ApplicationError::NotFound(msg) => Custom(Status::NotFound, Json(Response { body: msg })),
-        ApplicationError::Forbidden => Custom(
-            Status::Forbidden,
-            Json(Response {
-                body: "Forbidden".to_string(),
-            }),
-        ),
-        ApplicationError::Unauthorized => Custom(
-            Status::Unauthorized,
-            Json(Response {
-                body: "Unauthorized".to_string(),
-            }),
-        ),
-        ApplicationError::Conflict(msg) => Custom(Status::Conflict, Json(Response { body: msg })),
-        ApplicationError::BadRequest(msg) => {
-            Custom(Status::BadRequest, Json(Response { body: msg }))
-        }
-        ApplicationError::Internal(msg) => {
-            log::error!("Internal error in markdown handler: {}", msg);
-            Custom(
-                Status::InternalServerError,
-                Json(Response {
-                    body: "Internal server error".to_string(),
-                }),
-            )
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_map_markdown_error_internal_hides_details() {
-        let response = map_markdown_error(ApplicationError::Internal(
-            "Database error - secret table name".to_string(),
-        ));
-        assert_eq!(response.0, Status::InternalServerError);
-        assert_eq!(response.1.0.body, "Internal server error");
-    }
-
-    #[test]
-    fn test_map_markdown_error_bad_request_returns_message() {
-        let response = map_markdown_error(ApplicationError::BadRequest(
-            "Missing required field: Email".to_string(),
-        ));
-        assert_eq!(response.0, Status::BadRequest);
-        assert_eq!(response.1.0.body, "Missing required field: Email");
     }
 }
 
@@ -129,8 +75,7 @@ mod tests {
 #[get("/resume/<resume_id>/export/markdown")]
 pub fn export_resume_markdown(resume_id: i32, maybe_auth: MaybeAuthSession) -> MarkdownResult {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    let markdown = markdown_export::export_resume_markdown(resume_id, user_id_value)
-        .map_err(map_markdown_error)?;
+    let markdown = markdown_export::export_resume_markdown(resume_id, user_id_value)?;
     Ok(MarkdownResponse(markdown))
 }
 
@@ -159,10 +104,12 @@ pub fn import_resume_markdown(
     markdown: LimitedMarkdown,
     hub: &State<Hub>,
 ) -> CustomJsonResult<ResumeView> {
-    match markdown_import::import_resume_markdown(&markdown.0, auth.user_id, None, hub.inner()) {
-        Ok((resume, true)) => Ok(Custom(Status::Created, Json(Response { body: resume }))),
-        Ok((resume, false)) => Ok(Custom(Status::Ok, Json(Response { body: resume }))),
-        Err(err) => Err(map_markdown_error(err)),
+    let (resume, created) =
+        markdown_import::import_resume_markdown(&markdown.0, auth.user_id, None, hub.inner())?;
+    if created {
+        Ok(Custom(Status::Created, Json(Response { body: resume })))
+    } else {
+        Ok(Custom(Status::Ok, Json(Response { body: resume })))
     }
 }
 
@@ -195,15 +142,13 @@ pub fn import_resume_markdown_into(
     hub: &State<Hub>,
     resume_id: i32,
 ) -> CustomJsonResult<ResumeView> {
-    match markdown_import::import_resume_markdown(
+    let (resume, _) = markdown_import::import_resume_markdown(
         &markdown.0,
         auth.user_id,
         Some(resume_id),
         hub.inner(),
-    ) {
-        Ok((resume, _)) => Ok(Custom(Status::Ok, Json(Response { body: resume }))),
-        Err(err) => Err(map_markdown_error(err)),
-    }
+    )?;
+    Ok(Custom(Status::Ok, Json(Response { body: resume })))
 }
 
 #[utoipa::path(
@@ -270,9 +215,10 @@ pub fn convert_resume_markdown(markdown: LimitedMarkdown) -> JsonResult<ResumeDo
                 },
             }))
         }
-        Err(MarkdownError::InvalidMarkdown(message)) => {
-            Err(Custom(Status::BadRequest, Json(Response { body: message })))
-        }
+        Err(MarkdownError::InvalidMarkdown(message)) => Err(ApiError(Custom(
+            Status::BadRequest,
+            Json(Response { body: message }),
+        ))),
     }
 }
 

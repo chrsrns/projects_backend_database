@@ -1,11 +1,10 @@
 use diesel::prelude::*;
-use domain::models::{NewSkill, NewSkillRequest, Resume, Skill};
-use infrastructure::establish_connection;
+use domain::models::{NewSkill, NewSkillRequest, Skill};
 
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
-    resume::common::{app_err_from_diesel_err, find_resume, require_owner},
+    resume::common::{require_owned_resume, run_published},
 };
 
 pub fn create_skill(
@@ -16,9 +15,7 @@ pub fn create_skill(
 ) -> Result<Skill, ApplicationError> {
     use domain::schema::skills;
 
-    let existing_resume: Resume = find_resume(resume_id_value)?;
-
-    require_owner(&existing_resume, user_id_value)?;
+    require_owned_resume(user_id_value, resume_id_value)?;
 
     let new_skill = NewSkill {
         resume_id: resume_id_value,
@@ -27,17 +24,16 @@ pub fn create_skill(
         display_order: payload.display_order,
     };
 
-    match diesel::insert_into(skills::table)
-        .values(&new_skill)
-        .get_result::<Skill>(&mut establish_connection())
-    {
-        Ok(skill) => {
-            publisher.resume_changed(
-                resume_id_value,
-                ResumeChangedAction::Updated(SectionType::Skills),
-            );
-            Ok(skill)
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Skill",
+        0,
+        resume_id_value,
+        ResumeChangedAction::Updated(SectionType::Skills),
+        publisher,
+        |conn| {
+            diesel::insert_into(skills::table)
+                .values(&new_skill)
+                .get_result::<Skill>(conn)
+        },
+    )
 }

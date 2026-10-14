@@ -1,13 +1,12 @@
 use diesel::prelude::*;
 use domain::models::{Resume, ResumeView, UpdateResume, UpdateResumeChangeset};
 use domain::schema::resumes;
-use infrastructure::establish_connection;
 
 use crate::error::ApplicationError;
 use crate::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
 use crate::resume::common::{
-    app_err_from_diesel_err, find_resume, partial_date_to_columns, require_owner,
-    validate_executive_summary, validate_optional_text_update, validate_optional_url_update,
+    partial_date_to_columns, require_owned_resume, run_published, validate_executive_summary,
+    validate_optional_text_update, validate_optional_url_update,
 };
 
 pub fn update_resume(
@@ -16,9 +15,7 @@ pub fn update_resume(
     mut resume: UpdateResume,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
-    let existing = find_resume(resume_id)?;
-
-    require_owner(&existing, user_id_value)?;
+    let existing = require_owned_resume(user_id_value, resume_id)?;
 
     if existing.base_resume_id.is_some() && resume.email.is_some() {
         return Err(ApplicationError::BadRequest(
@@ -86,17 +83,17 @@ pub fn update_resume(
         show_variant_tag: resume.show_variant_tag,
     };
 
-    match diesel::update(resumes::table.find(resume_id))
-        .set(&changeset)
-        .get_result::<Resume>(&mut establish_connection())
-    {
-        Ok(updated_resume) => {
-            publisher.resume_changed(
-                updated_resume.id,
-                ResumeChangedAction::Updated(SectionType::PersonalInfo),
-            );
-            Ok(ResumeView::from_resume(updated_resume, true, true))
-        }
-        Err(err) => Err(app_err_from_diesel_err(err)),
-    }
+    run_published(
+        "Resume",
+        resume_id,
+        resume_id,
+        ResumeChangedAction::Updated(SectionType::PersonalInfo),
+        publisher,
+        |conn| {
+            diesel::update(resumes::table.find(resume_id))
+                .set(&changeset)
+                .get_result::<Resume>(conn)
+        },
+    )
+    .map(|updated_resume| ResumeView::from_resume(updated_resume, true, true))
 }

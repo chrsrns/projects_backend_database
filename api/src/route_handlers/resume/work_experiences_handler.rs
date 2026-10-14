@@ -11,7 +11,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -34,10 +33,8 @@ pub fn list_work_experiences_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<WorkExperience>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match work_experiences::list_work_experiences(resume_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let items = work_experiences::list_work_experiences(resume_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -67,18 +64,16 @@ pub fn create_work_experience_handler(
     resume_id: i32,
     payload: Json<NewWorkExperienceRequest>,
 ) -> CustomJsonResult<WorkExperience> {
-    match work_experiences::create_work_experience(
+    let item = work_experiences::create_work_experience(
         auth.user_id,
         resume_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
-        Err(err) => Err(map_application_error(err)),
-    }
+    )?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: item }),
+    ))
 }
 
 #[utoipa::path(
@@ -108,15 +103,13 @@ pub fn update_work_experience_handler(
     work_id: i32,
     payload: Json<UpdateWorkExperienceRequest>,
 ) -> JsonResult<WorkExperience> {
-    match work_experiences::update_work_experience(
+    let item = work_experiences::update_work_experience(
         auth.user_id,
         work_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    )?;
+    Ok(Json(Response { body: item }))
 }
 
 #[utoipa::path(
@@ -140,10 +133,8 @@ pub fn delete_work_experience_handler(
     hub: &State<Hub>,
     work_id: i32,
 ) -> NoContentResult {
-    match work_experiences::delete_work_experience(auth.user_id, work_id, hub.inner()) {
-        Ok(_resume_id) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
-    }
+    work_experiences::delete_work_experience(auth.user_id, work_id, hub.inner())?;
+    Ok(NoContent)
 }
 
 #[utoipa::path(
@@ -168,10 +159,9 @@ pub fn list_work_experience_key_points_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<WorkExperienceKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match work_experiences::list_work_experience_key_points(resume_id, work_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let items =
+        work_experiences::list_work_experience_key_points(resume_id, work_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -203,19 +193,17 @@ pub fn create_work_experience_key_point_handler(
     work_id: i32,
     payload: Json<NewWorkExperienceKeyPointRequest>,
 ) -> CustomJsonResult<WorkExperienceKeyPoint> {
-    match work_experiences::create_work_experience_key_point(
+    let item = work_experiences::create_work_experience_key_point(
         auth.user_id,
         resume_id,
         work_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
-        Err(err) => Err(map_application_error(err)),
-    }
+    )?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: item }),
+    ))
 }
 
 #[utoipa::path(
@@ -245,15 +233,13 @@ pub fn update_work_experience_key_point_handler(
     key_point_id: i32,
     payload: Json<UpdateWorkExperienceKeyPoint>,
 ) -> JsonResult<WorkExperienceKeyPoint> {
-    match work_experiences::update_work_experience_key_point(
+    let item = work_experiences::update_work_experience_key_point(
         auth.user_id,
         key_point_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok((item, _resume_id)) => Ok(Json(Response { body: item })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    )?;
+    Ok(Json(Response { body: item }))
 }
 
 #[utoipa::path(
@@ -277,12 +263,6 @@ pub fn delete_work_experience_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
 ) -> NoContentResult {
-    match work_experiences::delete_work_experience_key_point(
-        auth.user_id,
-        key_point_id,
-        hub.inner(),
-    ) {
-        Ok(_resume_id) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
-    }
+    work_experiences::delete_work_experience_key_point(auth.user_id, key_point_id, hub.inner())?;
+    Ok(NoContent)
 }

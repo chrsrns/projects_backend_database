@@ -8,7 +8,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::map_application_error;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -22,10 +21,8 @@ use crate::realtime::Hub;
 #[get("/resumes")]
 pub fn list_resumes_handler(maybe_auth: MaybeAuthSession) -> JsonResult<Vec<ResumeView>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match read::list_resumes(user_id_value) {
-        Ok(resumes) => Ok(Json(Response { body: resumes })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let resumes = read::list_resumes(user_id_value)?;
+    Ok(Json(Response { body: resumes }))
 }
 
 #[utoipa::path(
@@ -44,10 +41,8 @@ pub fn list_resumes_handler(maybe_auth: MaybeAuthSession) -> JsonResult<Vec<Resu
 #[get("/resume/<resume_id>")]
 pub fn list_resume_handler(resume_id: i32, maybe_auth: MaybeAuthSession) -> JsonResult<ResumeView> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match read::list_resume(resume_id, user_id_value) {
-        Ok(resume) => Ok(Json(Response { body: resume })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let resume = read::list_resume(resume_id, user_id_value)?;
+    Ok(Json(Response { body: resume }))
 }
 
 #[utoipa::path(
@@ -68,13 +63,11 @@ pub fn create_resume_handler(
     hub: &State<Hub>,
     resume: Json<NewResumeRequest>,
 ) -> CustomJsonResult<ResumeView> {
-    match create::create_resume(auth.user_id, resume.into_inner(), hub.inner()) {
-        Ok(resume) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: resume }),
-        )),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let resume = create::create_resume(auth.user_id, resume.into_inner(), hub.inner())?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: resume }),
+    ))
 }
 
 #[utoipa::path(
@@ -100,10 +93,8 @@ pub fn update_resume_handler(
     resume_id: i32,
     resume: Json<UpdateResume>,
 ) -> JsonResult<ResumeView> {
-    match update::update_resume(auth.user_id, resume_id, resume.into_inner(), hub.inner()) {
-        Ok(updated) => Ok(Json(Response { body: updated })),
-        Err(err) => Err(map_application_error(err)),
-    }
+    let updated = update::update_resume(auth.user_id, resume_id, resume.into_inner(), hub.inner())?;
+    Ok(Json(Response { body: updated }))
 }
 
 #[utoipa::path(
@@ -127,8 +118,6 @@ pub fn delete_resume_handler(
     hub: &State<Hub>,
     resume_id: i32,
 ) -> NoContentResult {
-    match delete::delete_resume(auth.user_id, resume_id, hub.inner()) {
-        Ok(()) => Ok(NoContent),
-        Err(err) => Err(map_application_error(err)),
-    }
+    delete::delete_resume(auth.user_id, resume_id, hub.inner())?;
+    Ok(NoContent)
 }
