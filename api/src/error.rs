@@ -48,10 +48,7 @@ pub fn map_application_error(err: ApplicationError) -> Custom<Json<Response<Stri
 pub struct ApiError(pub Custom<Json<Response<String>>>);
 
 impl<'r> rocket::response::Responder<'r, 'static> for ApiError {
-    fn respond_to(
-        self,
-        req: &'r rocket::Request<'_>,
-    ) -> rocket::response::Result<'static> {
+    fn respond_to(self, req: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
         self.0.respond_to(req)
     }
 }

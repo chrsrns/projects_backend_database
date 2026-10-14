@@ -53,8 +53,6 @@ pub async fn generate_handler(
     };
 
     let client_ref: &dyn LlmClient = client.inner().as_ref();
-    match generate_content(client_ref, request).await {
-        Ok(response) => Ok(Custom(Status::Ok, Json(Response { body: response }))),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    let response = generate_content(client_ref, request).await?;
+    Ok(Custom(Status::Ok, Json(Response { body: response })))
 }

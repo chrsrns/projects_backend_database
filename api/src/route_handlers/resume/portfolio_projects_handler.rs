@@ -12,7 +12,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::ApiError;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -35,10 +34,8 @@ pub fn list_portfolio_projects_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioProject>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match portfolio_projects::list_portfolio_projects(resume_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    let items = portfolio_projects::list_portfolio_projects(resume_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -68,18 +65,16 @@ pub fn create_portfolio_project_handler(
     resume_id: i32,
     payload: Json<NewPortfolioProjectRequest>,
 ) -> CustomJsonResult<PortfolioProject> {
-    match portfolio_projects::create_portfolio_project(
+    let item = portfolio_projects::create_portfolio_project(
         auth.user_id,
         resume_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: item }),
+    ))
 }
 
 #[utoipa::path(
@@ -109,15 +104,13 @@ pub fn update_portfolio_project_handler(
     project_id: i32,
     payload: Json<UpdatePortfolioProject>,
 ) -> JsonResult<PortfolioProject> {
-    match portfolio_projects::update_portfolio_project(
+    let item = portfolio_projects::update_portfolio_project(
         auth.user_id,
         project_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Json(Response { body: item }))
 }
 
 #[utoipa::path(
@@ -141,10 +134,8 @@ pub fn delete_portfolio_project_handler(
     hub: &State<Hub>,
     project_id: i32,
 ) -> NoContentResult {
-    match portfolio_projects::delete_portfolio_project(auth.user_id, project_id, hub.inner()) {
-        Ok(()) => Ok(NoContent),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    portfolio_projects::delete_portfolio_project(auth.user_id, project_id, hub.inner())?;
+    Ok(NoContent)
 }
 
 #[utoipa::path(
@@ -169,10 +160,9 @@ pub fn list_portfolio_key_points_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioKeyPoint>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match portfolio_projects::list_portfolio_key_points(resume_id, project_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    let items =
+        portfolio_projects::list_portfolio_key_points(resume_id, project_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -204,19 +194,17 @@ pub fn create_portfolio_key_point_handler(
     project_id: i32,
     payload: Json<NewPortfolioKeyPointRequest>,
 ) -> CustomJsonResult<PortfolioKeyPoint> {
-    match portfolio_projects::create_portfolio_key_point(
+    let item = portfolio_projects::create_portfolio_key_point(
         auth.user_id,
         resume_id,
         project_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: item }),
+    ))
 }
 
 #[utoipa::path(
@@ -246,15 +234,13 @@ pub fn update_portfolio_key_point_handler(
     key_point_id: i32,
     payload: Json<UpdatePortfolioKeyPoint>,
 ) -> JsonResult<PortfolioKeyPoint> {
-    match portfolio_projects::update_portfolio_key_point(
+    let item = portfolio_projects::update_portfolio_key_point(
         auth.user_id,
         key_point_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Json(Response { body: item }))
 }
 
 #[utoipa::path(
@@ -278,10 +264,8 @@ pub fn delete_portfolio_key_point_handler(
     hub: &State<Hub>,
     key_point_id: i32,
 ) -> NoContentResult {
-    match portfolio_projects::delete_portfolio_key_point(auth.user_id, key_point_id, hub.inner()) {
-        Ok(()) => Ok(NoContent),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    portfolio_projects::delete_portfolio_key_point(auth.user_id, key_point_id, hub.inner())?;
+    Ok(NoContent)
 }
 
 #[utoipa::path(
@@ -306,10 +290,9 @@ pub fn list_portfolio_technologies_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioTechnology>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match portfolio_projects::list_portfolio_technologies(resume_id, project_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    let items =
+        portfolio_projects::list_portfolio_technologies(resume_id, project_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -341,19 +324,17 @@ pub fn create_portfolio_technology_handler(
     project_id: i32,
     payload: Json<NewPortfolioTechnologyRequest>,
 ) -> CustomJsonResult<PortfolioTechnology> {
-    match portfolio_projects::create_portfolio_technology(
+    let item = portfolio_projects::create_portfolio_technology(
         auth.user_id,
         resume_id,
         project_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: item }),
-        )),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: item }),
+    ))
 }
 
 #[utoipa::path(
@@ -383,15 +364,13 @@ pub fn update_portfolio_technology_handler(
     technology_id: i32,
     payload: Json<UpdatePortfolioTechnology>,
 ) -> JsonResult<PortfolioTechnology> {
-    match portfolio_projects::update_portfolio_technology(
+    let item = portfolio_projects::update_portfolio_technology(
         auth.user_id,
         technology_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(item) => Ok(Json(Response { body: item })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Json(Response { body: item }))
 }
 
 #[utoipa::path(
@@ -415,9 +394,6 @@ pub fn delete_portfolio_technology_handler(
     hub: &State<Hub>,
     technology_id: i32,
 ) -> NoContentResult {
-    match portfolio_projects::delete_portfolio_technology(auth.user_id, technology_id, hub.inner())
-    {
-        Ok(()) => Ok(NoContent),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    portfolio_projects::delete_portfolio_technology(auth.user_id, technology_id, hub.inner())?;
+    Ok(NoContent)
 }

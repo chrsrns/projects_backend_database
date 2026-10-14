@@ -8,7 +8,6 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
-use crate::error::ApiError;
 use crate::realtime::Hub;
 
 #[utoipa::path(
@@ -33,10 +32,8 @@ pub fn list_frameworks_handler(
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<Framework>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    match frameworks::list_frameworks(resume_id, language_id, user_id_value) {
-        Ok(items) => Ok(Json(Response { body: items })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    let items = frameworks::list_frameworks(resume_id, language_id, user_id_value)?;
+    Ok(Json(Response { body: items }))
 }
 
 #[utoipa::path(
@@ -68,19 +65,17 @@ pub fn create_framework_handler(
     language_id: i32,
     payload: Json<NewFrameworkRequest>,
 ) -> CustomJsonResult<Framework> {
-    match frameworks::create_framework(
+    let framework = frameworks::create_framework(
         auth.user_id,
         resume_id,
         language_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(framework) => Ok(Custom(
-            rocket::http::Status::Created,
-            Json(Response { body: framework }),
-        )),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Custom(
+        rocket::http::Status::Created,
+        Json(Response { body: framework }),
+    ))
 }
 
 #[utoipa::path(
@@ -110,15 +105,13 @@ pub fn update_framework_handler(
     framework_id: i32,
     payload: Json<UpdateFramework>,
 ) -> JsonResult<Framework> {
-    match frameworks::update_framework(
+    let framework = frameworks::update_framework(
         auth.user_id,
         framework_id,
         payload.into_inner(),
         hub.inner(),
-    ) {
-        Ok(framework) => Ok(Json(Response { body: framework })),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    )?;
+    Ok(Json(Response { body: framework }))
 }
 
 #[utoipa::path(
@@ -142,8 +135,6 @@ pub fn delete_framework_handler(
     hub: &State<Hub>,
     framework_id: i32,
 ) -> NoContentResult {
-    match frameworks::delete_framework(auth.user_id, framework_id, hub.inner()) {
-        Ok(()) => Ok(NoContent),
-        Err(err) => Err(ApiError::from(err)),
-    }
+    frameworks::delete_framework(auth.user_id, framework_id, hub.inner())?;
+    Ok(NoContent)
 }
