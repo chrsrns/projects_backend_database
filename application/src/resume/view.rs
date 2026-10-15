@@ -51,10 +51,35 @@ fn base_accessibility(
     Ok(accessibility)
 }
 
-fn visible_resumes(
+/// By-id read access (V218): `unlisted` and `public` are reachable by
+/// anyone who knows the UUID; `private` only for the owner.
+fn accessible_resume(
     viewer: Option<i32>,
-    resume_id: Option<Uuid>,
+    resume_id: Uuid,
 ) -> Result<Vec<Resume>, ApplicationError> {
+    use domain::schema::resumes::dsl as resumes_dsl;
+
+    let mut query = resumes_dsl::resumes
+        .filter(resumes_dsl::id.eq(resume_id))
+        .into_boxed();
+    query = match viewer {
+        Some(user_id) => query.filter(
+            resumes_dsl::visibility
+                .ne(Visibility::Private.as_str())
+                .or(resumes_dsl::created_by.eq(user_id)),
+        ),
+        None => query.filter(resumes_dsl::visibility.ne(Visibility::Private.as_str())),
+    };
+
+    query
+        .select(resumes::all_columns)
+        .load::<Resume>(&mut establish_connection())
+        .map_err(app_err_from_diesel_err)
+}
+
+/// Listing access (V211): non-owners see `public` rows only; `unlisted`
+/// is never listed.
+fn listed_resumes(viewer: Option<i32>) -> Result<Vec<Resume>, ApplicationError> {
     use domain::schema::resumes::dsl as resumes_dsl;
 
     let mut query = resumes_dsl::resumes.into_boxed();
@@ -66,9 +91,6 @@ fn visible_resumes(
         ),
         None => query.filter(resumes_dsl::visibility.eq(Visibility::Public.as_str())),
     };
-    if let Some(resume_id) = resume_id {
-        query = query.filter(resumes_dsl::id.eq(resume_id));
-    }
 
     query
         .select(resumes::all_columns)
@@ -101,7 +123,7 @@ pub fn load_resume_view(
     resume_id: Uuid,
     viewer: Option<i32>,
 ) -> Result<ResumeView, ApplicationError> {
-    let mut items = visible_resumes(viewer, Some(resume_id))?;
+    let mut items = accessible_resume(viewer, resume_id)?;
 
     match items.pop() {
         Some(resume) => Ok(build_views(viewer, vec![resume])?
@@ -115,21 +137,23 @@ pub fn load_resume_view(
 }
 
 pub fn load_resume_views(viewer: Option<i32>) -> Result<Vec<ResumeView>, ApplicationError> {
-    build_views(viewer, visible_resumes(viewer, None)?)
+    build_views(viewer, listed_resumes(viewer)?)
 }
 
-/// Builds views for rows the caller has already proven they may read, such
-/// as a freshly created resume or the variants of an accessible base.
-pub fn views_for_known_accessible_base(
+/// Builds views for rows the caller has already proven they may read,
+/// such as a freshly created resume or the variants of an accessible
+/// base. `base_linkage_visible` is the V218 linkage-reveal answer for the
+/// shared base (base `public` or owned by the viewer), not by-id access.
+pub fn views_for_accessible_base(
     items: Vec<Resume>,
     viewer: Option<i32>,
-    base_reachable: bool,
+    base_linkage_visible: bool,
 ) -> Vec<ResumeView> {
     items
         .into_iter()
         .map(|resume| {
             let is_owner = viewer_is_owner(&resume, viewer);
-            ResumeView::from_resume(resume, base_reachable, is_owner)
+            ResumeView::from_resume(resume, base_linkage_visible, is_owner)
         })
         .collect()
 }

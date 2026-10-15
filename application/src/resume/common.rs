@@ -103,10 +103,10 @@ pub fn find_accessible_resume(
     resume_query = match user_id_value {
         Some(uid) => resume_query.filter(
             resumes_dsl::visibility
-                .eq(Visibility::Public.as_str())
+                .ne(Visibility::Private.as_str())
                 .or(resumes_dsl::created_by.eq(uid)),
         ),
-        None => resume_query.filter(resumes_dsl::visibility.eq(Visibility::Public.as_str())),
+        None => resume_query.filter(resumes_dsl::visibility.ne(Visibility::Private.as_str())),
     };
 
     first_or_404("Resume", resume_id_value, resume_query)

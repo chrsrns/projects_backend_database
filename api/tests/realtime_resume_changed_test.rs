@@ -280,8 +280,7 @@ fn test_ws_subscribe_unlisted_resume_anonymous() {
         )
         .dispatch();
     assert_eq!(create_response.status(), Status::Created);
-    let create_json: Value =
-        serde_json::from_str(&create_response.into_string().unwrap()).unwrap();
+    let create_json: Value = serde_json::from_str(&create_response.into_string().unwrap()).unwrap();
     let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 

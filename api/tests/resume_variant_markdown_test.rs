@@ -340,7 +340,10 @@ fn marker_absent_row_returns_404() {
     let fixture = support::Fixture::new(9_241_051);
     let email = format!("marker.miss.{}.{}@example.com", 9_241_051, unique_suffix());
 
-    let (status, _) = import_markdown_body(&fixture, marked("Jane Doe", &email, &uuid::Uuid::new_v4().to_string()));
+    let (status, _) = import_markdown_body(
+        &fixture,
+        marked("Jane Doe", &email, &uuid::Uuid::new_v4().to_string()),
+    );
     assert_eq!(status, Status::NotFound);
 }
 

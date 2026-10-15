@@ -43,7 +43,7 @@ pub struct ResumeView {
 }
 
 impl ResumeView {
-    pub fn from_resume(resume: Resume, base_accessible: bool, is_owner: bool) -> Self {
+    pub fn from_resume(resume: Resume, base_linkage_visible: bool, is_owner: bool) -> Self {
         let target_date = resume.target_date.map(|canonical| PartialDate {
             canonical,
             precision: resume
@@ -55,8 +55,8 @@ impl ResumeView {
 
         ResumeView {
             is_variant: resume.base_resume_id.is_some()
-                && (base_accessible || resume.show_variant_tag),
-            base_resume_id: if base_accessible {
+                && (base_linkage_visible || resume.show_variant_tag),
+            base_resume_id: if base_linkage_visible {
                 resume.base_resume_id
             } else {
                 None

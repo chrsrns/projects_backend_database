@@ -374,8 +374,7 @@ fn test_unlisted_readable_by_id_but_never_listed() {
         )
         .dispatch();
     assert_eq!(create_response.status(), Status::Created);
-    let create_json: Value =
-        serde_json::from_str(&create_response.into_string().unwrap()).unwrap();
+    let create_json: Value = serde_json::from_str(&create_response.into_string().unwrap()).unwrap();
     let unlisted_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(unlisted_id);
     assert_eq!(create_json["body"]["visibility"], "unlisted");
@@ -386,9 +385,7 @@ fn test_unlisted_readable_by_id_but_never_listed() {
         Some(support::auth_header(&other.token)),
         Some(support::auth_header(&owner.token)),
     ] {
-        let mut req = fixture
-            .client()
-            .get(format!("/api/resume/{}", unlisted_id));
+        let mut req = fixture.client().get(format!("/api/resume/{}", unlisted_id));
         if let Some(h) = header {
             req.add_header(h);
         }
@@ -428,7 +425,10 @@ fn test_unlisted_readable_by_id_but_never_listed() {
         .dispatch();
     assert_eq!(export_response.status(), Status::Ok);
     let exported = export_response.into_string().expect("export body");
-    assert!(exported.contains("- Email:"), "export carries the resume body");
+    assert!(
+        exported.contains("- Email:"),
+        "export carries the resume body"
+    );
 
     // Link possession grants no write access.
     let update = fixture
@@ -522,8 +522,7 @@ fn test_visibility_wire_validation_and_defaults() {
         )
         .dispatch();
     assert_eq!(legacy.status(), Status::Created);
-    let legacy_json: Value =
-        serde_json::from_str(&legacy.into_string().unwrap()).unwrap();
+    let legacy_json: Value = serde_json::from_str(&legacy.into_string().unwrap()).unwrap();
     let legacy_id = support::resume_uuid(&legacy_json["body"]["id"]);
     fixture.track_resume_id(legacy_id);
     assert_eq!(
@@ -570,8 +569,7 @@ fn test_unlisted_variant_on_private_base_reachable_by_id() {
         )
         .dispatch();
     assert_eq!(base_response.status(), Status::Created);
-    let base_json: Value =
-        serde_json::from_str(&base_response.into_string().unwrap()).unwrap();
+    let base_json: Value = serde_json::from_str(&base_response.into_string().unwrap()).unwrap();
     let base_id = support::resume_uuid(&base_json["body"]["id"]);
     fixture.track_resume_id(base_id);
 

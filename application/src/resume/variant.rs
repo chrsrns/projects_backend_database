@@ -44,12 +44,15 @@ pub fn list_variants(
         .load::<Resume>(&mut infrastructure::establish_connection())
         .map_err(app_err_from_diesel_err)?;
 
-    // Reaching this point already proved the caller may read the base, so
-    // every listed variant has a reachable base.
-    Ok(view::views_for_known_accessible_base(
+    // The caller proved by-id access to the base, but linkage reveal is
+    // stricter (V218): the base id is shown only when the base is public
+    // or owned by the viewer — an unlisted base's capability uuid stays
+    // redacted from its public variants.
+    let base_linkage_visible = base.visibility == Visibility::Public.as_str() || is_owner;
+    Ok(view::views_for_accessible_base(
         variants,
         user_id_value,
-        true,
+        base_linkage_visible,
     ))
 }
 
