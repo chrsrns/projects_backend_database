@@ -344,7 +344,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                 github_url: parsed.github_url,
                 mobile_number: parsed.mobile_number,
                 executive_summary: parsed.executive_summary,
-                is_public: parsed.is_public,
+                is_public: parsed.visibility == domain::models::Visibility::Public,
                 video: parsed.video,
             },
             education,
@@ -388,7 +388,7 @@ mod tests {
             mobile_number: None,
             executive_summary: None,
             video: None,
-            is_public: true,
+            visibility: domain::models::Visibility::Public,
             education: vec![],
             education_key_points: vec![],
             skills: vec![],
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn mapping_propagates_resume_fields_and_placeholders() {
         let mut parsed = empty_parsed();
-        parsed.is_public = true;
+        parsed.visibility = domain::models::Visibility::Public;
         parsed.video = Some("https://video.example".to_string());
         parsed.executive_summary = Some("Summary text".to_string());
         parsed.skills = vec![

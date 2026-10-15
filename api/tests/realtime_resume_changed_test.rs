@@ -27,7 +27,7 @@ fn test_resume_update_publishes_resume_changed_event() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -42,7 +42,7 @@ fn test_resume_update_publishes_resume_changed_event() {
 
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
-    let resume_id = create_json["body"]["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
 
     fixture.track_resume_id(resume_id);
 
@@ -89,7 +89,7 @@ fn test_skill_create_publishes_resume_changed_event() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_response = fixture
@@ -104,7 +104,7 @@ fn test_skill_create_publishes_resume_changed_event() {
 
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
-    let resume_id = create_json["body"]["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let mut rx = fixture.hub.subscribe(resume_id);
@@ -152,7 +152,7 @@ fn test_ws_endpoint_subscribe_receives_resume_changed_event() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_response = fixture
@@ -167,10 +167,10 @@ fn test_ws_endpoint_subscribe_receives_resume_changed_event() {
 
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
-    let resume_id = create_json["body"]["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
-    let port = 18_000 + (resume_id as u16 % 1_000);
+    let port = 18_000 + (resume_id.as_u128() % 1_000) as u16;
     let ws_token = fixture.auth_token().to_string();
     let hub = fixture.hub.clone();
     let (event_tx, event_rx) = mpsc::channel();
@@ -252,7 +252,7 @@ fn test_ws_endpoint_subscribe_receives_resume_changed_event() {
 
     let event_json: Value = serde_json::from_str(&payload).expect("valid event json");
     assert_eq!(event_json["type"], "resume.changed");
-    assert_eq!(event_json["resume_id"], resume_id);
+    assert_eq!(event_json["resume_id"], resume_id.to_string());
     assert_eq!(event_json["action"]["updated"], "personalinfo");
 
     runtime.block_on(async move {

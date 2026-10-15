@@ -22,11 +22,15 @@ fn variant_markdown(email: &str, public: bool) -> String {
     )
 }
 
-fn import_base(fixture: &mut support::Fixture, lock_key: i64) -> i32 {
+fn import_base(fixture: &mut support::Fixture, lock_key: i64) -> uuid::Uuid {
     import_base_with_visibility(fixture, lock_key, true)
 }
 
-fn import_base_with_visibility(fixture: &mut support::Fixture, lock_key: i64, public: bool) -> i32 {
+fn import_base_with_visibility(
+    fixture: &mut support::Fixture,
+    lock_key: i64,
+    public: bool,
+) -> uuid::Uuid {
     let email = format!("variant.base.{}.{}@example.com", lock_key, unique_suffix());
     let response = fixture
         .client()
@@ -38,7 +42,7 @@ fn import_base_with_visibility(fixture: &mut support::Fixture, lock_key: i64, pu
 
     assert_eq!(response.status(), Status::Created, "base import");
     let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
-    let id = json["body"]["id"].as_i64().unwrap() as i32;
+    let id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(id);
     id
 }
@@ -73,7 +77,7 @@ fn clone_request() -> NewVariantRequest {
         target_date: Some(PartialDate::from_iso_str("2026-03").unwrap()),
         job_description: Some("Build the thing".to_string()),
         variant_label: Some("Acme 2026".to_string()),
-        is_public: None,
+        visibility: None,
         show_variant_tag: None,
     }
 }
@@ -85,7 +89,7 @@ fn variant_clone_deep_copies_all_children() {
 
     let (status, variant_json) = post_variant_json(&fixture, base_id, variant_body());
     assert_eq!(status, Status::Created, "clone through the endpoint");
-    let variant_id = variant_json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&variant_json["body"]["id"]);
     fixture.track_resume_id(variant_id);
 
     let base = get_json(&fixture, &format!("/api/resume/{}", base_id));
@@ -105,7 +109,7 @@ fn variant_clone_deep_copies_all_children() {
         base_resume["executive_summary"],
         cloned_resume["executive_summary"]
     );
-    assert_eq!(base_resume["is_public"], cloned_resume["is_public"]);
+    assert_eq!(base_resume["visibility"], cloned_resume["visibility"]);
 
     let base_education = get_json(&fixture, &format!("/api/resume/{}/education", base_id));
     let cloned_education = get_json(&fixture, &format!("/api/resume/{}/education", variant_id));
@@ -397,7 +401,11 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
         create_variant(fixture.user_id(), base_id, clone_request(), &fixture.hub).expect("clone");
     fixture.track_resume_id(variant.id);
 
-    assert!(variant.is_public, "base is public, so the clone is public");
+    assert_eq!(
+        variant.visibility,
+        domain::models::Visibility::Public,
+        "base is public, so the clone is public"
+    );
     assert_eq!(
         variant.show_variant_tag,
         Some(true),
@@ -409,13 +417,17 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
     assert_eq!(variant.variant_label.as_deref(), Some("Acme 2026"));
 
     let mut hidden = clone_request();
-    hidden.is_public = Some(false);
+    hidden.visibility = Some(domain::models::Visibility::Private);
     hidden.show_variant_tag = Some(false);
     let private =
         create_variant(fixture.user_id(), base_id, hidden, &fixture.hub).expect("clone private");
     fixture.track_resume_id(private.id);
 
-    assert!(!private.is_public, "explicit is_public wins over the base");
+    assert_eq!(
+        private.visibility,
+        domain::models::Visibility::Private,
+        "explicit visibility wins over the base"
+    );
     assert_eq!(
         private.show_variant_tag,
         Some(false),
@@ -425,7 +437,7 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
 
 fn post_variant(
     fixture: &support::Fixture,
-    base_id: i32,
+    base_id: uuid::Uuid,
     body: Value,
 ) -> rocket::local::blocking::LocalResponse<'_> {
     fixture
@@ -437,7 +449,11 @@ fn post_variant(
         .dispatch()
 }
 
-fn post_variant_json(fixture: &support::Fixture, base_id: i32, body: Value) -> (Status, Value) {
+fn post_variant_json(
+    fixture: &support::Fixture,
+    base_id: uuid::Uuid,
+    body: Value,
+) -> (Status, Value) {
     let response = post_variant(fixture, base_id, body);
     let status = response.status();
     let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
@@ -446,7 +462,7 @@ fn post_variant_json(fixture: &support::Fixture, base_id: i32, body: Value) -> (
 
 fn get_variants_json(
     fixture: &support::Fixture,
-    base_id: i32,
+    base_id: uuid::Uuid,
     token: Option<&str>,
 ) -> (Status, Value) {
     let request = fixture
@@ -462,7 +478,7 @@ fn get_variants_json(
     (status, json)
 }
 
-fn put_resume(fixture: &support::Fixture, resume_id: i32, body: Value) -> (Status, Value) {
+fn put_resume(fixture: &support::Fixture, resume_id: uuid::Uuid, body: Value) -> (Status, Value) {
     let response = fixture
         .client()
         .put(format!("/api/resume/{}", resume_id))
@@ -502,7 +518,7 @@ fn variant_list_ordered_by_target_date_desc_nulls_last() {
         body["target_date"] = target_date;
         let (status, json) = post_variant_json(&fixture, base_id, body);
         assert_eq!(status, Status::Created);
-        let id = json["body"]["id"].as_i64().unwrap() as i32;
+        let id = support::resume_uuid(&json["body"]["id"]);
         fixture.track_resume_id(id);
         created.push((id, json["body"]["target_date"].clone()));
     }
@@ -513,9 +529,9 @@ fn variant_list_ordered_by_target_date_desc_nulls_last() {
     let items = json["body"].as_array().unwrap();
     assert_eq!(items.len(), 5);
 
-    let ids: Vec<i32> = items
+    let ids: Vec<uuid::Uuid> = items
         .iter()
-        .map(|item| item["id"].as_i64().unwrap() as i32)
+        .map(|item| support::resume_uuid(&item["id"]))
         .collect();
     let dates: Vec<Value> = items
         .iter()
@@ -558,7 +574,7 @@ fn variant_update_metadata_absent_blank_null_semantics() {
 
     let (status, json) = post_variant_json(&fixture, base_id, variant_body());
     assert_eq!(status, Status::Created);
-    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(variant_id);
     assert_eq!(json["body"]["company_name"], "Acme Corp");
 
@@ -653,7 +669,7 @@ fn variant_update_target_date_precision_moves_together() {
 
     let (status, json) = post_variant_json(&fixture, base_id, variant_body());
     assert_eq!(status, Status::Created);
-    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(variant_id);
     assert_eq!(json["body"]["target_date_precision"], "month");
     assert_eq!(
@@ -752,7 +768,7 @@ fn resume_body_cannot_set_base_resume_id() {
             serde_json::json!({
                 "name": "Forged Variant",
                 "email": format!("variant.forge.{}@example.com", unique_suffix()),
-                "is_public": true,
+                "visibility": "public",
                 "base_resume_id": base_id
             })
             .to_string(),
@@ -766,7 +782,7 @@ fn resume_body_cannot_set_base_resume_id() {
         "a create body cannot claim a parent"
     );
     assert_eq!(created_json["body"]["is_variant"], Value::Bool(false));
-    let forged_id = created_json["body"]["id"].as_i64().unwrap() as i32;
+    let forged_id = support::resume_uuid(&created_json["body"]["id"]);
     fixture.track_resume_id(forged_id);
 
     let (status, updated) = put_resume(
@@ -789,7 +805,7 @@ fn variant_email_put_rejected_even_same_value() {
 
     let (status, json) = post_variant_json(&fixture, base_id, variant_body());
     assert_eq!(status, Status::Created);
-    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(variant_id);
     let variant_email = json["body"]["email"].as_str().unwrap().to_string();
 
@@ -879,7 +895,7 @@ fn base_delete_with_variants_returns_409_and_keeps_the_base() {
 
     let (status, json) = post_variant_json(&fixture, base_id, variant_body());
     assert_eq!(status, Status::Created);
-    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(variant_id);
 
     let blocked_status = fixture
@@ -936,14 +952,14 @@ fn variant_list_endpoint_visibility_and_empty_on_variant() {
 
     let (public_status, public_json) = post_variant_json(&fixture, base_id, variant_body());
     assert_eq!(public_status, Status::Created);
-    let public_id = public_json["body"]["id"].as_i64().unwrap() as i32;
+    let public_id = support::resume_uuid(&public_json["body"]["id"]);
     fixture.track_resume_id(public_id);
 
     let mut hidden_body = variant_body();
-    hidden_body["is_public"] = serde_json::json!(false);
+    hidden_body["visibility"] = serde_json::json!("private");
     let (hidden_status, hidden_json) = post_variant_json(&fixture, base_id, hidden_body);
     assert_eq!(hidden_status, Status::Created);
-    let hidden_id = hidden_json["body"]["id"].as_i64().unwrap() as i32;
+    let hidden_id = support::resume_uuid(&hidden_json["body"]["id"]);
     fixture.track_resume_id(hidden_id);
 
     let owner_token = fixture.auth_token().to_string();
@@ -956,7 +972,7 @@ fn variant_list_endpoint_visibility_and_empty_on_variant() {
     assert_eq!(anonymous_status, Status::Ok);
     let anonymous_items = anonymous_json["body"].as_array().unwrap();
     assert_eq!(anonymous_items.len(), 1, "anonymous sees public variants");
-    assert_eq!(anonymous_items[0]["id"].as_i64().unwrap() as i32, public_id);
+    assert_eq!(anonymous_items[0]["id"], public_id.to_string());
 
     let (variant_status, variant_json) = get_variants_json(&fixture, public_id, Some(&owner_token));
     assert_eq!(variant_status, Status::Ok);
@@ -973,7 +989,7 @@ fn variant_list_endpoint_private_base_returns_404_for_other_user() {
 
     let (status, json) = post_variant_json(&fixture, base_id, variant_body());
     assert_eq!(status, Status::Created);
-    fixture.track_resume_id(json["body"]["id"].as_i64().unwrap() as i32);
+    fixture.track_resume_id(support::resume_uuid(&json["body"]["id"]));
 
     let other = support::register_and_login(fixture.client(), "variant.other.get");
     fixture.track_user_id(other.user_id);
@@ -999,7 +1015,7 @@ fn variant_create_endpoint_returns_201_and_publishes_for_variant_id_only() {
     assert_eq!(response.status(), Status::Created, "create variant");
 
     let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
-    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(variant_id);
 
     assert_ne!(variant_id, base_id, "the clone is a new row");
@@ -1037,7 +1053,7 @@ fn variant_create_endpoint_rejects_nesting_with_400() {
     let response = post_variant(&fixture, base_id, variant_body());
     assert_eq!(response.status(), Status::Created);
     let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
-    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(variant_id);
 
     let nested = post_variant(&fixture, variant_id, variant_body());
@@ -1052,7 +1068,7 @@ fn variant_create_endpoint_forbids_non_owner_with_403() {
     let response = post_variant(&fixture, base_id, variant_body());
     assert_eq!(response.status(), Status::Created);
     let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
-    let variant_id = json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(variant_id);
 
     let other = support::register_and_login(fixture.client(), "variant.other.post");
@@ -1076,7 +1092,7 @@ fn variant_create_endpoint_forbids_non_owner_with_403() {
 fn variant_create_endpoint_missing_base_returns_404() {
     let fixture = support::Fixture::new(9_241_013);
 
-    let response = post_variant(&fixture, 2_000_000_000, variant_body());
+    let response = post_variant(&fixture, uuid::Uuid::new_v4(), variant_body());
     assert_eq!(response.status(), Status::NotFound);
 }
 
@@ -1090,7 +1106,7 @@ fn variant_list_visibility_owner_vs_public() {
     fixture.track_resume_id(public_variant.id);
 
     let mut hidden_request = clone_request();
-    hidden_request.is_public = Some(false);
+    hidden_request.visibility = Some(domain::models::Visibility::Private);
     let private_variant = create_variant(fixture.user_id(), base_id, hidden_request, &fixture.hub)
         .expect("clone private");
     fixture.track_resume_id(private_variant.id);

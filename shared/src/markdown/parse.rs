@@ -40,7 +40,7 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
     let mut profile_image_url: Option<String> = None;
     let mut github_url: Option<String> = None;
     let mut mobile_number: Option<String> = None;
-    let mut is_public: bool = false;
+    let mut visibility = domain::models::Visibility::Private;
     let mut executive_summary: Option<String> = None;
     let mut video: Option<String> = None;
     let mut summary_text = String::new();
@@ -218,9 +218,14 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                                     }
                                 }
                                 "Public" => {
-                                    is_public = value.eq_ignore_ascii_case("true")
+                                    visibility = if value.eq_ignore_ascii_case("true")
                                         || value.eq_ignore_ascii_case("yes")
-                                        || value == "1";
+                                        || value == "1"
+                                    {
+                                        domain::models::Visibility::Public
+                                    } else {
+                                        domain::models::Visibility::Private
+                                    };
                                 }
                                 _ => {}
                             }
@@ -412,7 +417,7 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
         mobile_number,
         executive_summary,
         video,
-        is_public,
+        visibility,
         education,
         education_key_points,
         skills,
@@ -753,7 +758,7 @@ mod tests {
             mobile_number: None,
             executive_summary: None,
             video: None,
-            is_public: false,
+            visibility: domain::models::Visibility::Private,
             education: vec![],
             education_key_points: vec![ParsedEducationKeyPoint {
                 education_index: 0,
@@ -783,7 +788,7 @@ mod tests {
             mobile_number: None,
             executive_summary: None,
             video: None,
-            is_public: false,
+            visibility: domain::models::Visibility::Private,
             education: vec![],
             education_key_points: vec![],
             skills: vec![],
@@ -813,7 +818,7 @@ mod tests {
             mobile_number: None,
             executive_summary: None,
             video: None,
-            is_public: false,
+            visibility: domain::models::Visibility::Private,
             education: vec![],
             education_key_points: vec![],
             skills: vec![],
@@ -843,7 +848,7 @@ mod tests {
             mobile_number: None,
             executive_summary: None,
             video: None,
-            is_public: false,
+            visibility: domain::models::Visibility::Private,
             education: vec![],
             education_key_points: vec![],
             skills: vec![],
@@ -1193,7 +1198,7 @@ mod tests {
         let parsed = markdown_to_resume(markdown).expect("parse ok");
         assert_eq!(parsed.name, "Jane");
         assert_eq!(parsed.email, "jane@example.com");
-        assert!(parsed.is_public);
+        assert_eq!(parsed.visibility, domain::models::Visibility::Public);
         assert_eq!(parsed.skills.len(), 3);
         assert_eq!(parsed.skills[0].skill_name, "Rust");
         assert_eq!(parsed.skills[0].confidence_percentage, 90);

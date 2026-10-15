@@ -1,4 +1,5 @@
 use serde::Serialize;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -25,5 +26,5 @@ pub enum ResumeChangedAction {
 /// this trait so event selection lives next to the decision that
 /// produced the change.
 pub trait ResumeChangePublisher: Send + Sync {
-    fn resume_changed(&self, resume_id: i32, action: ResumeChangedAction);
+    fn resume_changed(&self, resume_id: Uuid, action: ResumeChangedAction);
 }

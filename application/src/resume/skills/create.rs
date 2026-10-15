@@ -1,6 +1,8 @@
 use diesel::prelude::*;
 use domain::models::{NewSkill, NewSkillRequest, Skill};
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
@@ -9,7 +11,7 @@ use crate::{
 
 pub fn create_skill(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     payload: NewSkillRequest,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<Skill, ApplicationError> {

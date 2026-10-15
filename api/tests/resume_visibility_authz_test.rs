@@ -23,7 +23,7 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
         "email": public_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let public_create_response = fixture
@@ -40,7 +40,7 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
         .into_string()
         .expect("public create body");
     let public_create_json: Value = serde_json::from_str(&public_create_body).expect("valid json");
-    let public_resume_id = public_create_json["body"]["id"].as_i64().expect("id") as i32;
+    let public_resume_id = support::resume_uuid(&public_create_json["body"]["id"]);
     fixture.track_resume_id(public_resume_id);
 
     let private_email = support::unique_email("private.resume");
@@ -51,7 +51,7 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
         "email": private_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let private_create_response = fixture
@@ -69,7 +69,7 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
         .expect("private create body");
     let private_create_json: Value =
         serde_json::from_str(&private_create_body).expect("valid json");
-    let private_resume_id = private_create_json["body"]["id"].as_i64().expect("id") as i32;
+    let private_resume_id = support::resume_uuid(&private_create_json["body"]["id"]);
     fixture.track_resume_id(private_resume_id);
 
     let anon_list_response = fixture.client().get("/api/resumes").dispatch();
@@ -81,12 +81,12 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     assert!(
         anon_items
             .iter()
-            .any(|r| r["id"].as_i64() == Some(public_resume_id as i64))
+            .any(|r| r["id"].as_str() == Some(public_resume_id.to_string().as_str()))
     );
     assert!(
         !anon_items
             .iter()
-            .any(|r| r["id"].as_i64() == Some(private_resume_id as i64))
+            .any(|r| r["id"].as_str() == Some(private_resume_id.to_string().as_str()))
     );
 
     let owner_list_response = fixture
@@ -102,12 +102,12 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     assert!(
         owner_items
             .iter()
-            .any(|r| r["id"].as_i64() == Some(public_resume_id as i64))
+            .any(|r| r["id"].as_str() == Some(public_resume_id.to_string().as_str()))
     );
     assert!(
         owner_items
             .iter()
-            .any(|r| r["id"].as_i64() == Some(private_resume_id as i64))
+            .any(|r| r["id"].as_str() == Some(private_resume_id.to_string().as_str()))
     );
 
     let anon_get_private = fixture
@@ -186,7 +186,7 @@ fn test_child_active_filter_for_non_owners() {
         "email": support::unique_email("child.visibility"),
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -201,7 +201,7 @@ fn test_child_active_filter_for_non_owners() {
 
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
-    let resume_id = create_json["body"]["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     // Create education with active and inactive key points

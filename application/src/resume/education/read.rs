@@ -2,6 +2,8 @@ use diesel::prelude::*;
 use domain::models::{Education, EducationKeyPoint};
 use infrastructure::establish_connection;
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     resume::common::{
@@ -10,7 +12,7 @@ use crate::{
 };
 
 pub fn list_educations(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<Vec<Education>, ApplicationError> {
     use domain::schema::education::dsl as education_dsl;
@@ -36,7 +38,7 @@ pub fn list_educations(
 }
 
 pub fn list_education_key_points(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     education_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<EducationKeyPoint>, ApplicationError> {

@@ -16,7 +16,7 @@ fn test_create_and_retrieve_resume_persistence() {
         "email": "john.doe@example.com",
         "github_url": "https://github.com/johndoe",
         "mobile_number": "+1234567890",
-        "is_public": true
+        "visibility": "public"
     });
 
     // Step 1: Create a new resume via POST
@@ -36,9 +36,7 @@ fn test_create_and_retrieve_resume_persistence() {
 
     // Extract the created resume from response
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
 
     // Track for cleanup
     fixture.track_resume_id(resume_id);
@@ -60,7 +58,7 @@ fn test_create_and_retrieve_resume_persistence() {
     let retrieved_resume = &get_json["body"];
 
     // Step 3: Verify all fields match
-    assert_eq!(retrieved_resume["id"], resume_id);
+    assert_eq!(retrieved_resume["id"], resume_id.to_string());
     assert_eq!(retrieved_resume["name"], "John Doe");
     assert_eq!(
         retrieved_resume["profile_image_url"],
@@ -104,7 +102,7 @@ fn test_create_resume_appears_in_list() {
         "email": unique_email,
         "github_url": "https://github.com/janesmith",
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -120,9 +118,7 @@ fn test_create_resume_appears_in_list() {
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
     let created_resume = &create_json["body"];
-    let created_id = created_resume["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let created_id = support::resume_uuid(&created_resume["id"]);
 
     // Track for cleanup
     fixture.track_resume_id(created_id);
@@ -145,7 +141,7 @@ fn test_create_resume_appears_in_list() {
     // Verify the specific resume we created is in the list
     let found = resumes_array
         .iter()
-        .any(|r| r["email"] == unique_email && r["id"] == created_id);
+        .any(|r| r["email"] == unique_email && r["id"] == created_id.to_string());
 
     assert!(
         found,
@@ -156,7 +152,7 @@ fn test_create_resume_appears_in_list() {
     // Also verify all fields are correct in the list
     let created_resume_in_list = resumes_array
         .iter()
-        .find(|r| r["id"] == created_id)
+        .find(|r| r["id"] == created_id.to_string())
         .expect("Should find the created resume");
 
     assert_eq!(created_resume_in_list["name"], "Jane Smith");
@@ -175,7 +171,7 @@ fn test_retrieve_nonexistent_resume() {
     let fixture = support::Fixture::new(9_226_003);
 
     // Try to retrieve a resume with an ID that doesn't exist
-    let nonexistent_id = 999999;
+    let nonexistent_id = uuid::Uuid::new_v4();
     let response = fixture
         .client()
         .get(format!("/api/resume/{}", nonexistent_id))
@@ -206,7 +202,7 @@ fn test_update_and_retrieve_resume_persistence() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -222,9 +218,7 @@ fn test_update_and_retrieve_resume_persistence() {
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
 
     fixture.track_resume_id(resume_id);
 
@@ -245,7 +239,7 @@ fn test_update_and_retrieve_resume_persistence() {
     let update_body = update_response.into_string().expect("Response body");
     let update_json: Value = serde_json::from_str(&update_body).expect("Valid JSON");
     let updated_resume = &update_json["body"];
-    assert_eq!(updated_resume["id"], resume_id);
+    assert_eq!(updated_resume["id"], resume_id.to_string());
     assert_eq!(updated_resume["location"], "New Location");
 
     let get_response = fixture
@@ -258,7 +252,7 @@ fn test_update_and_retrieve_resume_persistence() {
     let get_body = get_response.into_string().expect("Response body");
     let get_json: Value = serde_json::from_str(&get_body).expect("Valid JSON");
     let retrieved_resume = &get_json["body"];
-    assert_eq!(retrieved_resume["id"], resume_id);
+    assert_eq!(retrieved_resume["id"], resume_id.to_string());
     assert_eq!(retrieved_resume["location"], "New Location");
 }
 
@@ -266,7 +260,7 @@ fn test_update_and_retrieve_resume_persistence() {
 fn test_update_nonexistent_resume() {
     let fixture = support::Fixture::new(9_226_005);
 
-    let nonexistent_id = 999999;
+    let nonexistent_id = uuid::Uuid::new_v4();
     let update_resume_json = serde_json::json!({
         "location": "Does Not Matter"
     });
@@ -301,7 +295,7 @@ fn test_delete_resume_then_not_found() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -317,9 +311,7 @@ fn test_delete_resume_then_not_found() {
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
 
     fixture.track_resume_id(resume_id);
 
@@ -347,7 +339,7 @@ fn test_delete_resume_then_not_found() {
 fn test_delete_nonexistent_resume() {
     let fixture = support::Fixture::new(9_226_006);
 
-    let nonexistent_id = 999999;
+    let nonexistent_id = uuid::Uuid::new_v4();
     let response = fixture
         .client()
         .delete(format!("/api/resume/{}", nonexistent_id))
@@ -395,7 +387,7 @@ fn test_create_resume_duplicate_email_returns_409() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let first_response = fixture
@@ -411,9 +403,7 @@ fn test_create_resume_duplicate_email_returns_409() {
     let first_body = first_response.into_string().expect("Response body");
     let first_json: Value = serde_json::from_str(&first_body).expect("Valid JSON");
     let created_resume = &first_json["body"];
-    let resume_id = created_resume["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     let second_response = fixture
@@ -458,7 +448,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
         "email": email_a,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let resume_b = serde_json::json!({
@@ -468,7 +458,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
         "email": email_b,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_a = fixture
@@ -481,7 +471,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     assert_eq!(create_a.status(), Status::Created);
     let create_a_body = create_a.into_string().expect("Response body");
     let create_a_json: Value = serde_json::from_str(&create_a_body).expect("Valid JSON");
-    let id_a = create_a_json["body"]["id"].as_i64().expect("id") as i32;
+    let id_a = support::resume_uuid(&create_a_json["body"]["id"]);
     fixture.track_resume_id(id_a);
 
     let create_b = fixture
@@ -494,7 +484,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     assert_eq!(create_b.status(), Status::Created);
     let create_b_body = create_b.into_string().expect("Response body");
     let create_b_json: Value = serde_json::from_str(&create_b_body).expect("Valid JSON");
-    let id_b = create_b_json["body"]["id"].as_i64().expect("id") as i32;
+    let id_b = support::resume_uuid(&create_b_json["body"]["id"]);
     fixture.track_resume_id(id_b);
 
     let list_response = fixture.client().get("/api/resumes").dispatch();
@@ -504,10 +494,10 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
 
     let resumes_array = list_json["body"].as_array().expect("Should be array");
 
-    let our_ids: Vec<i32> = resumes_array
+    let our_ids: Vec<uuid::Uuid> = resumes_array
         .iter()
         .filter_map(|r| {
-            let id = r["id"].as_i64()? as i32;
+            let id = r["id"].as_str()?.parse::<uuid::Uuid>().ok()?;
             if id == id_a || id == id_b {
                 Some(id)
             } else {
@@ -552,7 +542,7 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -568,7 +558,7 @@ fn test_updated_at_changes_on_update_created_at_stays_same() {
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
     let created = &create_json["body"];
 
-    let resume_id = created["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&created["id"]);
     fixture.track_resume_id(resume_id);
 
     let created_at_before = created["created_at"]
@@ -631,7 +621,7 @@ fn test_skills_crud_flow() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_resume_response = fixture
@@ -647,9 +637,7 @@ fn test_skills_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["id"]
-        .as_i64()
-        .expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_resume_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let new_skill_json = serde_json::json!({
@@ -673,9 +661,7 @@ fn test_skills_crud_flow() {
     let create_skill_json: Value = serde_json::from_str(&create_skill_body).expect("valid json");
     let skill_id = create_skill_json["body"]["id"].as_i64().expect("skill id") as i32;
     assert_eq!(
-        create_skill_json["body"]["resume_id"]
-            .as_i64()
-            .expect("resume_id") as i32,
+        support::resume_uuid(&create_skill_json["body"]["resume_id"]),
         resume_id
     );
     assert_eq!(
@@ -784,7 +770,7 @@ fn test_languages_crud_flow() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_resume_response = fixture
@@ -800,9 +786,7 @@ fn test_languages_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["id"]
-        .as_i64()
-        .expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_resume_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let new_language_json = serde_json::json!({
@@ -828,9 +812,7 @@ fn test_languages_crud_flow() {
         .as_i64()
         .expect("language id") as i32;
     assert_eq!(
-        create_language_json["body"]["resume_id"]
-            .as_i64()
-            .expect("resume_id") as i32,
+        support::resume_uuid(&create_language_json["body"]["resume_id"]),
         resume_id
     );
     assert_eq!(
@@ -917,7 +899,7 @@ fn test_frameworks_crud_flow() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_resume_response = fixture
@@ -933,9 +915,7 @@ fn test_frameworks_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["id"]
-        .as_i64()
-        .expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_resume_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let new_language_json = serde_json::json!({
@@ -1079,7 +1059,7 @@ fn test_education_and_key_points_crud_flow() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_resume_response = fixture
@@ -1095,9 +1075,7 @@ fn test_education_and_key_points_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["id"]
-        .as_i64()
-        .expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_resume_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let new_education_json = serde_json::json!({
@@ -1282,7 +1260,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_resume_response = fixture
@@ -1298,9 +1276,7 @@ fn test_work_experiences_and_key_points_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["id"]
-        .as_i64()
-        .expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_resume_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let new_work_json = serde_json::json!({
@@ -1526,7 +1502,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_resume_response = fixture
@@ -1542,9 +1518,7 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .into_string()
         .expect("create resume body");
     let create_resume_json: Value = serde_json::from_str(&create_resume_body).expect("valid json");
-    let resume_id = create_resume_json["body"]["id"]
-        .as_i64()
-        .expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_resume_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let new_project_json = serde_json::json!({

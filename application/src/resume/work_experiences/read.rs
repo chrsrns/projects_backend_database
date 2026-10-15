@@ -2,6 +2,8 @@ use diesel::prelude::*;
 use domain::models::{WorkExperience, WorkExperienceKeyPoint};
 use infrastructure::establish_connection;
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     resume::common::{
@@ -10,7 +12,7 @@ use crate::{
 };
 
 pub fn list_work_experiences(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<Vec<WorkExperience>, ApplicationError> {
     use domain::schema::work_experiences::dsl as work_dsl;
@@ -37,7 +39,7 @@ pub fn list_work_experiences(
 }
 
 pub fn list_work_experience_key_points(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     work_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<WorkExperienceKeyPoint>, ApplicationError> {

@@ -9,13 +9,14 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::Hub;
+use uuid::Uuid;
 
 #[utoipa::path(
     get,
     path = "/resume/{resume_id}/languages",
     tag = "Languages",
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     responses(
         (status = 200, description = "OK", body = Response<Vec<Language>>, content_type = "application/json"),
@@ -26,7 +27,7 @@ use crate::realtime::Hub;
 )]
 #[get("/resume/<resume_id>/languages")]
 pub fn list_languages_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<Language>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
@@ -40,7 +41,7 @@ pub fn list_languages_handler(
     tag = "Languages",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     request_body(content = NewLanguageRequest, content_type = "application/json"),
     responses(
@@ -58,7 +59,7 @@ pub fn list_languages_handler(
 pub fn create_language_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     payload: Json<NewLanguageRequest>,
 ) -> CustomJsonResult<Language> {
     let language =

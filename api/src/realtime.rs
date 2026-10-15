@@ -2,6 +2,7 @@ use rocket::tokio::sync::broadcast;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use uuid::Uuid;
 
 pub use application::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
 
@@ -9,7 +10,7 @@ pub use application::realtime::{ResumeChangePublisher, ResumeChangedAction, Sect
 pub struct ResumeChangedEvent {
     #[serde(rename = "type")]
     pub kind: String,
-    pub resume_id: i32,
+    pub resume_id: Uuid,
     pub action: ResumeChangedAction,
 }
 
@@ -19,7 +20,7 @@ pub struct Hub {
 }
 
 struct HubInner {
-    topics: RwLock<HashMap<i32, broadcast::Sender<ResumeChangedEvent>>>,
+    topics: RwLock<HashMap<Uuid, broadcast::Sender<ResumeChangedEvent>>>,
     buffer: usize,
 }
 
@@ -33,7 +34,7 @@ impl Hub {
         }
     }
 
-    fn sender_for(&self, resume_id: i32) -> broadcast::Sender<ResumeChangedEvent> {
+    fn sender_for(&self, resume_id: Uuid) -> broadcast::Sender<ResumeChangedEvent> {
         {
             let guard = self
                 .inner
@@ -61,11 +62,11 @@ impl Hub {
         sender
     }
 
-    pub fn subscribe(&self, resume_id: i32) -> broadcast::Receiver<ResumeChangedEvent> {
+    pub fn subscribe(&self, resume_id: Uuid) -> broadcast::Receiver<ResumeChangedEvent> {
         self.sender_for(resume_id).subscribe()
     }
 
-    pub fn publish_resume_changed(&self, resume_id: i32, action: ResumeChangedAction) {
+    pub fn publish_resume_changed(&self, resume_id: Uuid, action: ResumeChangedAction) {
         let sender = self.sender_for(resume_id);
         let _ = sender.send(ResumeChangedEvent {
             kind: "resume.changed".to_string(),
@@ -76,7 +77,7 @@ impl Hub {
 }
 
 impl ResumeChangePublisher for Hub {
-    fn resume_changed(&self, resume_id: i32, action: ResumeChangedAction) {
+    fn resume_changed(&self, resume_id: Uuid, action: ResumeChangedAction) {
         self.publish_resume_changed(resume_id, action);
     }
 }
@@ -94,12 +95,13 @@ mod tests {
     #[test]
     fn subscribe_then_publish_delivers_event() {
         let hub = Hub::new();
-        let mut rx = hub.subscribe(123);
+        let id = Uuid::nil();
+        let mut rx = hub.subscribe(id);
 
-        hub.publish_resume_changed(123, ResumeChangedAction::Updated(SectionType::PersonalInfo));
+        hub.publish_resume_changed(id, ResumeChangedAction::Updated(SectionType::PersonalInfo));
 
         let evt = rx.try_recv().expect("event should be delivered");
-        assert_eq!(evt.resume_id, 123);
+        assert_eq!(evt.resume_id, id);
         assert_eq!(
             evt.action,
             ResumeChangedAction::Updated(SectionType::PersonalInfo)

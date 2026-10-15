@@ -10,6 +10,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::Hub;
+use uuid::Uuid;
 
 #[utoipa::path(
     post,
@@ -17,7 +18,7 @@ use crate::realtime::Hub;
     tag = "Resumes",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Base resume id")
+        ("resume_id" = Uuid, Path, description = "Base resume id")
     ),
     request_body(content = NewVariantRequest, content_type = "application/json"),
     responses(
@@ -36,7 +37,7 @@ use crate::realtime::Hub;
 pub fn create_variant_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     request: Json<NewVariantRequest>,
 ) -> CustomJsonResult<ResumeView> {
     let created =
@@ -49,7 +50,7 @@ pub fn create_variant_handler(
     path = "/resume/{resume_id}/variants",
     tag = "Resumes",
     params(
-        ("resume_id" = i32, Path, description = "Base resume id")
+        ("resume_id" = Uuid, Path, description = "Base resume id")
     ),
     responses(
         (status = 200, description = "OK", body = Response<Vec<ResumeView>>, content_type = "application/json"),
@@ -58,7 +59,7 @@ pub fn create_variant_handler(
 )]
 #[get("/resume/<resume_id>/variants")]
 pub fn list_variants_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<ResumeView>> {
     let user_id_value = maybe_auth.0.map(|auth| auth.user_id);

@@ -2,6 +2,8 @@ use diesel::prelude::*;
 use domain::models::{PortfolioKeyPoint, PortfolioProject, PortfolioTechnology};
 use infrastructure::establish_connection;
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     resume::common::{
@@ -10,7 +12,7 @@ use crate::{
 };
 
 pub fn list_portfolio_projects(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<Vec<PortfolioProject>, ApplicationError> {
     use domain::schema::portfolio_projects::dsl as projects_dsl;
@@ -37,7 +39,7 @@ pub fn list_portfolio_projects(
 }
 
 pub fn list_portfolio_key_points(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     project_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<PortfolioKeyPoint>, ApplicationError> {
@@ -77,7 +79,7 @@ pub fn list_portfolio_key_points(
 }
 
 pub fn list_portfolio_technologies(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     project_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<PortfolioTechnology>, ApplicationError> {

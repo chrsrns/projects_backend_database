@@ -14,7 +14,7 @@ const RESUME_VIEW_KEYS: [&str; 22] = [
     "created_at",
     "updated_at",
     "created_by",
-    "is_public",
+    "visibility",
     "executive_summary",
     "video",
     "is_variant",
@@ -72,7 +72,7 @@ fn import_base(fixture: &support::Fixture, lock_key: i64, public: bool) -> (Stat
     (status, json)
 }
 
-fn post_variant(fixture: &support::Fixture, base_id: i32, body: Value) -> (Status, Value) {
+fn post_variant(fixture: &support::Fixture, base_id: uuid::Uuid, body: Value) -> (Status, Value) {
     let response = fixture
         .client()
         .post(format!("/api/resume/{}/variants", base_id))
@@ -85,7 +85,11 @@ fn post_variant(fixture: &support::Fixture, base_id: i32, body: Value) -> (Statu
     (status, json)
 }
 
-fn get_resume(fixture: &support::Fixture, resume_id: i32, token: Option<&str>) -> (Status, Value) {
+fn get_resume(
+    fixture: &support::Fixture,
+    resume_id: uuid::Uuid,
+    token: Option<&str>,
+) -> (Status, Value) {
     let request = fixture.client().get(format!("/api/resume/{}", resume_id));
     let request = match token {
         Some(token) => request.header(support::auth_header(token)),
@@ -99,7 +103,7 @@ fn get_resume(fixture: &support::Fixture, resume_id: i32, token: Option<&str>) -
 
 fn get_variants(
     fixture: &support::Fixture,
-    resume_id: i32,
+    resume_id: uuid::Uuid,
     token: Option<&str>,
 ) -> (Status, Value) {
     let request = fixture
@@ -121,7 +125,7 @@ fn resume_view_shape_flat_across_all_endpoints() {
 
     let (status, imported) = import_base(&fixture, 9_241_030, true);
     assert_eq!(status, Status::Created);
-    let base_id = imported["body"]["id"].as_i64().unwrap() as i32;
+    let base_id = support::resume_uuid(&imported["body"]["id"]);
     fixture.track_resume_id(base_id);
     assert_flat_resume_view(&imported["body"]);
 
@@ -134,7 +138,7 @@ fn resume_view_shape_flat_across_all_endpoints() {
             serde_json::json!({
                 "name": "Flat Shape",
                 "email": format!("variant.flat.{}@example.com", unique_suffix()),
-                "is_public": true
+                "visibility": "public"
             })
             .to_string(),
         )
@@ -142,7 +146,7 @@ fn resume_view_shape_flat_across_all_endpoints() {
     assert_eq!(created.status(), Status::Created);
     let created_json: Value = serde_json::from_str(&created.into_string().unwrap()).unwrap();
     assert_flat_resume_view(&created_json["body"]);
-    let created_id = created_json["body"]["id"].as_i64().unwrap() as i32;
+    let created_id = support::resume_uuid(&created_json["body"]["id"]);
     fixture.track_resume_id(created_id);
 
     let updated = fixture
@@ -163,7 +167,7 @@ fn resume_view_shape_flat_across_all_endpoints() {
     );
     assert_eq!(status, Status::Created);
     assert_flat_resume_view(&variant_json["body"]);
-    let variant_id = variant_json["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&variant_json["body"]["id"]);
     fixture.track_resume_id(variant_id);
 
     let (status, single) = get_resume(&fixture, base_id, Some(fixture.auth_token()));
@@ -201,7 +205,7 @@ fn list_resumes_includes_variants_in_id_order() {
 
     let (status, base) = import_base(&fixture, 9_241_033, true);
     assert_eq!(status, Status::Created);
-    let base_id = base["body"]["id"].as_i64().unwrap() as i32;
+    let base_id = support::resume_uuid(&base["body"]["id"]);
     fixture.track_resume_id(base_id);
 
     let mut variant_ids = Vec::new();
@@ -209,10 +213,10 @@ fn list_resumes_includes_variants_in_id_order() {
         let (status, json) = post_variant(
             &fixture,
             base_id,
-            serde_json::json!({ "company_name": company, "is_public": true }),
+            serde_json::json!({ "company_name": company, "visibility": "public" }),
         );
         assert_eq!(status, Status::Created);
-        let id = json["body"]["id"].as_i64().unwrap() as i32;
+        let id = support::resume_uuid(&json["body"]["id"]);
         fixture.track_resume_id(id);
         variant_ids.push(id);
     }
@@ -226,10 +230,10 @@ fn list_resumes_includes_variants_in_id_order() {
     let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
     let items = json["body"].as_array().unwrap();
 
-    let ids: Vec<i32> = items
+    let ids: Vec<uuid::Uuid> = items
         .iter()
-        .map(|item| item["id"].as_i64().unwrap() as i32)
-        .collect();
+        .map(|item| support::resume_uuid(&item["id"]))
+        .collect::<Vec<uuid::Uuid>>();
     let mut sorted = ids.clone();
     sorted.sort_unstable();
     assert_eq!(ids, sorted, "the list keeps its ascending id order");
@@ -245,19 +249,19 @@ fn list_resumes_includes_variants_in_id_order() {
     for variant_id in &variant_ids {
         let item = items
             .iter()
-            .find(|item| item["id"].as_i64().unwrap() as i32 == *variant_id)
+            .find(|item| item["id"].as_str() == Some(variant_id.to_string().as_str()))
             .expect("variant present in the list");
         assert_eq!(item["is_variant"], Value::Bool(true));
         assert_eq!(
-            item["base_resume_id"].as_i64().unwrap() as i32,
-            base_id,
+            item["base_resume_id"],
+            base_id.to_string(),
             "the owner sees the parent link"
         );
     }
 
     let base_item = items
         .iter()
-        .find(|item| item["id"].as_i64().unwrap() as i32 == base_id)
+        .find(|item| item["id"].as_str() == Some(base_id.to_string().as_str()))
         .expect("base present in the list");
     assert_eq!(base_item["is_variant"], Value::Bool(false));
     assert!(base_item["base_resume_id"].is_null());
@@ -269,7 +273,7 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
 
     let (status, public_base) = import_base(&fixture, 9_241_031, true);
     assert_eq!(status, Status::Created);
-    let public_base_id = public_base["body"]["id"].as_i64().unwrap() as i32;
+    let public_base_id = support::resume_uuid(&public_base["body"]["id"]);
     fixture.track_resume_id(public_base_id);
 
     let (status, public_variant) = post_variant(
@@ -277,17 +281,17 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
         public_base_id,
         serde_json::json!({
             "company_name": "Acme Corp",
-            "is_public": true,
+            "visibility": "public",
             "show_variant_tag": false
         }),
     );
     assert_eq!(status, Status::Created);
-    let public_variant_id = public_variant["body"]["id"].as_i64().unwrap() as i32;
+    let public_variant_id = support::resume_uuid(&public_variant["body"]["id"]);
     fixture.track_resume_id(public_variant_id);
 
     let (status, private_base) = import_base(&fixture, 9_241_032, false);
     assert_eq!(status, Status::Created);
-    let private_base_id = private_base["body"]["id"].as_i64().unwrap() as i32;
+    let private_base_id = support::resume_uuid(&private_base["body"]["id"]);
     fixture.track_resume_id(private_base_id);
 
     let (status, tagged_variant) = post_variant(
@@ -295,12 +299,12 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
         private_base_id,
         serde_json::json!({
             "company_name": "Globex",
-            "is_public": true,
+            "visibility": "public",
             "show_variant_tag": true
         }),
     );
     assert_eq!(status, Status::Created);
-    let tagged_variant_id = tagged_variant["body"]["id"].as_i64().unwrap() as i32;
+    let tagged_variant_id = support::resume_uuid(&tagged_variant["body"]["id"]);
     fixture.track_resume_id(tagged_variant_id);
 
     let (status, quiet_variant) = post_variant(
@@ -308,12 +312,12 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
         private_base_id,
         serde_json::json!({
             "company_name": "Initech",
-            "is_public": true,
+            "visibility": "public",
             "show_variant_tag": false
         }),
     );
     assert_eq!(status, Status::Created);
-    let quiet_variant_id = quiet_variant["body"]["id"].as_i64().unwrap() as i32;
+    let quiet_variant_id = support::resume_uuid(&quiet_variant["body"]["id"]);
     fixture.track_resume_id(quiet_variant_id);
 
     let other = support::register_and_login(fixture.client(), "variant.view.other");
@@ -325,8 +329,8 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
     assert_eq!(status, Status::Ok);
     assert_eq!(owner_view["body"]["is_variant"], Value::Bool(true));
     assert_eq!(
-        owner_view["body"]["base_resume_id"].as_i64().unwrap() as i32,
-        public_base_id
+        owner_view["body"]["base_resume_id"],
+        public_base_id.to_string()
     );
     assert_eq!(owner_view["body"]["show_variant_tag"], Value::Bool(false));
 
@@ -336,8 +340,8 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
     assert_eq!(status, Status::Ok);
     assert_eq!(other_view["body"]["is_variant"], Value::Bool(true));
     assert_eq!(
-        other_view["body"]["base_resume_id"].as_i64().unwrap() as i32,
-        public_base_id
+        other_view["body"]["base_resume_id"],
+        public_base_id.to_string()
     );
     assert!(other_view["body"]["show_variant_tag"].is_null());
 
@@ -366,8 +370,8 @@ fn resume_view_redacts_base_and_tag_for_other_viewers() {
     assert_eq!(status, Status::Ok);
     assert_eq!(owner_quiet["body"]["is_variant"], Value::Bool(true));
     assert_eq!(
-        owner_quiet["body"]["base_resume_id"].as_i64().unwrap() as i32,
-        private_base_id
+        owner_quiet["body"]["base_resume_id"],
+        private_base_id.to_string()
     );
 
     // The private base itself stays invisible to the other user.
@@ -383,16 +387,16 @@ fn variants_of_an_inaccessible_variant_returns_404() {
     // independent of its base, so this is the inaccessible case.
     let (status, private_base) = import_base(&fixture, 9_241_034, false);
     assert_eq!(status, Status::Created);
-    let private_base_id = private_base["body"]["id"].as_i64().unwrap() as i32;
+    let private_base_id = support::resume_uuid(&private_base["body"]["id"]);
     fixture.track_resume_id(private_base_id);
 
     let (status, private_variant) = post_variant(
         &fixture,
         private_base_id,
-        serde_json::json!({ "company_name": "Acme Corp", "is_public": false }),
+        serde_json::json!({ "company_name": "Acme Corp", "visibility": "private" }),
     );
     assert_eq!(status, Status::Created);
-    let private_variant_id = private_variant["body"]["id"].as_i64().unwrap() as i32;
+    let private_variant_id = support::resume_uuid(&private_variant["body"]["id"]);
     fixture.track_resume_id(private_variant_id);
 
     let other = support::register_and_login(fixture.client(), "variant.view.inaccessible");

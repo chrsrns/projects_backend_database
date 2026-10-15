@@ -1,4 +1,6 @@
 use diesel::prelude::*;
+use uuid::Uuid;
+
 use domain::models::{
     NewEducation, NewEducationKeyPoint, NewFramework, NewLanguage, NewPortfolioKeyPoint,
     NewPortfolioProject, NewPortfolioTechnology, NewResume, NewSkill, NewWorkExperience,
@@ -86,7 +88,7 @@ fn front_matter_show_variant_tag(
 
 /// Row update applied by a markdown import. Content fields are always set
 /// (`Some(None)` stores NULL, so a dropped bullet clears the column); `email`
-/// and `is_public` are skipped entirely on a variant target; the variant
+/// and `visibility` are skipped entirely on a variant target; the variant
 /// metadata fields use the absent/null/set tri-state.
 #[derive(AsChangeset)]
 #[diesel(table_name = domain::schema::resumes)]
@@ -99,7 +101,7 @@ struct ImportResumeChangeset {
     mobile_number: Option<Option<String>>,
     executive_summary: Option<Option<String>>,
     video: Option<Option<String>>,
-    is_public: Option<bool>,
+    visibility: Option<String>,
     company_name: Option<Option<String>>,
     role_title: Option<Option<String>>,
     variant_label: Option<Option<String>>,
@@ -130,27 +132,12 @@ fn decode_front_matter_metadata(
     })
 }
 
-/// Decodes the `resume_id` routing marker. The marker must be a positive
-/// integer, either as a JSON number or a numeric JSON string; an empty value
-/// or any other scalar is malformed.
-fn resume_id_marker(value: &serde_json::Value) -> Result<i32, ApplicationError> {
-    let bad = || {
-        ApplicationError::BadRequest(
-            "front-matter resume_id must be a positive integer".to_string(),
-        )
-    };
+/// Decodes the `resume_id` routing marker. The marker must be a UUID
+/// string; an empty value or any other scalar is malformed.
+fn resume_id_marker(value: &serde_json::Value) -> Result<Uuid, ApplicationError> {
+    let bad = || ApplicationError::BadRequest("front-matter resume_id must be a UUID".to_string());
     match value {
-        serde_json::Value::Number(n) => n
-            .as_i64()
-            .and_then(|v| i32::try_from(v).ok())
-            .filter(|v| *v > 0)
-            .ok_or_else(bad),
-        serde_json::Value::String(s) => s
-            .trim()
-            .parse::<i32>()
-            .ok()
-            .filter(|v| *v > 0)
-            .ok_or_else(bad),
+        serde_json::Value::String(s) => Uuid::parse_str(s.trim()).ok().ok_or_else(bad),
         _ => Err(bad()),
     }
 }
@@ -191,7 +178,7 @@ fn check_parent_indices<T>(
 /// Prologue gate: an explicit route target is fetched and its ownership
 /// checked before any markdown parsing or front-matter handling.
 fn resolve_explicit_target(
-    explicit_id: Option<i32>,
+    explicit_id: Option<Uuid>,
     user_id_value: i32,
 ) -> Result<Option<Resume>, ApplicationError> {
     match explicit_id {
@@ -279,7 +266,7 @@ fn parse_and_validate(
 fn resolve_target_row(
     conn: &mut DbConnection,
     explicit_target: Option<Resume>,
-    marker_id: Option<i32>,
+    marker_id: Option<Uuid>,
     email_value: &str,
     user_id_value: i32,
 ) -> Result<Option<Resume>, ApplicationError> {
@@ -360,8 +347,8 @@ fn write_import_tx(
         )
         .execute(conn)?;
 
-        // A variant keeps its stored email, is_public and created_by:
-        // the markdown Email/Public bullets stay required by the format
+        // A variant keeps its stored email, visibility and created_by:
+        // the markdown Email/Visibility bullets stay required by the format
         // but are ignored on a variant target. Front-matter metadata
         // keys apply with absent = no change and empty/null = NULL.
         let changeset = ImportResumeChangeset {
@@ -377,10 +364,10 @@ fn write_import_tx(
             mobile_number: Some(new_resume.mobile_number.clone()),
             executive_summary: Some(new_resume.executive_summary.clone()),
             video: Some(new_resume.video.clone()),
-            is_public: if target_is_variant {
+            visibility: if target_is_variant {
                 None
             } else {
-                Some(new_resume.is_public)
+                Some(new_resume.visibility.clone())
             },
             company_name: metadata.company_name.clone(),
             role_title: metadata.role_title.clone(),
@@ -576,7 +563,7 @@ fn write_import_tx(
 pub fn import_resume_markdown(
     markdown: &str,
     user_id_value: i32,
-    explicit_id: Option<i32>,
+    explicit_id: Option<Uuid>,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<(ResumeView, bool), ApplicationError> {
     let explicit_target = resolve_explicit_target(explicit_id, user_id_value)?;
@@ -627,6 +614,7 @@ pub fn import_resume_markdown(
     };
 
     let new_resume = NewResume {
+        id: Uuid::now_v7(),
         name: full_resume.name.clone(),
         profile_image_url: full_resume.profile_image_url.clone(),
         location: full_resume.location.clone(),
@@ -636,7 +624,7 @@ pub fn import_resume_markdown(
         executive_summary: validated.executive_summary.clone(),
         video: validated.video.clone(),
         created_by: Some(user_id_value),
-        is_public: full_resume.is_public,
+        visibility: full_resume.visibility.as_str().to_string(),
         base_resume_id: None,
         company_name: None,
         role_title: None,

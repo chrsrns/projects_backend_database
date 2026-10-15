@@ -23,6 +23,13 @@ pub fn unique_email(prefix: &str) -> String {
     format!("{}.{}.{}.{}@example.com", prefix, pid, nanos, counter)
 }
 
+pub fn resume_uuid(value: &Value) -> uuid::Uuid {
+    value
+        .as_str()
+        .and_then(|s| s.parse::<uuid::Uuid>().ok())
+        .expect("response field should be a UUID string")
+}
+
 pub fn auth_header(token: &str) -> Header<'static> {
     Header::new("Authorization", format!("Bearer {}", token))
 }
@@ -84,7 +91,7 @@ pub fn register_and_login(client: &Client, email_prefix: &str) -> AuthContext {
 pub struct Fixture {
     client: Client,
     pub(crate) hub: Hub,
-    created_resume_ids: Vec<i32>,
+    created_resume_ids: Vec<uuid::Uuid>,
     created_user_ids: Vec<i32>,
     created_session_ids: Vec<String>,
     auth_token: String,
@@ -142,7 +149,7 @@ impl Fixture {
         Header::new("Authorization", format!("Bearer {}", self.auth_token))
     }
 
-    pub fn track_resume_id(&mut self, id: i32) {
+    pub fn track_resume_id(&mut self, id: uuid::Uuid) {
         self.created_resume_ids.push(id);
     }
 
@@ -154,7 +161,7 @@ impl Fixture {
         self.created_session_ids.push(id);
     }
 
-    pub fn untrack_resume_id(&mut self, id: i32) {
+    pub fn untrack_resume_id(&mut self, id: uuid::Uuid) {
         self.created_resume_ids.retain(|&existing| existing != id);
     }
 }
@@ -168,14 +175,14 @@ impl Drop for Fixture {
 
             // A variant references its base, so variants must be deleted first
             // or the base delete is rejected by the foreign key.
-            let variant_ids: Vec<i32> = resumes_dsl::resumes
+            let variant_ids: Vec<uuid::Uuid> = resumes_dsl::resumes
                 .filter(resumes_dsl::id.eq_any(&self.created_resume_ids))
                 .filter(resumes_dsl::base_resume_id.is_not_null())
                 .select(resumes_dsl::id)
                 .load(connection)
                 .unwrap_or_default();
 
-            let base_ids: Vec<i32> = self
+            let base_ids: Vec<uuid::Uuid> = self
                 .created_resume_ids
                 .iter()
                 .copied()
@@ -183,7 +190,7 @@ impl Drop for Fixture {
                 .collect();
 
             for resume_id in variant_ids.iter().chain(base_ids.iter()) {
-                match diesel::delete(resumes_dsl::resumes.find(resume_id)).execute(connection) {
+                match diesel::delete(resumes_dsl::resumes.find(*resume_id)).execute(connection) {
                     Ok(_) => println!("✓ Deleted resume ID {}", resume_id),
                     Err(e) => eprintln!("✗ Failed to delete resume ID {}: {}", resume_id, e),
                 }

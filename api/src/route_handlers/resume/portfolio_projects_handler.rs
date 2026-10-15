@@ -9,6 +9,7 @@ use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
+use uuid::Uuid;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
@@ -19,7 +20,7 @@ use crate::realtime::Hub;
     path = "/resume/{resume_id}/portfolio_projects",
     tag = "PortfolioProjects",
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     responses(
         (status = 200, description = "OK", body = Response<Vec<PortfolioProject>>, content_type = "application/json"),
@@ -30,7 +31,7 @@ use crate::realtime::Hub;
 )]
 #[get("/resume/<resume_id>/portfolio_projects")]
 pub fn list_portfolio_projects_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioProject>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
@@ -44,7 +45,7 @@ pub fn list_portfolio_projects_handler(
     tag = "PortfolioProjects",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     request_body(content = NewPortfolioProjectRequest, content_type = "application/json"),
     responses(
@@ -62,7 +63,7 @@ pub fn list_portfolio_projects_handler(
 pub fn create_portfolio_project_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     payload: Json<NewPortfolioProjectRequest>,
 ) -> CustomJsonResult<PortfolioProject> {
     let item = portfolio_projects::create_portfolio_project(
@@ -143,7 +144,7 @@ pub fn delete_portfolio_project_handler(
     path = "/resume/{resume_id}/portfolio_projects/{project_id}/key_points",
     tag = "PortfolioKeyPoints",
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("project_id" = i32, Path, description = "Portfolio project id")
     ),
     responses(
@@ -155,7 +156,7 @@ pub fn delete_portfolio_project_handler(
 )]
 #[get("/resume/<resume_id>/portfolio_projects/<project_id>/key_points")]
 pub fn list_portfolio_key_points_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     project_id: i32,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioKeyPoint>> {
@@ -171,7 +172,7 @@ pub fn list_portfolio_key_points_handler(
     tag = "PortfolioKeyPoints",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("project_id" = i32, Path, description = "Portfolio project id")
     ),
     request_body(content = NewPortfolioKeyPointRequest, content_type = "application/json"),
@@ -190,7 +191,7 @@ pub fn list_portfolio_key_points_handler(
 pub fn create_portfolio_key_point_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     project_id: i32,
     payload: Json<NewPortfolioKeyPointRequest>,
 ) -> CustomJsonResult<PortfolioKeyPoint> {
@@ -273,7 +274,7 @@ pub fn delete_portfolio_key_point_handler(
     path = "/resume/{resume_id}/portfolio_projects/{project_id}/technologies",
     tag = "PortfolioTechnologies",
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("project_id" = i32, Path, description = "Portfolio project id")
     ),
     responses(
@@ -285,7 +286,7 @@ pub fn delete_portfolio_key_point_handler(
 )]
 #[get("/resume/<resume_id>/portfolio_projects/<project_id>/technologies")]
 pub fn list_portfolio_technologies_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     project_id: i32,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<PortfolioTechnology>> {
@@ -301,7 +302,7 @@ pub fn list_portfolio_technologies_handler(
     tag = "PortfolioTechnologies",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("project_id" = i32, Path, description = "Portfolio project id")
     ),
     request_body(content = NewPortfolioTechnologyRequest, content_type = "application/json"),
@@ -320,7 +321,7 @@ pub fn list_portfolio_technologies_handler(
 pub fn create_portfolio_technology_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     project_id: i32,
     payload: Json<NewPortfolioTechnologyRequest>,
 ) -> CustomJsonResult<PortfolioTechnology> {

@@ -152,7 +152,7 @@ fn test_openapi_json_is_served() {
         "target_date",
         "job_description",
         "variant_label",
-        "is_public",
+        "visibility",
         "show_variant_tag",
     ] {
         assert!(

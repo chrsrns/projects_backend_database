@@ -12,6 +12,7 @@ mod portfolio;
 mod resume;
 mod resume_view;
 mod skills;
+mod visibility;
 mod work_experience;
 
 pub use auth::*;
@@ -24,6 +25,7 @@ pub use portfolio::*;
 pub use resume::*;
 pub use resume_view::*;
 pub use skills::*;
+pub use visibility::*;
 pub use work_experience::*;
 
 /// Decodes a nullable string patch field: an absent key stays `None`, an

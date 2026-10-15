@@ -3,13 +3,13 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use rocket::serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use super::deserialize_optional_nullable_string;
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct PortfolioProject {
     pub id: i32,
-    pub resume_id: i32,
     pub project_name: String,
     #[schema(max_length = 500)]
     pub image_url: Option<String>,
@@ -24,13 +24,14 @@ pub struct PortfolioProject {
     pub active: bool,
     #[schema(max_length = 500)]
     pub video_url: Option<String>,
+    pub resume_id: Uuid,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = portfolio_projects)]
 pub struct NewPortfolioProject {
-    pub resume_id: i32,
+    pub resume_id: Uuid,
     pub project_name: String,
     #[schema(max_length = 500)]
     pub image_url: Option<String>,

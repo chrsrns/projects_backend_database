@@ -80,7 +80,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
     if let Some(video) = &resume.resume.video {
         writeln!(output, "- Video: {}", video).unwrap();
     }
-    writeln!(output, "- Public: {}", resume.resume.is_public).unwrap();
+    writeln!(output, "- Public: {}", resume.resume.visibility == "public").unwrap();
     writeln!(output).unwrap();
 
     if let Some(summary) = &resume.resume.executive_summary {
@@ -269,15 +269,17 @@ mod tests {
     #[test]
     fn test_export_emits_resume_id_marker_for_base() {
         let output = resume_to_markdown(&full_resume(resume_row()), true);
-        assert!(output.starts_with("---\nresume_id: 7\n---\n"));
+        assert!(
+            output.starts_with("---\nresume_id: \"00000000-0000-0000-0000-000000000007\"\n---\n")
+        );
         assert!(output.contains("# Jane Doe"));
     }
 
     #[test]
     fn test_export_variant_emits_metadata_keys() {
         let mut resume = resume_row();
-        resume.id = 12;
-        resume.base_resume_id = Some(7);
+        resume.id = uuid::Uuid::from_u128(12);
+        resume.base_resume_id = Some(uuid::Uuid::from_u128(7));
         resume.company_name = Some("Acme Corp".to_string());
         resume.role_title = Some("Engineer".to_string());
         resume.target_date = Some(NaiveDate::from_ymd_opt(2026, 3, 1).unwrap());
@@ -287,7 +289,7 @@ mod tests {
         resume.show_variant_tag = false;
 
         let output = resume_to_markdown(&full_resume(resume), true);
-        assert!(output.contains("resume_id: 12\n"));
+        assert!(output.contains("resume_id: \"00000000-0000-0000-0000-00000000000c\"\n"));
         assert!(output.contains("company_name: \"Acme Corp\"\n"));
         assert!(output.contains("role_title: \"Engineer\"\n"));
         assert!(output.contains("target_date: \"2026-03\"\n"));
@@ -299,7 +301,7 @@ mod tests {
     #[test]
     fn test_export_variant_omits_show_variant_tag_for_non_owner() {
         let mut resume = resume_row();
-        resume.base_resume_id = Some(7);
+        resume.base_resume_id = Some(uuid::Uuid::from_u128(7));
         resume.company_name = Some("Acme".to_string());
         resume.show_variant_tag = false;
 
@@ -311,7 +313,7 @@ mod tests {
     #[test]
     fn test_export_omits_null_metadata_keys() {
         let mut resume = resume_row();
-        resume.base_resume_id = Some(7);
+        resume.base_resume_id = Some(uuid::Uuid::from_u128(7));
         resume.company_name = Some("Acme".to_string());
 
         let output = resume_to_markdown(&full_resume(resume), true);

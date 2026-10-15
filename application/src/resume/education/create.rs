@@ -3,6 +3,7 @@ use domain::models::{
     Education, EducationKeyPoint, NewEducation, NewEducationKeyPoint, NewEducationKeyPointRequest,
     NewEducationRequest,
 };
+use uuid::Uuid;
 
 use crate::{
     error::ApplicationError,
@@ -12,7 +13,7 @@ use crate::{
 
 pub fn create_education(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     payload: NewEducationRequest,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<Education, ApplicationError> {
@@ -64,7 +65,7 @@ pub fn create_education(
 
 pub fn create_education_key_point(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     education_id_value: i32,
     payload: NewEducationKeyPointRequest,
     publisher: &dyn ResumeChangePublisher,

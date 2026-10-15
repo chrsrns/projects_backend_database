@@ -1,6 +1,8 @@
 use diesel::prelude::*;
 use infrastructure::establish_connection;
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction},
@@ -9,7 +11,7 @@ use crate::{
 
 pub fn delete_resume(
     user_id_value: i32,
-    resume_id: i32,
+    resume_id: Uuid,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<(), ApplicationError> {
     use domain::schema::resumes;

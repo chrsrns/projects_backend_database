@@ -3,7 +3,7 @@ use serde_json::Value;
 
 mod support;
 
-fn create_resume(fixture: &mut support::Fixture) -> i32 {
+fn create_resume(fixture: &mut support::Fixture) -> uuid::Uuid {
     let email = support::unique_email("portfolio_video.resume");
     let new_resume_json = serde_json::json!({
         "name": "Portfolio Video User",
@@ -12,7 +12,7 @@ fn create_resume(fixture: &mut support::Fixture) -> i32 {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -27,14 +27,14 @@ fn create_resume(fixture: &mut support::Fixture) -> i32 {
 
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
-    let resume_id = create_json["body"]["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
     resume_id
 }
 
 fn create_project(
     fixture: &mut support::Fixture,
-    resume_id: i32,
+    resume_id: uuid::Uuid,
     video_url: Option<&str>,
 ) -> (i32, Value) {
     let mut new_project_json = serde_json::json!({

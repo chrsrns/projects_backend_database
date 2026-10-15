@@ -16,7 +16,7 @@ fn test_create_and_read_video() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "video": video_url
     });
 
@@ -33,7 +33,7 @@ fn test_create_and_read_video() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     assert_eq!(created_resume["video"], video_url);
@@ -49,7 +49,7 @@ fn test_create_and_read_video() {
     let get_json: Value = serde_json::from_str(&get_body).expect("valid JSON");
     let retrieved_resume = &get_json["body"];
 
-    assert_eq!(retrieved_resume["id"], resume_id);
+    assert_eq!(retrieved_resume["id"], resume_id.to_string());
     assert_eq!(retrieved_resume["video"], video_url);
 }
 
@@ -65,7 +65,7 @@ fn test_update_video() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "video": "https://example.com/old.mp4"
     });
 
@@ -82,7 +82,7 @@ fn test_update_video() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     let updated_video = "https://example.com/new.mp4";
@@ -103,7 +103,7 @@ fn test_update_video() {
     let update_body = update_response.into_string().expect("update body");
     let update_json: Value = serde_json::from_str(&update_body).expect("valid JSON");
     let updated_resume = &update_json["body"];
-    assert_eq!(updated_resume["id"], resume_id);
+    assert_eq!(updated_resume["id"], resume_id.to_string());
     assert_eq!(updated_resume["video"], updated_video);
 
     let get_response = fixture
@@ -131,7 +131,7 @@ fn test_update_video_with_null_clears() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "video": "https://example.com/video.mp4"
     });
 
@@ -148,7 +148,7 @@ fn test_update_video_with_null_clears() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     let update_json = serde_json::json!({
@@ -191,7 +191,7 @@ fn test_update_video_with_empty_string_no_change() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "video": video_url
     });
 
@@ -208,7 +208,7 @@ fn test_update_video_with_empty_string_no_change() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     let update_json = serde_json::json!({
@@ -251,7 +251,7 @@ fn test_create_video_too_long() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "video": long_video
     });
 
@@ -278,7 +278,7 @@ fn test_create_video_blank_normalized() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "video": "   \t\n  "
     });
 
@@ -295,7 +295,7 @@ fn test_create_video_blank_normalized() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     assert!(created_resume["video"].is_null());

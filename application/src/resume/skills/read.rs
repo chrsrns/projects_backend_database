@@ -2,13 +2,15 @@ use diesel::prelude::*;
 use domain::models::Skill;
 use infrastructure::establish_connection;
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     resume::common::{app_err_from_diesel_err, find_accessible_resume},
 };
 
 pub fn list_skills(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<Vec<Skill>, ApplicationError> {
     use domain::schema::skills::dsl as skills_dsl;

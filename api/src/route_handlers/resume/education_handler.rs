@@ -8,6 +8,7 @@ use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
+use uuid::Uuid;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
@@ -18,7 +19,7 @@ use crate::realtime::Hub;
     path = "/resume/{resume_id}/education",
     tag = "Education",
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     responses(
         (status = 200, description = "OK", body = Response<Vec<Education>>, content_type = "application/json"),
@@ -29,7 +30,7 @@ use crate::realtime::Hub;
 )]
 #[get("/resume/<resume_id>/education")]
 pub fn list_educations_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<Education>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
@@ -43,7 +44,7 @@ pub fn list_educations_handler(
     tag = "Education",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     request_body(content = NewEducationRequest, content_type = "application/json"),
     responses(
@@ -61,7 +62,7 @@ pub fn list_educations_handler(
 pub fn create_education_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     payload: Json<NewEducationRequest>,
 ) -> CustomJsonResult<Education> {
     let item =
@@ -138,7 +139,7 @@ pub fn delete_education_handler(
     path = "/resume/{resume_id}/education/{education_id}/key_points",
     tag = "Education",
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("education_id" = i32, Path, description = "Education id")
     ),
     responses(
@@ -150,7 +151,7 @@ pub fn delete_education_handler(
 )]
 #[get("/resume/<resume_id>/education/<education_id>/key_points")]
 pub fn list_education_key_points_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     education_id: i32,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<EducationKeyPoint>> {
@@ -165,7 +166,7 @@ pub fn list_education_key_points_handler(
     tag = "Education",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("education_id" = i32, Path, description = "Education id")
     ),
     request_body(content = NewEducationKeyPointRequest, content_type = "application/json"),
@@ -184,7 +185,7 @@ pub fn list_education_key_points_handler(
 pub fn create_education_key_point_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     education_id: i32,
     payload: Json<NewEducationKeyPointRequest>,
 ) -> CustomJsonResult<EducationKeyPoint> {
