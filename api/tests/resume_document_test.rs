@@ -91,13 +91,13 @@ fn test_convert_valid_markdown_returns_document() {
         serde_json::from_str(&response.into_string().expect("convert body")).expect("valid json");
 
     let envelope = &json["body"];
-    assert_eq!(envelope["schema_version"], 1);
+    assert_eq!(envelope["schema_version"], 2);
     assert_eq!(envelope["generator"], "projects_backend_database");
 
     let document = &envelope["document"];
     assert_eq!(document["resume"]["id"], 0);
     assert_eq!(document["resume"]["name"], "Jane Doe");
-    assert_eq!(document["resume"]["is_public"], true);
+    assert_eq!(document["resume"]["visibility"], "public");
     assert_eq!(
         document["resume"]["executive_summary"],
         "Experienced backend developer."
@@ -375,7 +375,7 @@ fn test_handlers_take_only_markdown_argument() {
         Ok(json) => json.0.body,
         Err(_) => panic!("convert should succeed"),
     };
-    assert_eq!(envelope.schema_version, 1);
+    assert_eq!(envelope.schema_version, 2);
     assert_eq!(envelope.generator, "projects_backend_database");
     assert_eq!(envelope.document.resume.id, 0);
     assert_eq!(envelope.document.education[0].id, 1);
@@ -495,7 +495,7 @@ fn test_convert_front_matter_is_stripped() {
     assert_eq!(json, bare, "front-matter keys never reach ResumeDocument");
     let document = serde_json::to_string(&json["body"]["document"]).unwrap();
     assert!(!document.contains("Acme"));
-    assert_eq!(json["body"]["schema_version"], 1);
+    assert_eq!(json["body"]["schema_version"], 2);
 }
 
 #[test]
