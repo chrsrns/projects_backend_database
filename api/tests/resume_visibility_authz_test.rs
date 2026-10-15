@@ -1,4 +1,4 @@
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, Header, Status};
 use serde_json::Value;
 
 mod support;
@@ -346,4 +346,282 @@ fn test_child_active_filter_for_non_owners() {
     let anon_kps = anon_kps_json["body"].as_array().expect("anon kps array");
     assert_eq!(anon_kps.len(), 1);
     assert_eq!(anon_kps[0]["key_point"], "Active key point");
+}
+
+#[test]
+fn test_unlisted_readable_by_id_but_never_listed() {
+    let mut fixture = support::Fixture::new(9_226_001);
+
+    let owner = support::register_and_login(fixture.client(), "unlisted.owner");
+    fixture.track_user_id(owner.user_id);
+    fixture.track_session_id(owner.token.clone());
+    let other = support::register_and_login(fixture.client(), "unlisted.other");
+    fixture.track_user_id(other.user_id);
+    fixture.track_session_id(other.token.clone());
+
+    let create_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(support::auth_header(&owner.token))
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Unlisted Resume",
+                "email": support::unique_email("unlisted.resume"),
+                "visibility": "unlisted"
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(create_response.status(), Status::Created);
+    let create_json: Value =
+        serde_json::from_str(&create_response.into_string().unwrap()).unwrap();
+    let unlisted_id = support::resume_uuid(&create_json["body"]["id"]);
+    fixture.track_resume_id(unlisted_id);
+    assert_eq!(create_json["body"]["visibility"], "unlisted");
+
+    // By-id reads: anonymous, another user, and the owner all get 200.
+    for header in [
+        None,
+        Some(support::auth_header(&other.token)),
+        Some(support::auth_header(&owner.token)),
+    ] {
+        let mut req = fixture
+            .client()
+            .get(format!("/api/resume/{}", unlisted_id));
+        if let Some(h) = header {
+            req.add_header(h);
+        }
+        assert_eq!(req.dispatch().status(), Status::Ok, "by-id read");
+    }
+
+    // Listings: the unlisted resume is invisible to everyone but its owner.
+    let id_str = unlisted_id.to_string();
+    let visible_to = |header: Option<Header<'static>>| {
+        let mut req = fixture.client().get("/api/resumes");
+        if let Some(h) = header {
+            req.add_header(h);
+        }
+        let resp = req.dispatch();
+        assert_eq!(resp.status(), Status::Ok);
+        let json: Value = serde_json::from_str(&resp.into_string().unwrap()).unwrap();
+        json["body"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["id"].as_str() == Some(id_str.as_str()))
+    };
+    assert!(!visible_to(None), "anonymous list hides unlisted");
+    assert!(
+        !visible_to(Some(support::auth_header(&other.token))),
+        "non-owner list hides unlisted"
+    );
+    assert!(
+        visible_to(Some(support::auth_header(&owner.token))),
+        "owner list shows unlisted"
+    );
+
+    // Anonymous markdown export works: unlisted reads like public.
+    let export_response = fixture
+        .client()
+        .get(format!("/api/resume/{}/export/markdown", unlisted_id))
+        .dispatch();
+    assert_eq!(export_response.status(), Status::Ok);
+    let exported = export_response.into_string().expect("export body");
+    assert!(exported.contains("- Email:"), "export carries the resume body");
+
+    // Link possession grants no write access.
+    let update = fixture
+        .client()
+        .put(format!("/api/resume/{}", unlisted_id))
+        .header(support::auth_header(&other.token))
+        .header(ContentType::JSON)
+        .body(serde_json::json!({"location": "leak"}).to_string())
+        .dispatch();
+    assert_eq!(update.status(), Status::Forbidden);
+    let delete = fixture
+        .client()
+        .delete(format!("/api/resume/{}", unlisted_id))
+        .header(support::auth_header(&other.token))
+        .dispatch();
+    assert_eq!(delete.status(), Status::Forbidden);
+    let anon_update = fixture
+        .client()
+        .put(format!("/api/resume/{}", unlisted_id))
+        .header(ContentType::JSON)
+        .body(serde_json::json!({"location": "leak"}).to_string())
+        .dispatch();
+    assert_eq!(anon_update.status(), Status::Unauthorized);
+}
+
+#[test]
+fn test_visibility_wire_validation_and_defaults() {
+    let mut fixture = support::Fixture::new(9_226_002);
+
+    // Absent visibility defaults to private.
+    let response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Default Visibility",
+                "email": support::unique_email("default.vis")
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(response.status(), Status::Created);
+    let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let id = support::resume_uuid(&json["body"]["id"]);
+    fixture.track_resume_id(id);
+    assert_eq!(json["body"]["visibility"], "private");
+    let anon_get_status = fixture
+        .client()
+        .get(format!("/api/resume/{}", id))
+        .dispatch()
+        .status();
+    assert_eq!(anon_get_status, Status::NotFound, "default stays private");
+
+    // A bogus visibility value is rejected.
+    let bad_status = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Bad Visibility",
+                "email": support::unique_email("bad.vis"),
+                "visibility": "bogus"
+            })
+            .to_string(),
+        )
+        .dispatch()
+        .status();
+    assert!(
+        bad_status == Status::BadRequest || bad_status == Status::UnprocessableEntity,
+        "invalid visibility rejected, got {}",
+        bad_status
+    );
+
+    // Legacy boolean field is gone from the wire contract.
+    let legacy = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Legacy Field",
+                "email": support::unique_email("legacy.vis"),
+                "is_public": true
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(legacy.status(), Status::Created);
+    let legacy_json: Value =
+        serde_json::from_str(&legacy.into_string().unwrap()).unwrap();
+    let legacy_id = support::resume_uuid(&legacy_json["body"]["id"]);
+    fixture.track_resume_id(legacy_id);
+    assert_eq!(
+        legacy_json["body"]["visibility"], "private",
+        "legacy is_public ignored, default private"
+    );
+}
+
+#[test]
+fn test_malformed_uuid_path_param_returns_422() {
+    let fixture = support::Fixture::new(9_226_003);
+    for path in [
+        "/api/resume/not-a-uuid",
+        "/api/resume/12345",
+        "/api/resume/zzzzzzzz-0000-0000-0000-000000000000",
+    ] {
+        let response = fixture.client().get(path).dispatch();
+        assert_eq!(
+            response.status(),
+            Status::UnprocessableEntity,
+            "malformed uuid path {}",
+            path
+        );
+    }
+}
+
+#[test]
+fn test_unlisted_variant_on_private_base_reachable_by_id() {
+    let mut fixture = support::Fixture::new(9_226_004);
+
+    // Owner creates a private base, then an unlisted variant on it.
+    let base_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Private Base",
+                "email": support::unique_email("unlisted.variant.base"),
+                "visibility": "private"
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(base_response.status(), Status::Created);
+    let base_json: Value =
+        serde_json::from_str(&base_response.into_string().unwrap()).unwrap();
+    let base_id = support::resume_uuid(&base_json["body"]["id"]);
+    fixture.track_resume_id(base_id);
+
+    let variant_response = fixture
+        .client()
+        .post(format!("/api/resume/{}/variants", base_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "company_name": "Acme Corp",
+                "visibility": "unlisted"
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(variant_response.status(), Status::Created);
+    let variant_json: Value =
+        serde_json::from_str(&variant_response.into_string().unwrap()).unwrap();
+    let variant_id = support::resume_uuid(&variant_json["body"]["id"]);
+    fixture.track_resume_id(variant_id);
+
+    // Anonymous by-id read of the unlisted variant succeeds even though the
+    // base is private.
+    let anon_get = fixture
+        .client()
+        .get(format!("/api/resume/{}", variant_id))
+        .dispatch();
+    assert_eq!(anon_get.status(), Status::Ok, "unlisted variant reachable");
+    let view: Value = serde_json::from_str(&anon_get.into_string().unwrap()).unwrap();
+    assert_eq!(view["body"]["visibility"], "unlisted");
+    // Private base: linkage stays hidden regardless of tag visibility.
+    assert!(view["body"]["base_resume_id"].is_null());
+
+    // The variant never shows up in anonymous listings.
+    let list = fixture.client().get("/api/resumes").dispatch();
+    let list_json: Value = serde_json::from_str(&list.into_string().unwrap()).unwrap();
+    assert!(
+        !list_json["body"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["id"].as_str() == Some(variant_id.to_string().as_str())),
+        "unlisted variant absent from anon list"
+    );
+
+    // Anonymous variants listing on the private base stays 404.
+    let variants_list = fixture
+        .client()
+        .get(format!("/api/resume/{}/variants", base_id))
+        .dispatch();
+    assert_eq!(variants_list.status(), Status::NotFound);
 }

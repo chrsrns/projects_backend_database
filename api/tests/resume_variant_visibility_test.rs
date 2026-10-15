@@ -422,3 +422,53 @@ fn variants_of_an_inaccessible_variant_returns_404() {
     let (status, _) = get_variants(&fixture, private_variant_id, None);
     assert_eq!(status, Status::NotFound);
 }
+
+#[test]
+fn test_unlisted_base_variants_listing_rules() {
+    let mut fixture = support::Fixture::new(9_226_010);
+
+    let base_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Unlisted Base",
+                "email": support::unique_email("unlisted.base"),
+                "visibility": "unlisted"
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(base_response.status(), Status::Created);
+    let base_json: Value = serde_json::from_str(&base_response.into_string().unwrap()).unwrap();
+    let base_id = support::resume_uuid(&base_json["body"]["id"]);
+    fixture.track_resume_id(base_id);
+
+    // One public variant and one private variant on the unlisted base.
+    for (company, vis) in [("Acme Corp", "public"), ("Globex", "private")] {
+        let (status, json) = post_variant(
+            &fixture,
+            base_id,
+            serde_json::json!({ "company_name": company, "visibility": vis }),
+        );
+        assert_eq!(status, Status::Created, "{} variant create", company);
+        fixture.track_resume_id(support::resume_uuid(&json["body"]["id"]));
+    }
+
+    // Anonymous: by-id access reaches an unlisted base, so the variants
+    // listing answers 200 with public variants only.
+    let (status, items) = get_variants(&fixture, base_id, None);
+    assert_eq!(status, Status::Ok);
+    let items = items["body"].as_array().expect("variants array");
+    assert_eq!(items.len(), 1, "public variants only");
+    assert_eq!(items[0]["company_name"], "Acme Corp");
+    assert_eq!(items[0]["visibility"], "public");
+    // Linkage to the unlisted base is not revealed: a link-holder for the
+    // variant may not learn the base's capability UUID.
+    assert!(
+        items[0]["base_resume_id"].is_null(),
+        "unlisted base stays redacted"
+    );
+}

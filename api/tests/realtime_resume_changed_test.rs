@@ -260,3 +260,112 @@ fn test_ws_endpoint_subscribe_receives_resume_changed_event() {
         let _ = server.await;
     });
 }
+
+#[test]
+fn test_ws_subscribe_unlisted_resume_anonymous() {
+    let mut fixture = support::Fixture::new(9_226_020);
+
+    let create_response = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Realtime Unlisted",
+                "email": support::unique_email("realtime.unlisted"),
+                "visibility": "unlisted"
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(create_response.status(), Status::Created);
+    let create_json: Value =
+        serde_json::from_str(&create_response.into_string().unwrap()).unwrap();
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
+    fixture.track_resume_id(resume_id);
+
+    let port = 18_000 + (resume_id.as_u128() % 1_000) as u16;
+    let hub = fixture.hub.clone();
+    let (event_tx, event_rx) = mpsc::channel();
+
+    let runtime = rocket::tokio::runtime::Runtime::new().expect("tokio runtime");
+    let (shutdown, server) = runtime.block_on(async move {
+        let rocket =
+            api::build_rocket_with_hub(hub, shared::node_config::NodeConfig { port: 53421 })
+                .configure(
+                    rocket::Config::figment()
+                        .merge(("address", "127.0.0.1"))
+                        .merge(("port", port)),
+                );
+
+        let ignited = rocket.ignite().await.expect("ignite rocket");
+        let shutdown = ignited.shutdown();
+        let server = rocket::tokio::spawn(async move {
+            let _ = ignited.launch().await;
+        });
+
+        rocket::tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+
+        let ws_url = format!("ws://127.0.0.1:{}/api/ws", port);
+        let (mut socket, _) = tokio_tungstenite::connect_async(&ws_url)
+            .await
+            .expect("connect websocket");
+
+        // No token: the link itself is the capability for an unlisted resume.
+        let subscribe_message = serde_json::json!({
+            "type": "subscribe",
+            "resume_id": resume_id,
+            "token": null
+        });
+
+        socket
+            .send(Message::Text(subscribe_message.to_string().into()))
+            .await
+            .expect("send subscribe message");
+
+        rocket::tokio::spawn(async move {
+            let incoming =
+                rocket::tokio::time::timeout(std::time::Duration::from_secs(2), socket.next())
+                    .await
+                    .expect("websocket message timeout")
+                    .expect("websocket stream item")
+                    .expect("websocket text frame");
+
+            let payload = match incoming {
+                Message::Text(text) => text.to_string(),
+                other => panic!("unexpected websocket message: {other:?}"),
+            };
+
+            event_tx
+                .send(payload)
+                .expect("send websocket event to test thread");
+        });
+
+        (shutdown, server)
+    });
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    let update_response = fixture
+        .client()
+        .put(format!("/api/resume/{}", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(serde_json::json!({"location": "Updated"}).to_string())
+        .dispatch();
+    assert_eq!(update_response.status(), Status::Ok);
+
+    let payload = event_rx
+        .recv_timeout(std::time::Duration::from_secs(3))
+        .expect("receive websocket event");
+
+    let event_json: Value = serde_json::from_str(&payload).expect("valid event json");
+    assert_eq!(event_json["type"], "resume.changed");
+    assert_eq!(event_json["resume_id"], resume_id.to_string());
+
+    runtime.block_on(async move {
+        shutdown.notify();
+        let _ = server.await;
+    });
+}
