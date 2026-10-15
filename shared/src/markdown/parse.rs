@@ -41,6 +41,8 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
     let mut github_url: Option<String> = None;
     let mut mobile_number: Option<String> = None;
     let mut visibility = domain::models::Visibility::Private;
+    let mut visibility_from_bullet = false;
+    let mut visibility_from_legacy = false;
     let mut executive_summary: Option<String> = None;
     let mut video: Option<String> = None;
     let mut summary_text = String::new();
@@ -217,15 +219,32 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
                                         video = Some(value);
                                     }
                                 }
+                                // Canonical bullet: case-sensitive value set.
+                                "Visibility" => {
+                                    visibility = value
+                                        .parse::<domain::models::Visibility>()
+                                        .map_err(|_| {
+                                            MarkdownError::InvalidMarkdown(
+                                                "Visibility must be private, unlisted or public"
+                                                    .to_string(),
+                                            )
+                                        })?;
+                                    visibility_from_bullet = true;
+                                }
+                                // Legacy alias: case-insensitive boolean domain.
                                 "Public" => {
-                                    visibility = if value.eq_ignore_ascii_case("true")
-                                        || value.eq_ignore_ascii_case("yes")
-                                        || value == "1"
-                                    {
-                                        domain::models::Visibility::Public
-                                    } else {
-                                        domain::models::Visibility::Private
+                                    let lower = value.to_ascii_lowercase();
+                                    visibility = match lower.as_str() {
+                                        "true" | "yes" | "1" => domain::models::Visibility::Public,
+                                        "false" | "no" | "0" => domain::models::Visibility::Private,
+                                        _ => {
+                                            return Err(MarkdownError::InvalidMarkdown(format!(
+                                                "Public must be true, yes, 1, false, no or 0, got '{}'",
+                                                value
+                                            )));
+                                        }
                                     };
+                                    visibility_from_legacy = true;
                                 }
                                 _ => {}
                             }
@@ -402,6 +421,12 @@ fn markdown_body_to_resume(markdown: &str) -> Result<ParsedResume, MarkdownError
     let resume_name = resume_name.ok_or_else(|| {
         MarkdownError::InvalidMarkdown("Missing resume name (H1 heading)".to_string())
     })?;
+
+    if visibility_from_bullet && visibility_from_legacy {
+        return Err(MarkdownError::InvalidMarkdown(
+            "Both Visibility and Public bullets are present; keep one".to_string(),
+        ));
+    }
 
     let email = email.ok_or_else(|| {
         MarkdownError::InvalidMarkdown("Missing required field: Email".to_string())
@@ -1249,5 +1274,59 @@ mod tests {
         assert_eq!(parsed.portfolio_technologies.len(), 1);
         assert_eq!(parsed.portfolio_technologies[0].technology_name, "Rust");
         assert!(parsed.portfolio_technologies[0].active);
+    }
+    #[test]
+    fn test_visibility_bullet_parses_each_value() {
+        for (bullet, expected) in [
+            ("Visibility: private", domain::models::Visibility::Private),
+            ("Visibility: unlisted", domain::models::Visibility::Unlisted),
+            ("Visibility: public", domain::models::Visibility::Public),
+        ] {
+            let markdown = format!("# Resume\n\n- Email: t@example.com\n- {}\n", bullet);
+            let parsed = markdown_to_resume(&markdown).expect("parse ok");
+            assert_eq!(parsed.visibility, expected, "{}", bullet);
+        }
+    }
+
+    #[test]
+    fn test_visibility_bullet_rejects_bad_value_and_case() {
+        for bullet in ["Visibility: bogus", "Visibility: PUBLIC", "Visibility: "] {
+            let markdown = format!("# Resume\n\n- Email: t@example.com\n- {}\n", bullet);
+            assert!(
+                markdown_to_resume(&markdown).is_err(),
+                "rejected: {}",
+                bullet
+            );
+        }
+    }
+
+    #[test]
+    fn test_public_alias_matrix() {
+        for (value, expected) in [
+            ("true", domain::models::Visibility::Public),
+            ("YES", domain::models::Visibility::Public),
+            ("1", domain::models::Visibility::Public),
+            ("false", domain::models::Visibility::Private),
+            ("No", domain::models::Visibility::Private),
+            ("0", domain::models::Visibility::Private),
+        ] {
+            let markdown = format!("# Resume\n\n- Email: t@example.com\n- Public: {}\n", value);
+            let parsed = markdown_to_resume(&markdown).expect("parse ok");
+            assert_eq!(parsed.visibility, expected, "Public: {}", value);
+        }
+        for value in ["maybe", "unlisted", ""] {
+            let markdown = format!("# Resume\n\n- Email: t@example.com\n- Public: {}\n", value);
+            assert!(
+                markdown_to_resume(&markdown).is_err(),
+                "Public: {} rejected",
+                value
+            );
+        }
+    }
+
+    #[test]
+    fn test_visibility_and_public_both_present_is_error() {
+        let markdown = "# Resume\n\n- Email: t@example.com\n- Visibility: public\n- Public: true\n";
+        assert!(markdown_to_resume(markdown).is_err());
     }
 }
