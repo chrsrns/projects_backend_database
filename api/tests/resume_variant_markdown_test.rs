@@ -175,8 +175,8 @@ fn variant_metadata_in_front_matter_but_not_resume_document() {
     let converted: Value = serde_json::from_str(&convert.into_string().unwrap()).unwrap();
 
     assert_eq!(
-        converted["body"]["schema_version"], 1,
-        "the document contract version is unchanged"
+        converted["body"]["schema_version"], 2,
+        "the document contract version tracks the visibility rename"
     );
 
     let document = serde_json::to_string(&converted["body"]["document"]).unwrap();

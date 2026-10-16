@@ -58,7 +58,7 @@ Variant targeting metadata round-trips through a `---` front-matter block in the
 
 ### Markdown resume endpoints
 
-Markdown bodies are accepted as `text/markdown` up to 1 MiB (larger payloads get a `413`). Every export opens with a front-matter block whose `resume_id` marker routes a re-import back onto that row; `POST /api/resume/import/markdown` resolves marker, then email match, then create. Stripping the marker imports the content as a new resume. The explicit route `POST /api/resume/{id}/import/markdown` targets the URL id (owner only; a disagreeing marker answers `400`). On a variant target the `Email`/`Public` bullets are validated but ignored, and the front-matter metadata keys apply with absent = no change and empty/`null` = `NULL`.
+Markdown bodies are accepted as `text/markdown` up to 1 MiB (larger payloads get a `413`). Every export opens with a front-matter block whose `resume_id` marker routes a re-import back onto that row; `POST /api/resume/import/markdown` resolves marker, then email match, then create. Stripping the marker imports the content as a new resume. The explicit route `POST /api/resume/{id}/import/markdown` targets the URL id (owner only; a disagreeing marker answers `400`). On a variant target the `Email`/`Visibility` bullets are validated but ignored, and the front-matter metadata keys apply with absent = no change and empty/`null` = `NULL`.
 
 - **GET** `/api/resume/{id}/export/markdown` — export a resume as Markdown (public resumes are anonymous, private need owner auth)
 - **POST** `/api/resume/import/markdown` — import Markdown into a resume (Bearer auth)
