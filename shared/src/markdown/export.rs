@@ -80,7 +80,7 @@ pub fn resume_to_markdown(resume: &FullResume, viewer_is_owner: bool) -> String 
     if let Some(video) = &resume.resume.video {
         writeln!(output, "- Video: {}", video).unwrap();
     }
-    writeln!(output, "- Public: {}", resume.resume.visibility == "public").unwrap();
+    writeln!(output, "- Visibility: {}", resume.resume.visibility).unwrap();
     writeln!(output).unwrap();
 
     if let Some(summary) = &resume.resume.executive_summary {
@@ -345,5 +345,31 @@ mod tests {
     fn test_export_emits_no_active_marker_on_active_rows() {
         let output = resume_to_markdown(&active_fixture(true), true);
         assert!(!output.contains("[active:"), "{}", output);
+    }
+
+    #[test]
+    fn test_export_emits_visibility_bullet() {
+        for value in ["private", "unlisted", "public"] {
+            let mut row = resume_row();
+            row.visibility = value.to_string();
+            let output = resume_to_markdown(&full_resume(row), true);
+            assert!(output.contains(&format!("- Visibility: {}", value)), "{}", output);
+            assert!(!output.contains("- Public:"), "{}", output);
+        }
+    }
+
+    #[test]
+    fn test_export_visibility_round_trip() {
+        for (value, expected) in [
+            ("private", domain::models::Visibility::Private),
+            ("unlisted", domain::models::Visibility::Unlisted),
+            ("public", domain::models::Visibility::Public),
+        ] {
+            let mut row = resume_row();
+            row.visibility = value.to_string();
+            let output = resume_to_markdown(&full_resume(row), true);
+            let parsed = crate::markdown::parse_resume_markdown(&output).expect("parse ok");
+            assert_eq!(parsed.resume.visibility, expected, "{}", value);
+        }
     }
 }
