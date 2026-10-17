@@ -28,8 +28,8 @@ fn create_resume(fixture: &support::Fixture, name: &str, visibility: &str) -> Uu
 
     assert_eq!(response.status(), Status::Created, "create resume");
 
-    let body: Value = serde_json::from_str(&response.into_string().expect("create body"))
-        .expect("valid json");
+    let body: Value =
+        serde_json::from_str(&response.into_string().expect("create body")).expect("valid json");
     support::resume_uuid(&body["body"]["id"])
 }
 
@@ -227,12 +227,14 @@ fn timeline_lists_summaries_newest_first() {
     assert_eq!(revisions, vec![3, 2, 1]);
 
     let entry = &body["body"][0];
-    for field in ["revision", "created_at", "created_by", "action", "is_restore"] {
-        assert!(
-            entry.get(field).is_some(),
-            "a summary carries {}",
-            field
-        );
+    for field in [
+        "revision",
+        "created_at",
+        "created_by",
+        "action",
+        "is_restore",
+    ] {
+        assert!(entry.get(field).is_some(), "a summary carries {}", field);
     }
     assert!(
         entry.get("snapshot").is_none(),

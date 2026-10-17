@@ -353,7 +353,11 @@ mod tests {
             let mut row = resume_row();
             row.visibility = value.to_string();
             let output = resume_to_markdown(&full_resume(row), true);
-            assert!(output.contains(&format!("- Visibility: {}", value)), "{}", output);
+            assert!(
+                output.contains(&format!("- Visibility: {}", value)),
+                "{}",
+                output
+            );
             assert!(!output.contains("- Public:"), "{}", output);
         }
     }

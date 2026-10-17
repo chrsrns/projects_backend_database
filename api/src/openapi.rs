@@ -6,12 +6,11 @@ use domain::models::{
     NewLanguageRequest, NewPortfolioKeyPointRequest, NewPortfolioProjectRequest,
     NewPortfolioTechnologyRequest, NewResumeRequest, NewSkillRequest, NewVariantRequest,
     NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, PartialDate, PortfolioKeyPoint,
-    PortfolioProject, PortfolioTechnology, ResumeRevision, ResumeRevisionDiff,
-    ResumeRevisionSummary, ResumeSnapshot, ResumeView, RestoreRequest, RevisionChange,
-    RevisionChangeKind, Skill, UpdateEducationKeyPoint,
-    UpdateEducationRequest, UpdateFramework, UpdateLanguage, UpdatePortfolioKeyPoint,
-    UpdatePortfolioProject, UpdatePortfolioTechnology, UpdateResume, UpdateSkill,
-    UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest, User, WorkExperience,
+    PortfolioProject, PortfolioTechnology, RestoreRequest, ResumeRevision, ResumeRevisionDiff,
+    ResumeRevisionSummary, ResumeSnapshot, ResumeView, RevisionChange, RevisionChangeKind, Skill,
+    UpdateEducationKeyPoint, UpdateEducationRequest, UpdateFramework, UpdateLanguage,
+    UpdatePortfolioKeyPoint, UpdatePortfolioProject, UpdatePortfolioTechnology, UpdateResume,
+    UpdateSkill, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest, User, WorkExperience,
     WorkExperienceKeyPoint,
 };
 use shared::response_models::{AuthTokenResponse, Response};

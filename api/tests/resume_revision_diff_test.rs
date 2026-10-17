@@ -68,7 +68,12 @@ fn head_revision(fixture: &support::Fixture, resume_id: Uuid) -> i64 {
         .expect("the resume has a revision")
 }
 
-fn restore(fixture: &support::Fixture, resume_id: Uuid, revision: i64, expected: i64) -> (Status, Value) {
+fn restore(
+    fixture: &support::Fixture,
+    resume_id: Uuid,
+    revision: i64,
+    expected: i64,
+) -> (Status, Value) {
     let response = fixture
         .client()
         .post(format!(
@@ -113,7 +118,10 @@ fn add_education_with_key_point(fixture: &support::Fixture, resume_id: Uuid) {
         ))
         .header(fixture.auth_header())
         .header(ContentType::JSON)
-        .body(serde_json::json!({ "key_point": "Graduated with honors", "display_order": 1 }).to_string())
+        .body(
+            serde_json::json!({ "key_point": "Graduated with honors", "display_order": 1 })
+                .to_string(),
+        )
         .dispatch();
     assert_eq!(key_point.status(), Status::Created);
 }
@@ -373,14 +381,13 @@ fn restore_racing_an_edit_keeps_the_chain_dense() {
         application::resume::update::update_resume(user_id, resume_id, dto, &NullPublisher).is_ok()
     });
 
-    let restore_outcome =
-        application::resume::revision::restore::restore_revision(
-            user_id,
-            resume_id,
-            head,
-            head,
-            &NullPublisher,
-        );
+    let restore_outcome = application::resume::revision::restore::restore_revision(
+        user_id,
+        resume_id,
+        head,
+        head,
+        &NullPublisher,
+    );
 
     let edit_succeeded = edit.join().expect("thread joins");
 
@@ -398,7 +405,8 @@ fn restore_racing_an_edit_keeps_the_chain_dense() {
 
     let expected_len = head as i64 + edit_succeeded as i64 + restore_outcome.is_ok() as i64;
     assert_eq!(
-        numbers.len() as i64, expected_len,
+        numbers.len() as i64,
+        expected_len,
         "every successful write is recorded exactly once: {:?}",
         numbers
     );

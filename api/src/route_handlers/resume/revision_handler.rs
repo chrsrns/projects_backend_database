@@ -1,6 +1,6 @@
 use application::resume::revision::{read, restore};
 use domain::models::{
-    ResumeRevision, ResumeRevisionDiff, ResumeRevisionSummary, ResumeView, RestoreRequest,
+    RestoreRequest, ResumeRevision, ResumeRevisionDiff, ResumeRevisionSummary, ResumeView,
 };
 use rocket::State;
 use rocket::http::Status;

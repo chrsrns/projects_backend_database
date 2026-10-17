@@ -170,12 +170,12 @@ fn apply_snapshot(
     // its child ids are the ids the rows carried when it was captured, not
     // identities that survive the restore.
     diesel::delete(skills::table.filter(skills::dsl::resume_id.eq(resume_id))).execute(conn)?;
-    diesel::delete(languages::table.filter(languages::dsl::resume_id.eq(resume_id))).execute(conn)?;
-    diesel::delete(education::table.filter(education::dsl::resume_id.eq(resume_id))).execute(conn)?;
-    diesel::delete(
-        work_experiences::table.filter(work_experiences::dsl::resume_id.eq(resume_id)),
-    )
-    .execute(conn)?;
+    diesel::delete(languages::table.filter(languages::dsl::resume_id.eq(resume_id)))
+        .execute(conn)?;
+    diesel::delete(education::table.filter(education::dsl::resume_id.eq(resume_id)))
+        .execute(conn)?;
+    diesel::delete(work_experiences::table.filter(work_experiences::dsl::resume_id.eq(resume_id)))
+        .execute(conn)?;
     diesel::delete(
         portfolio_projects::table.filter(portfolio_projects::dsl::resume_id.eq(resume_id)),
     )

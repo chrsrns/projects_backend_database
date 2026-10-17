@@ -64,7 +64,8 @@ pub fn revision_diff(
     let row = load_revision_row(resume_id, revision, user_id)?;
     let before = read_snapshot(&row)?;
 
-    let head = head_revision(&mut establish_connection(), resume_id).map_err(app_err_from_diesel_err)?;
+    let head =
+        head_revision(&mut establish_connection(), resume_id).map_err(app_err_from_diesel_err)?;
     let after = if revision < head {
         let next = load_revision_row(resume_id, revision + 1, user_id)?;
         read_snapshot(&next)?
@@ -72,7 +73,9 @@ pub fn revision_diff(
         let mut conn = establish_connection();
         let full = load_full_resume(&mut conn, resume_id)
             .map_err(app_err_from_diesel_err)?
-            .ok_or_else(|| ApplicationError::NotFound(format!("Resume with id {resume_id} not found")))?;
+            .ok_or_else(|| {
+                ApplicationError::NotFound(format!("Resume with id {resume_id} not found"))
+            })?;
         snapshot_from_full_resume(&full)
     };
 

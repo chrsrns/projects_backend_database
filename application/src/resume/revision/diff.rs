@@ -152,7 +152,12 @@ fn diff_child_map<P, C: Serialize>(
     }
 }
 
-fn compare_education(builder: &mut DiffBuilder, path: &str, before: &SnapshotEducation, after: &SnapshotEducation) {
+fn compare_education(
+    builder: &mut DiffBuilder,
+    path: &str,
+    before: &SnapshotEducation,
+    after: &SnapshotEducation,
+) {
     compare_fields!(
         builder,
         path,
@@ -186,7 +191,12 @@ fn compare_education_key_point(
     );
 }
 
-fn compare_skill(builder: &mut DiffBuilder, path: &str, before: &SnapshotSkill, after: &SnapshotSkill) {
+fn compare_skill(
+    builder: &mut DiffBuilder,
+    path: &str,
+    before: &SnapshotSkill,
+    after: &SnapshotSkill,
+) {
     compare_fields!(
         builder,
         path,
@@ -513,8 +523,14 @@ mod tests {
 
         let location = find(&changes, "/location").expect("a change for /location");
         assert_eq!(location.kind, RevisionChangeKind::Changed);
-        assert_eq!(location.before.as_ref().and_then(Value::as_str), Some("Here"));
-        assert_eq!(location.after.as_ref().and_then(Value::as_str), Some("There"));
+        assert_eq!(
+            location.before.as_ref().and_then(Value::as_str),
+            Some("Here")
+        );
+        assert_eq!(
+            location.after.as_ref().and_then(Value::as_str),
+            Some("There")
+        );
 
         let added = find(&changes, "/education/0").expect("an addition for the entry");
         assert_eq!(added.kind, RevisionChangeKind::Added);
