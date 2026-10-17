@@ -108,27 +108,34 @@ fn diff_list<T: Serialize>(
 /// Entries are matched by the parent's position, not by the key: after a
 /// restore every child carries a fresh id, so keying on it would report the
 /// whole collection as removed and re-added even when nothing changed.
+/// One side of a child-collection comparison: the parent collection and the
+/// children keyed by their parent's id.
+struct Side<'a, P, C> {
+    parents: &'a [P],
+    children: &'a BTreeMap<i32, Vec<C>>,
+}
+
 fn diff_child_map<P, C: Serialize>(
     builder: &mut DiffBuilder,
     collection: &str,
-    parents_before: &[P],
-    parents_after: &[P],
+    before: Side<'_, P, C>,
+    after: Side<'_, P, C>,
     parent_id: impl Fn(&P) -> i32,
-    before: &BTreeMap<i32, Vec<C>>,
-    after: &BTreeMap<i32, Vec<C>>,
     compare: impl Fn(&mut DiffBuilder, &str, &C, &C),
 ) {
     let empty: Vec<C> = Vec::new();
-    let positions = parents_before.len().max(parents_after.len());
+    let positions = before.parents.len().max(after.parents.len());
 
     for position in 0..positions {
-        let children_before = parents_before
+        let children_before = before
+            .parents
             .get(position)
-            .and_then(|parent| before.get(&parent_id(parent)))
+            .and_then(|parent| before.children.get(&parent_id(parent)))
             .unwrap_or(&empty);
-        let children_after = parents_after
+        let children_after = after
+            .parents
             .get(position)
-            .and_then(|parent| after.get(&parent_id(parent)))
+            .and_then(|parent| after.children.get(&parent_id(parent)))
             .unwrap_or(&empty);
 
         let paired = children_before.len().min(children_after.len());
@@ -358,11 +365,15 @@ pub fn structural_diff(before: &ResumeSnapshot, after: &ResumeSnapshot) -> Vec<R
     diff_child_map(
         &mut builder,
         "/education_key_points",
-        &before.education,
-        &after.education,
+        Side {
+            parents: &before.education,
+            children: &before.education_key_points,
+        },
+        Side {
+            parents: &after.education,
+            children: &after.education_key_points,
+        },
         |parent| parent.id,
-        &before.education_key_points,
-        &after.education_key_points,
         compare_education_key_point,
     );
     diff_list(
@@ -382,11 +393,15 @@ pub fn structural_diff(before: &ResumeSnapshot, after: &ResumeSnapshot) -> Vec<R
     diff_child_map(
         &mut builder,
         "/work_experience_key_points",
-        &before.work_experiences,
-        &after.work_experiences,
+        Side {
+            parents: &before.work_experiences,
+            children: &before.work_experience_key_points,
+        },
+        Side {
+            parents: &after.work_experiences,
+            children: &after.work_experience_key_points,
+        },
         |parent| parent.id,
-        &before.work_experience_key_points,
-        &after.work_experience_key_points,
         compare_work_experience_key_point,
     );
     diff_list(
@@ -399,21 +414,29 @@ pub fn structural_diff(before: &ResumeSnapshot, after: &ResumeSnapshot) -> Vec<R
     diff_child_map(
         &mut builder,
         "/portfolio_key_points",
-        &before.portfolio_projects,
-        &after.portfolio_projects,
+        Side {
+            parents: &before.portfolio_projects,
+            children: &before.portfolio_key_points,
+        },
+        Side {
+            parents: &after.portfolio_projects,
+            children: &after.portfolio_key_points,
+        },
         |parent| parent.id,
-        &before.portfolio_key_points,
-        &after.portfolio_key_points,
         compare_portfolio_key_point,
     );
     diff_child_map(
         &mut builder,
         "/portfolio_technologies",
-        &before.portfolio_projects,
-        &after.portfolio_projects,
+        Side {
+            parents: &before.portfolio_projects,
+            children: &before.portfolio_technologies,
+        },
+        Side {
+            parents: &after.portfolio_projects,
+            children: &after.portfolio_technologies,
+        },
         |parent| parent.id,
-        &before.portfolio_technologies,
-        &after.portfolio_technologies,
         compare_portfolio_technology,
     );
     diff_list(
@@ -426,11 +449,15 @@ pub fn structural_diff(before: &ResumeSnapshot, after: &ResumeSnapshot) -> Vec<R
     diff_child_map(
         &mut builder,
         "/frameworks",
-        &before.languages,
-        &after.languages,
+        Side {
+            parents: &before.languages,
+            children: &before.frameworks,
+        },
+        Side {
+            parents: &after.languages,
+            children: &after.frameworks,
+        },
         |parent| parent.id,
-        &before.frameworks,
-        &after.frameworks,
         compare_framework,
     );
 

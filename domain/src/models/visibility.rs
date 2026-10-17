@@ -8,9 +8,10 @@ use utoipa::{PartialSchema, ToSchema};
 /// Resume visibility. `private`: owner only. `unlisted`: readable by anyone
 /// holding the UUID, absent from every non-owner listing. `public`: readable
 /// and listed for everyone.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde", rename_all = "lowercase")]
 pub enum Visibility {
+    #[default]
     Private,
     Unlisted,
     Public,
@@ -28,12 +29,6 @@ impl Visibility {
     /// True when the row is reachable by id for a viewer who is not the owner.
     pub fn is_link_accessible(self) -> bool {
         matches!(self, Visibility::Unlisted | Visibility::Public)
-    }
-}
-
-impl Default for Visibility {
-    fn default() -> Self {
-        Visibility::Private
     }
 }
 
