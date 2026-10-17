@@ -2,13 +2,15 @@ use diesel::prelude::*;
 use domain::models::{Framework, Language};
 use infrastructure::establish_connection;
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     resume::common::{app_err_from_diesel_err, find_accessible_resume, first_or_404},
 };
 
 pub fn list_frameworks(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     language_id_value: i32,
     user_id_value: Option<i32>,
 ) -> Result<Vec<Framework>, ApplicationError> {

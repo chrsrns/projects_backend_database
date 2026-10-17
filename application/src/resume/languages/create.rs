@@ -1,6 +1,8 @@
 use diesel::prelude::*;
 use domain::models::{Language, NewLanguage, NewLanguageRequest};
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
@@ -9,7 +11,7 @@ use crate::{
 
 pub fn create_language(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     payload: NewLanguageRequest,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<Language, ApplicationError> {

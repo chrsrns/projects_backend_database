@@ -9,6 +9,7 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::Hub;
+use uuid::Uuid;
 
 #[utoipa::path(
     get,
@@ -30,7 +31,7 @@ pub fn list_resumes_handler(maybe_auth: MaybeAuthSession) -> JsonResult<Vec<Resu
     path = "/resume/{resume_id}",
     tag = "Resumes",
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     responses(
         (status = 200, description = "OK", body = Response<ResumeView>, content_type = "application/json"),
@@ -39,7 +40,10 @@ pub fn list_resumes_handler(maybe_auth: MaybeAuthSession) -> JsonResult<Vec<Resu
     )
 )]
 #[get("/resume/<resume_id>")]
-pub fn list_resume_handler(resume_id: i32, maybe_auth: MaybeAuthSession) -> JsonResult<ResumeView> {
+pub fn list_resume_handler(
+    resume_id: Uuid,
+    maybe_auth: MaybeAuthSession,
+) -> JsonResult<ResumeView> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     let resume = read::list_resume(resume_id, user_id_value)?;
     Ok(Json(Response { body: resume }))
@@ -76,7 +80,7 @@ pub fn create_resume_handler(
     tag = "Resumes",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     request_body(content = UpdateResume, content_type = "application/json"),
     responses(
@@ -90,7 +94,7 @@ pub fn create_resume_handler(
 pub fn update_resume_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     resume: Json<UpdateResume>,
 ) -> JsonResult<ResumeView> {
     let updated = update::update_resume(auth.user_id, resume_id, resume.into_inner(), hub.inner())?;
@@ -103,7 +107,7 @@ pub fn update_resume_handler(
     tag = "Resumes",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     responses(
         (status = 204, description = "No Content"),
@@ -116,7 +120,7 @@ pub fn update_resume_handler(
 pub fn delete_resume_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
 ) -> NoContentResult {
     delete::delete_resume(auth.user_id, resume_id, hub.inner())?;
     Ok(NoContent)

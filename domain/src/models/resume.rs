@@ -6,11 +6,12 @@ use rocket::serde::json::Value as JsonValue;
 use rocket::serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use super::{
     Education, EducationKeyPoint, Framework, Language, PartialDate, PortfolioKeyPoint,
-    PortfolioProject, PortfolioTechnology, Skill, WorkExperience, WorkExperienceKeyPoint,
-    deserialize_optional_nullable_string,
+    PortfolioProject, PortfolioTechnology, Skill, Visibility, WorkExperience,
+    WorkExperienceKeyPoint, deserialize_optional_nullable_string,
 };
 
 fn deserialize_optional_nullable_target_date<'de, D>(
@@ -35,7 +36,6 @@ where
 
 #[derive(Queryable, Serialize, ToSchema, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Resume {
-    pub id: i32,
     pub name: String,
     pub profile_image_url: Option<String>,
     pub location: Option<String>,
@@ -45,11 +45,9 @@ pub struct Resume {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub created_by: Option<i32>,
-    pub is_public: bool,
     pub executive_summary: Option<String>,
     #[schema(max_length = 500)]
     pub video: Option<String>,
-    pub base_resume_id: Option<i32>,
     pub company_name: Option<String>,
     pub role_title: Option<String>,
     #[schema(value_type = Option<PartialDate>)]
@@ -59,12 +57,17 @@ pub struct Resume {
     pub job_description: Option<String>,
     pub variant_label: Option<String>,
     pub show_variant_tag: bool,
+    #[schema(value_type = Visibility)]
+    pub visibility: String,
+    pub id: Uuid,
+    pub base_resume_id: Option<Uuid>,
 }
 
 #[derive(Insertable, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = resumes)]
 pub struct NewResume {
+    pub id: Uuid,
     pub name: String,
     pub profile_image_url: Option<String>,
     pub location: Option<String>,
@@ -73,10 +76,11 @@ pub struct NewResume {
     pub mobile_number: Option<String>,
     pub executive_summary: Option<String>,
     pub created_by: Option<i32>,
-    pub is_public: bool,
+    #[schema(value_type = Visibility)]
+    pub visibility: String,
     #[schema(max_length = 500)]
     pub video: Option<String>,
-    pub base_resume_id: Option<i32>,
+    pub base_resume_id: Option<Uuid>,
     pub company_name: Option<String>,
     pub role_title: Option<String>,
     pub target_date: Option<NaiveDate>,
@@ -96,7 +100,7 @@ pub struct NewResumeRequest {
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
     pub executive_summary: Option<String>,
-    pub is_public: Option<bool>,
+    pub visibility: Option<Visibility>,
     #[schema(max_length = 500)]
     pub video: Option<String>,
 }
@@ -115,7 +119,7 @@ pub struct UpdateResume {
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     #[schema(value_type = Option<String>, max_length = 500)]
     pub video: Option<Option<String>>,
-    pub is_public: Option<bool>,
+    pub visibility: Option<Visibility>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     #[schema(value_type = Option<String>, max_length = 255)]
     pub company_name: Option<Option<String>>,
@@ -150,7 +154,7 @@ impl UpdateResume {
             && self.mobile_number.is_none()
             && self.executive_summary.is_none()
             && self.video.is_none()
-            && self.is_public.is_none()
+            && self.visibility.is_none()
             && self.company_name.is_none()
             && self.role_title.is_none()
             && self.variant_label.is_none()
@@ -171,7 +175,7 @@ pub struct UpdateResumeChangeset {
     pub mobile_number: Option<String>,
     pub executive_summary: Option<Option<String>>,
     pub video: Option<Option<String>>,
-    pub is_public: Option<bool>,
+    pub visibility: Option<String>,
     pub company_name: Option<Option<String>>,
     pub role_title: Option<Option<String>>,
     pub variant_label: Option<Option<String>>,
@@ -193,7 +197,7 @@ pub struct NewVariantRequest {
     pub job_description: Option<String>,
     #[schema(max_length = 255)]
     pub variant_label: Option<String>,
-    pub is_public: Option<bool>,
+    pub visibility: Option<Visibility>,
     pub show_variant_tag: Option<bool>,
 }
 

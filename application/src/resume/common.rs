@@ -2,19 +2,24 @@ use chrono::NaiveDate;
 use diesel::prelude::{BoolExpressionMethods, ExpressionMethods, QueryDsl};
 use diesel::query_dsl::LoadQuery;
 use diesel::query_dsl::methods::LimitDsl;
-use domain::models::{PartialDate, Resume};
+use domain::models::{PartialDate, Resume, Visibility};
 use infrastructure::{DbConnection, establish_connection};
 
 use crate::error::ApplicationError;
 use crate::realtime::{ResumeChangePublisher, ResumeChangedAction};
+use uuid::Uuid;
 
-fn entity_not_found(entity: &str, id: i32) -> ApplicationError {
+fn entity_not_found(entity: &str, id: impl std::fmt::Display) -> ApplicationError {
     ApplicationError::NotFound(format!("{entity} with id {id} not found"))
 }
 
 /// Runs `query.first` on a freshly checked-out pooled connection and maps a
 /// miss to a uniform "{entity} with id {id} not found" 404 body.
-pub fn first_or_404<'q, Q, T>(entity: &str, id: i32, query: Q) -> Result<T, ApplicationError>
+pub fn first_or_404<'q, Q, T>(
+    entity: &str,
+    id: impl std::fmt::Display,
+    query: Q,
+) -> Result<T, ApplicationError>
 where
     Q: LimitDsl + diesel::RunQueryDsl<DbConnection>,
     <Q as LimitDsl>::Output: LoadQuery<'q, DbConnection, T>,
@@ -29,7 +34,7 @@ where
 
 /// Loads the resume by id (404 when absent) then requires `user_id` to own
 /// it (403 when foreign), in that order.
-pub fn require_owned_resume(user_id: i32, resume_id: i32) -> Result<Resume, ApplicationError> {
+pub fn require_owned_resume(user_id: i32, resume_id: Uuid) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes;
 
     let resume = first_or_404("Resume", resume_id, resumes::table.find(resume_id))?;
@@ -43,8 +48,8 @@ pub fn require_owned_resume(user_id: i32, resume_id: i32) -> Result<Resume, Appl
 /// `app_err_from_diesel_err`.
 pub fn run_published<T>(
     entity: &str,
-    id: i32,
-    resume_id: i32,
+    id: impl std::fmt::Display,
+    resume_id: Uuid,
     action: ResumeChangedAction,
     publisher: &dyn ResumeChangePublisher,
     op: impl FnOnce(&mut DbConnection) -> diesel::result::QueryResult<T>,
@@ -64,8 +69,8 @@ pub fn run_published<T>(
 /// `resume_changed` with `action` for `resume_id`.
 pub fn run_published_delete(
     entity: &str,
-    id: i32,
-    resume_id: i32,
+    id: impl std::fmt::Display,
+    resume_id: Uuid,
     action: ResumeChangedAction,
     publisher: &dyn ResumeChangePublisher,
     op: impl FnOnce(&mut DbConnection) -> diesel::result::QueryResult<usize>,
@@ -81,14 +86,14 @@ pub fn run_published_delete(
     }
 }
 
-pub fn find_resume(resume_id: i32) -> Result<Resume, ApplicationError> {
+pub fn find_resume(resume_id: Uuid) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes;
 
     first_or_404("Resume", resume_id, resumes::table.find(resume_id))
 }
 
 pub fn find_accessible_resume(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<Resume, ApplicationError> {
     use domain::schema::resumes::dsl as resumes_dsl;
@@ -97,11 +102,11 @@ pub fn find_accessible_resume(
     resume_query = resume_query.filter(resumes_dsl::id.eq(resume_id_value));
     resume_query = match user_id_value {
         Some(uid) => resume_query.filter(
-            resumes_dsl::is_public
-                .eq(true)
+            resumes_dsl::visibility
+                .ne(Visibility::Private.as_str())
                 .or(resumes_dsl::created_by.eq(uid)),
         ),
-        None => resume_query.filter(resumes_dsl::is_public.eq(true)),
+        None => resume_query.filter(resumes_dsl::visibility.ne(Visibility::Private.as_str())),
     };
 
     first_or_404("Resume", resume_id_value, resume_query)
@@ -236,7 +241,7 @@ mod tests {
 
     fn resume_with_owner(owner: Option<i32>) -> Resume {
         Resume {
-            id: 1,
+            id: Uuid::nil(),
             name: "n".to_string(),
             profile_image_url: None,
             location: None,
@@ -246,7 +251,7 @@ mod tests {
             created_at: Utc::now().naive_utc(),
             updated_at: Utc::now().naive_utc(),
             created_by: owner,
-            is_public: false,
+            visibility: "private".to_string(),
             executive_summary: None,
             video: None,
             base_resume_id: None,

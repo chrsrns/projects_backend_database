@@ -3,6 +3,7 @@ use domain::models::{
     NewWorkExperience, NewWorkExperienceKeyPoint, NewWorkExperienceKeyPointRequest,
     NewWorkExperienceRequest, WorkExperience, WorkExperienceKeyPoint,
 };
+use uuid::Uuid;
 
 use crate::{
     error::ApplicationError,
@@ -23,7 +24,7 @@ fn normalize_optional_text(value: Option<String>) -> Option<String> {
 
 pub fn create_work_experience(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     payload: NewWorkExperienceRequest,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<WorkExperience, ApplicationError> {
@@ -75,7 +76,7 @@ pub fn create_work_experience(
 
 pub fn create_work_experience_key_point(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     work_id_value: i32,
     payload: NewWorkExperienceKeyPointRequest,
     publisher: &dyn ResumeChangePublisher,

@@ -1,4 +1,5 @@
 use std::io::Cursor;
+use uuid::Uuid;
 
 use application::resume::{markdown_export, markdown_import};
 use domain::models::ResumeView;
@@ -63,7 +64,7 @@ impl<'r> Responder<'r, 'static> for MarkdownResponse {
     path = "/resume/{resume_id}/export/markdown",
     tag = "Resumes",
     params(
-        ("resume_id" = i32, Path, description = "Resume ID")
+        ("resume_id" = Uuid, Path, description = "Resume ID")
     ),
     responses(
         (status = 200, description = "Markdown representation", body = String, content_type = "text/markdown"),
@@ -73,7 +74,7 @@ impl<'r> Responder<'r, 'static> for MarkdownResponse {
     )
 )]
 #[get("/resume/<resume_id>/export/markdown")]
-pub fn export_resume_markdown(resume_id: i32, maybe_auth: MaybeAuthSession) -> MarkdownResult {
+pub fn export_resume_markdown(resume_id: Uuid, maybe_auth: MaybeAuthSession) -> MarkdownResult {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
     let markdown = markdown_export::export_resume_markdown(resume_id, user_id_value)?;
     Ok(MarkdownResponse(markdown))
@@ -119,7 +120,7 @@ pub fn import_resume_markdown(
     tag = "Resumes",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume ID to import into")
+        ("resume_id" = Uuid, Path, description = "Resume ID to import into")
     ),
     request_body = String,
     responses(
@@ -140,7 +141,7 @@ pub fn import_resume_markdown_into(
     auth: AuthSession,
     markdown: LimitedMarkdown,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
 ) -> CustomJsonResult<ResumeView> {
     let (resume, _) = markdown_import::import_resume_markdown(
         &markdown.0,

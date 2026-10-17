@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 use domain::models::{Resume, ResumeView, UpdateResume, UpdateResumeChangeset};
 use domain::schema::resumes;
+use uuid::Uuid;
 
 use crate::error::ApplicationError;
 use crate::realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType};
@@ -11,7 +12,7 @@ use crate::resume::common::{
 
 pub fn update_resume(
     user_id_value: i32,
-    resume_id: i32,
+    resume_id: Uuid,
     mut resume: UpdateResume,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
@@ -69,7 +70,7 @@ pub fn update_resume(
         mobile_number: resume.mobile_number,
         executive_summary: resume.executive_summary,
         video: resume.video,
-        is_public: resume.is_public,
+        visibility: resume.visibility.map(|v| v.as_str().to_string()),
         company_name: resume.company_name,
         role_title: resume.role_title,
         variant_label: resume.variant_label,

@@ -19,7 +19,7 @@ fn unique_suffix() -> u128 {
         .as_nanos()
 }
 
-fn create_base(fixture: &mut support::Fixture, email: &str) -> i32 {
+fn create_base(fixture: &mut support::Fixture, email: &str) -> uuid::Uuid {
     let response = fixture
         .client()
         .post("/api/new_resume")
@@ -29,7 +29,7 @@ fn create_base(fixture: &mut support::Fixture, email: &str) -> i32 {
             serde_json::json!({
                 "name": "Integrity Base",
                 "email": email,
-                "is_public": true
+                "visibility": "public"
             })
             .to_string(),
         )
@@ -37,12 +37,12 @@ fn create_base(fixture: &mut support::Fixture, email: &str) -> i32 {
 
     assert_eq!(response.status(), Status::Created, "base create");
     let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
-    let id = json["body"]["id"].as_i64().unwrap() as i32;
+    let id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(id);
     id
 }
 
-fn post_variant(fixture: &support::Fixture, base_id: i32) -> (Status, Value) {
+fn post_variant(fixture: &support::Fixture, base_id: uuid::Uuid) -> (Status, Value) {
     let response = fixture
         .client()
         .post(format!("/api/resume/{}/variants", base_id))
@@ -74,7 +74,7 @@ fn variant_email_shares_base_email_partial_unique_index() {
             serde_json::json!({
                 "name": "Duplicate Base",
                 "email": email,
-                "is_public": true
+                "visibility": "public"
             })
             .to_string(),
         )
@@ -88,7 +88,7 @@ fn variant_email_shares_base_email_partial_unique_index() {
 
     let (status, first) = post_variant(&fixture, base_id);
     assert_eq!(status, Status::Created);
-    let first_id = first["body"]["id"].as_i64().unwrap() as i32;
+    let first_id = support::resume_uuid(&first["body"]["id"]);
     fixture.track_resume_id(first_id);
 
     let (status, second) = post_variant(&fixture, base_id);
@@ -97,7 +97,7 @@ fn variant_email_shares_base_email_partial_unique_index() {
         Status::Created,
         "two variants may share the base email"
     );
-    let second_id = second["body"]["id"].as_i64().unwrap() as i32;
+    let second_id = support::resume_uuid(&second["body"]["id"]);
     fixture.track_resume_id(second_id);
 
     assert_eq!(first["body"]["email"], email);
@@ -116,7 +116,7 @@ fn user_delete_cascade_removes_base_and_variant() {
 
     let (status, variant) = post_variant(&fixture, base_id);
     assert_eq!(status, Status::Created);
-    let variant_id = variant["body"]["id"].as_i64().unwrap() as i32;
+    let variant_id = support::resume_uuid(&variant["body"]["id"]);
     fixture.track_resume_id(variant_id);
 
     // Removing the owner in one statement must take the base and its
@@ -130,7 +130,7 @@ fn user_delete_cascade_removes_base_and_variant() {
 
     for resume_id in [base_id, variant_id] {
         let rows: Vec<IdRow> = diesel::sql_query("SELECT id FROM resumes WHERE id = $1")
-            .bind::<diesel::sql_types::Integer, _>(resume_id)
+            .bind::<diesel::sql_types::Uuid, _>(resume_id)
             .load(&mut connection)
             .expect("probe resume");
 
@@ -158,7 +158,7 @@ fn self_reference_and_precision_checks_fire() {
     let mut connection = infrastructure::establish_connection();
 
     let self_reference = diesel::sql_query("UPDATE resumes SET base_resume_id = id WHERE id = $1")
-        .bind::<diesel::sql_types::Integer, _>(resume_id)
+        .bind::<diesel::sql_types::Uuid, _>(resume_id)
         .execute(&mut connection)
         .expect_err("a resume cannot be its own base");
     assert!(
@@ -176,7 +176,7 @@ fn self_reference_and_precision_checks_fire() {
     let unknown_precision = diesel::sql_query(
         "UPDATE resumes SET target_date = DATE '2026-03-01', target_date_precision = 'fortnight' WHERE id = $1",
     )
-    .bind::<diesel::sql_types::Integer, _>(resume_id)
+    .bind::<diesel::sql_types::Uuid, _>(resume_id)
     .execute(&mut connection)
     .expect_err("precision must be day, month or year");
     assert!(
@@ -193,7 +193,7 @@ fn self_reference_and_precision_checks_fire() {
 
     let precision_without_date =
         diesel::sql_query("UPDATE resumes SET target_date_precision = 'day' WHERE id = $1")
-            .bind::<diesel::sql_types::Integer, _>(resume_id)
+            .bind::<diesel::sql_types::Uuid, _>(resume_id)
             .execute(&mut connection)
             .expect_err("a precision without a date is rejected");
     assert!(
@@ -230,11 +230,12 @@ fn fk_violation_maps_to_409() {
     let mut connection = infrastructure::establish_connection();
 
     let error = diesel::sql_query(
-        "INSERT INTO resumes (name, email, is_public, base_resume_id) VALUES ($1, $2, TRUE, $3)",
+        "INSERT INTO resumes (id, name, email, visibility, base_resume_id) VALUES ($4, $1, $2, 'private', $3)",
     )
     .bind::<diesel::sql_types::Text, _>("Orphan Variant")
     .bind::<diesel::sql_types::Text, _>(format!("variant.orphan.{}@example.com", unique_suffix()))
-    .bind::<diesel::sql_types::Integer, _>(2_000_000_000)
+    .bind::<diesel::sql_types::Uuid, _>(uuid::Uuid::new_v4())
+    .bind::<diesel::sql_types::Uuid, _>(uuid::Uuid::new_v4())
     .execute(&mut connection)
     .expect_err("a base reference to a missing resume must be rejected");
 

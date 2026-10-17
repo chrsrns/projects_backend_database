@@ -4,6 +4,7 @@ use domain::models::{
     NewPortfolioProjectRequest, NewPortfolioTechnology, NewPortfolioTechnologyRequest,
     PortfolioKeyPoint, PortfolioProject, PortfolioTechnology,
 };
+use uuid::Uuid;
 
 use crate::{
     error::ApplicationError,
@@ -13,7 +14,7 @@ use crate::{
 
 pub fn create_portfolio_project(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     payload: NewPortfolioProjectRequest,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<PortfolioProject, ApplicationError> {
@@ -49,7 +50,7 @@ pub fn create_portfolio_project(
 
 pub fn create_portfolio_key_point(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     project_id_value: i32,
     payload: NewPortfolioKeyPointRequest,
     publisher: &dyn ResumeChangePublisher,
@@ -90,7 +91,7 @@ pub fn create_portfolio_key_point(
 
 pub fn create_portfolio_technology(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     project_id_value: i32,
     payload: NewPortfolioTechnologyRequest,
     publisher: &dyn ResumeChangePublisher,

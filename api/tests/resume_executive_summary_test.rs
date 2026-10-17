@@ -15,7 +15,7 @@ fn test_create_and_read_executive_summary() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "executive_summary": "Experienced engineer with a focus on systems design."
     });
 
@@ -32,7 +32,7 @@ fn test_create_and_read_executive_summary() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     assert_eq!(
@@ -51,7 +51,7 @@ fn test_create_and_read_executive_summary() {
     let get_json: Value = serde_json::from_str(&get_body).expect("valid JSON");
     let retrieved_resume = &get_json["body"];
 
-    assert_eq!(retrieved_resume["id"], resume_id);
+    assert_eq!(retrieved_resume["id"], resume_id.to_string());
     assert_eq!(
         retrieved_resume["executive_summary"],
         "Experienced engineer with a focus on systems design."
@@ -70,7 +70,7 @@ fn test_update_executive_summary() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "executive_summary": "Initial summary."
     });
 
@@ -87,7 +87,7 @@ fn test_update_executive_summary() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     let update_json = serde_json::json!({
@@ -107,7 +107,7 @@ fn test_update_executive_summary() {
     let update_body = update_response.into_string().expect("update body");
     let update_json: Value = serde_json::from_str(&update_body).expect("valid JSON");
     let updated_resume = &update_json["body"];
-    assert_eq!(updated_resume["id"], resume_id);
+    assert_eq!(updated_resume["id"], resume_id.to_string());
     assert_eq!(updated_resume["executive_summary"], "Updated summary text.");
 
     let get_response = fixture
@@ -138,7 +138,7 @@ fn test_update_executive_summary_with_null_clears() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "executive_summary": "Will be cleared."
     });
 
@@ -155,7 +155,7 @@ fn test_update_executive_summary_with_null_clears() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     let update_json = serde_json::json!({
@@ -198,7 +198,7 @@ fn test_create_executive_summary_too_long() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "executive_summary": long_summary
     });
 
@@ -225,7 +225,7 @@ fn test_create_executive_summary_blank_normalized() {
         "email": email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": true,
+        "visibility": "public",
         "executive_summary": "   \t\n  "
     });
 
@@ -242,7 +242,7 @@ fn test_create_executive_summary_blank_normalized() {
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid JSON");
     let created_resume = &create_json["body"];
-    let resume_id = created_resume["id"].as_i64().expect("Resume ID") as i32;
+    let resume_id = support::resume_uuid(&created_resume["id"]);
     fixture.track_resume_id(resume_id);
 
     assert!(created_resume["executive_summary"].is_null());

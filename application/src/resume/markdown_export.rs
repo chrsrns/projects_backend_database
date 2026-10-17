@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use domain::models::{
     EducationKeyPoint, Framework, FullResume, PortfolioKeyPoint, PortfolioTechnology,
@@ -15,7 +16,7 @@ use crate::{
 };
 
 pub fn export_resume_markdown(
-    resume_id: i32,
+    resume_id: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<String, ApplicationError> {
     let resume = find_accessible_resume(resume_id, user_id_value)?;

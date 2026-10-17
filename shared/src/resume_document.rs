@@ -4,7 +4,7 @@ use domain::models::PartialDate;
 use rocket::serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub const RESUME_DOCUMENT_SCHEMA_VERSION: i32 = 1;
+pub const RESUME_DOCUMENT_SCHEMA_VERSION: i32 = 2;
 pub const RESUME_DOCUMENT_GENERATOR: &str = "projects_backend_database";
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -42,7 +42,7 @@ pub struct DocumentResume {
     pub github_url: Option<String>,
     pub mobile_number: Option<String>,
     pub executive_summary: Option<String>,
-    pub is_public: bool,
+    pub visibility: domain::models::Visibility,
     pub video: Option<String>,
 }
 
@@ -344,7 +344,7 @@ impl From<domain::models::ParsedResume> for ResumeDocument {
                 github_url: parsed.github_url,
                 mobile_number: parsed.mobile_number,
                 executive_summary: parsed.executive_summary,
-                is_public: parsed.is_public,
+                visibility: parsed.visibility,
                 video: parsed.video,
             },
             education,
@@ -388,7 +388,7 @@ mod tests {
             mobile_number: None,
             executive_summary: None,
             video: None,
-            is_public: true,
+            visibility: domain::models::Visibility::Public,
             education: vec![],
             education_key_points: vec![],
             skills: vec![],
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn mapping_propagates_resume_fields_and_placeholders() {
         let mut parsed = empty_parsed();
-        parsed.is_public = true;
+        parsed.visibility = domain::models::Visibility::Public;
         parsed.video = Some("https://video.example".to_string());
         parsed.executive_summary = Some("Summary text".to_string());
         parsed.skills = vec![
@@ -521,7 +521,10 @@ mod tests {
 
         let document = ResumeDocument::from(parsed);
         assert_eq!(document.resume.id, 0);
-        assert!(document.resume.is_public);
+        assert_eq!(
+            document.resume.visibility,
+            domain::models::Visibility::Public
+        );
         assert_eq!(
             document.resume.video.as_deref(),
             Some("https://video.example")
@@ -714,7 +717,7 @@ mod tests {
                 github_url: None,
                 mobile_number: None,
                 executive_summary: None,
-                is_public: true,
+                visibility: domain::models::Visibility::Public,
                 video: None,
             },
             education: vec![],
@@ -735,7 +738,7 @@ mod tests {
         };
         let json = serde_json::to_string(&envelope).unwrap();
         let back: ResumeDocumentEnvelope = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.schema_version, 1);
+        assert_eq!(back.schema_version, 2);
         assert_eq!(back.generator, "projects_backend_database");
         assert_eq!(back.document.resume.id, 0);
         assert_eq!(back.document.resume.email, "jane@example.com");

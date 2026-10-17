@@ -9,13 +9,14 @@ use shared::response_models::Response;
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
 use crate::realtime::Hub;
+use uuid::Uuid;
 
 #[utoipa::path(
     get,
     path = "/resume/{resume_id}/languages/{language_id}/frameworks",
     tag = "Frameworks",
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("language_id" = i32, Path, description = "Language id")
     ),
     responses(
@@ -27,7 +28,7 @@ use crate::realtime::Hub;
 )]
 #[get("/resume/<resume_id>/languages/<language_id>/frameworks")]
 pub fn list_frameworks_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     language_id: i32,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<Framework>> {
@@ -42,7 +43,7 @@ pub fn list_frameworks_handler(
     tag = "Frameworks",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("language_id" = i32, Path, description = "Language id")
     ),
     request_body(content = NewFrameworkRequest, content_type = "application/json"),
@@ -61,7 +62,7 @@ pub fn list_frameworks_handler(
 pub fn create_framework_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     language_id: i32,
     payload: Json<NewFrameworkRequest>,
 ) -> CustomJsonResult<Framework> {

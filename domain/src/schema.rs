@@ -3,7 +3,6 @@
 diesel::table! {
     education (id) {
         id -> Int4,
-        resume_id -> Int4,
         #[max_length = 100]
         education_stage -> Varchar,
         #[max_length = 255]
@@ -20,6 +19,7 @@ diesel::table! {
         start_date_precision -> Varchar,
         #[max_length = 10]
         end_date_precision -> Nullable<Varchar>,
+        resume_id -> Uuid,
     }
 }
 
@@ -48,11 +48,11 @@ diesel::table! {
 diesel::table! {
     languages (id) {
         id -> Int4,
-        resume_id -> Int4,
         #[max_length = 255]
         language_name -> Varchar,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        resume_id -> Uuid,
     }
 }
 
@@ -70,7 +70,6 @@ diesel::table! {
 diesel::table! {
     portfolio_projects (id) {
         id -> Int4,
-        resume_id -> Int4,
         #[max_length = 255]
         project_name -> Varchar,
         #[max_length = 500]
@@ -85,6 +84,7 @@ diesel::table! {
         active -> Bool,
         #[max_length = 500]
         video_url -> Nullable<Varchar>,
+        resume_id -> Uuid,
     }
 }
 
@@ -102,7 +102,6 @@ diesel::table! {
 
 diesel::table! {
     resumes (id) {
-        id -> Int4,
         #[max_length = 255]
         name -> Varchar,
         #[max_length = 500]
@@ -118,11 +117,9 @@ diesel::table! {
         created_at -> Timestamp,
         updated_at -> Timestamp,
         created_by -> Nullable<Int4>,
-        is_public -> Bool,
         executive_summary -> Nullable<Text>,
         #[max_length = 500]
         video -> Nullable<Varchar>,
-        base_resume_id -> Nullable<Int4>,
         #[max_length = 255]
         company_name -> Nullable<Varchar>,
         #[max_length = 255]
@@ -134,6 +131,10 @@ diesel::table! {
         #[max_length = 255]
         variant_label -> Nullable<Varchar>,
         show_variant_tag -> Bool,
+        #[max_length = 10]
+        visibility -> Varchar,
+        id -> Uuid,
+        base_resume_id -> Nullable<Uuid>,
     }
 }
 
@@ -150,12 +151,12 @@ diesel::table! {
 diesel::table! {
     skills (id) {
         id -> Int4,
-        resume_id -> Int4,
         #[max_length = 255]
         skill_name -> Varchar,
         confidence_percentage -> Int4,
         display_order -> Nullable<Int4>,
         created_at -> Timestamp,
+        resume_id -> Uuid,
     }
 }
 
@@ -185,7 +186,6 @@ diesel::table! {
 diesel::table! {
     work_experiences (id) {
         id -> Int4,
-        resume_id -> Int4,
         #[max_length = 255]
         job_title -> Varchar,
         #[max_length = 255]
@@ -200,6 +200,7 @@ diesel::table! {
         start_date_precision -> Varchar,
         #[max_length = 10]
         end_date_precision -> Nullable<Varchar>,
+        resume_id -> Uuid,
     }
 }
 

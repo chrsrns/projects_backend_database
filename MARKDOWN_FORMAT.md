@@ -8,7 +8,7 @@ An exported resume opens with a `---`-fenced front-matter block. On import the b
 
 ```markdown
 ---
-resume_id: 42
+resume_id: "01a14093-81f2-7387-aa71-36329ebd0805"
 company_name: "Acme Corp"
 role_title: "Staff Backend Engineer"
 target_date: "2026-03"
@@ -21,12 +21,12 @@ show_variant_tag: true
 
 - **Placement**: the first non-blank line of the file must be `---` (trailing whitespace allowed). An optional UTF-8 BOM and leading blank lines are tolerated. If the first non-blank line is not `---`, the file parses without a front-matter block.
 - **Lines**: one `key: <JSON scalar>` or bare `key:` per line; leading whitespace and whitespace around the colon are tolerated. A bare `key:` and `key: null` are equivalent.
-- **Keys**: `resume_id`, `company_name`, `role_title`, `target_date`, `job_description`, `variant_label`, `show_variant_tag`. Values must be JSON scalars — strings are double-quoted and JSON-escaped, `show_variant_tag` is `true`/`false`, `resume_id` is an integer or numeric string.
+- **Keys**: `resume_id`, `company_name`, `role_title`, `target_date`, `job_description`, `variant_label`, `show_variant_tag`. Values must be JSON scalars — strings are double-quoted and JSON-escaped, `show_variant_tag` is `true`/`false`, `resume_id` is a UUID string.
 - **Rejected with `400`**: unknown or duplicate keys, a line without a colon, a blank line inside the block, a non-scalar value, and an unclosed fence. A file that opens with `---` never degrades to body text — a legacy file whose first non-blank line is a `---` thematic break must remove it or make the block well formed.
-- **`resume_id`**: routing marker, must be a positive integer. `resume_id:` empty, `null`, or a non-integer value → `400`. Absent/foreign row → `404`/`403`; the marker never falls back to the email match.
+- **`resume_id`**: routing marker, must be a UUID string. `resume_id:` empty, `null`, a non-string, or a malformed UUID → `400`. Absent/foreign row → `404`/`403`; the marker never falls back to the email match.
 - **Variant metadata keys** (`company_name`, `role_title`, `target_date`, `job_description`, `variant_label`, `show_variant_tag`): applied only when the import target is a variant. On a variant target: absent key = no change, empty/`null` = stored `NULL` (`show_variant_tag` rejects empty/`null` instead — it is a required boolean), strings obey the usual caps, `target_date` is an ISO partial date (`YYYY`, `YYYY-MM`, `YYYY-MM-DD`). Metadata keys on a base resume target or on the create path → `400`.
 - **Export**: always emits `resume_id`. A variant export also emits every stored non-null metadata key; `show_variant_tag` is emitted only when the exporter owns the resume.
-- **Variant target quirk**: on a variant the markdown `Email` and `Public` bullets are still required/validated but ignored — the stored `email`, `is_public`, and `created_by` win.
+- **Variant target quirk**: on a variant the markdown `Email` and `Visibility` bullets are still required/validated but ignored — the stored `email`, `visibility`, and `created_by` win.
 - **Explicit route**: `POST /api/resume/{id}/import/markdown` targets the URL id directly (owner only). A front-matter `resume_id` that disagrees with the URL id → `400`.
 - **Validate/convert**: `POST /api/resume/validate/markdown` and `POST /api/resume/convert/markdown` parse the block and ignore it; a malformed block reports invalid or answers `400`.
 
@@ -49,7 +49,7 @@ Immediately after the H1, write a list of header fields. `Email` is required. Al
 - GitHub: https://github.com/janedoe
 - Mobile: +1987654321
 - Video: https://example.com/video.mp4
-- Public: true
+- Visibility: public
 ```
 
 - `Location`: free text.
@@ -58,7 +58,8 @@ Immediately after the H1, write a list of header fields. `Email` is required. Al
 - `GitHub`: URL.
 - `Mobile`: free text.
 - `Video`: URL or free text. Limited to 500 characters. Markdown link form is not supported and is ignored.
-- `Public`: `true`, `yes`, or `1` for public; anything else is private.
+- `Visibility`: exactly `private`, `unlisted`, or `public` (case-sensitive; other values → `400`). `unlisted` resumes are reachable by id via their UUID but never appear in listings; `private` is owner-only.
+- `Public` (legacy alias for `Visibility`): case-insensitive `true`/`yes`/`1` mean public, `false`/`no`/`0` mean private; any other value → `400`. Providing both `Visibility` and `Public` → `400`.
 
 URLs in header bullets may be written as plain text or as Markdown links. They are stored and exported as plain text. The `Video` bullet only accepts plain text; a Markdown link in a `Video` bullet is ignored and the video is stored as `NULL`.
 
@@ -248,7 +249,7 @@ Education entries and their key points, work experiences and their key points, a
 - GitHub: https://github.com/janedoe
 - Mobile: +1987654321
 - Video: https://example.com/video.mp4
-- Public: true
+- Visibility: public
 
 ## Summary
 

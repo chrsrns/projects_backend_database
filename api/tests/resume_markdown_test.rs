@@ -35,7 +35,7 @@ fn sample_markdown() -> String {
     .to_string()
 }
 
-fn create_full_resume(fixture: &mut support::Fixture, lock_key: i64) -> (i32, String) {
+fn create_full_resume(fixture: &mut support::Fixture, lock_key: i64) -> (uuid::Uuid, String) {
     let unique_email = format!(
         "markdown.user.{}.{}@example.com",
         lock_key,
@@ -52,7 +52,7 @@ fn create_full_resume(fixture: &mut support::Fixture, lock_key: i64) -> (i32, St
         "email": unique_email,
         "github_url": "https://github.com/johndoe",
         "mobile_number": "+1234567890",
-        "is_public": true
+        "visibility": "public"
     });
 
     let create_response = fixture
@@ -67,9 +67,7 @@ fn create_full_resume(fixture: &mut support::Fixture, lock_key: i64) -> (i32, St
 
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
-    let resume_id = create_json["body"]["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let education_response = fixture
@@ -311,7 +309,7 @@ fn test_import_resume_markdown() {
     assert_eq!(import_response.status(), Status::Created);
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     assert_eq!(import_json["body"]["name"], "Jane Doe");
@@ -425,7 +423,7 @@ fn test_import_resume_markdown_with_iso_dates() {
     assert_eq!(import_response.status(), Status::Created);
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let education_response = fixture
@@ -479,7 +477,7 @@ fn test_import_resume_markdown_with_full_month_names() {
     assert_eq!(import_response.status(), Status::Created);
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let education_response = fixture
@@ -553,7 +551,7 @@ fn test_export_resume_markdown_round_trip() {
     assert_eq!(import_response.status(), Status::Created);
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let imported_resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let imported_resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(imported_resume_id);
 
     assert_eq!(import_json["body"]["name"], "John Doe");
@@ -568,7 +566,7 @@ fn test_export_resume_markdown_round_trip() {
         "https://github.com/johndoe"
     );
     assert_eq!(import_json["body"]["mobile_number"], "+1234567890");
-    assert_eq!(import_json["body"]["is_public"], true);
+    assert_eq!(import_json["body"]["visibility"], "public");
 
     let education_response = fixture
         .client()
@@ -709,7 +707,7 @@ fn test_work_experience_company_name_with_separator_round_trip() {
             serde_json::json!({
                 "name": "Separator Test",
                 "email": unique_email,
-                "is_public": true
+                "visibility": "public"
             })
             .to_string(),
         )
@@ -717,9 +715,7 @@ fn test_work_experience_company_name_with_separator_round_trip() {
         .into_string()
         .expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
-    let resume_id = create_json["body"]["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     assert_eq!(
@@ -774,7 +770,7 @@ fn test_work_experience_company_name_with_separator_round_trip() {
         .into_string()
         .expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let imported_resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let imported_resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(imported_resume_id);
 
     let work_items_body = fixture
@@ -828,7 +824,7 @@ fn test_export_private_resume_markdown_requires_auth() {
         "email": unique_email,
         "github_url": null,
         "mobile_number": null,
-        "is_public": false
+        "visibility": "private"
     });
 
     let create_response = fixture
@@ -842,9 +838,7 @@ fn test_export_private_resume_markdown_requires_auth() {
 
     let create_body = create_response.into_string().expect("Response body");
     let create_json: Value = serde_json::from_str(&create_body).expect("Valid JSON");
-    let resume_id = create_json["body"]["id"]
-        .as_i64()
-        .expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let export_response = fixture
@@ -1022,7 +1016,7 @@ fn test_import_empty_sections() {
     assert_eq!(response.status(), Status::Created);
     let body = response.into_string().expect("body");
     let json: Value = serde_json::from_str(&body).expect("json");
-    let resume_id = json["body"]["id"].as_i64().expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 }
 
@@ -1049,7 +1043,7 @@ fn test_import_payload_larger_than_default_string_limit_is_accepted() {
     assert_eq!(response.status(), Status::Created);
     let body = response.into_string().expect("body");
     let json: Value = serde_json::from_str(&body).expect("json");
-    let resume_id = json["body"]["id"].as_i64().expect("Resume ID should exist") as i32;
+    let resume_id = support::resume_uuid(&json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 }
 
@@ -1107,7 +1101,7 @@ fn test_import_child_key_points_are_not_silently_dropped() {
 
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     // Fetch education entries to get the education ID
@@ -1190,7 +1184,7 @@ fn test_executive_summary_markdown_round_trip() {
 
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid JSON");
-    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let imported_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(imported_id);
     assert_eq!(import_json["body"]["executive_summary"], summary);
 }
@@ -1221,7 +1215,7 @@ fn test_executive_summary_markdown_omission() {
 
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid JSON");
-    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let imported_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(imported_id);
     assert!(import_json["body"]["executive_summary"].is_null());
 }
@@ -1246,7 +1240,7 @@ fn test_import_resume_markdown_with_year_only() {
     assert_eq!(import_response.status(), Status::Created);
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let education_response = fixture
@@ -1326,7 +1320,7 @@ fn test_export_resume_markdown_with_year_only_precision() {
     assert_eq!(import_response.status(), Status::Created);
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let export_response = fixture
@@ -1359,7 +1353,7 @@ fn test_export_resume_markdown_with_year_only_precision() {
     assert_eq!(reimport_response.status(), Status::Created);
     let reimport_body = reimport_response.into_string().expect("reimport body");
     let reimport_json: Value = serde_json::from_str(&reimport_body).expect("valid json");
-    let reimported_id = reimport_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let reimported_id = support::resume_uuid(&reimport_json["body"]["id"]);
     fixture.track_resume_id(reimported_id);
 
     let education_response = fixture
@@ -1408,7 +1402,7 @@ fn test_export_resume_markdown_with_month_year_round_trip() {
     assert_eq!(import_response.status(), Status::Created);
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let export_response = fixture
@@ -1445,7 +1439,7 @@ fn test_export_resume_markdown_with_month_year_round_trip() {
     assert_eq!(reimport_response.status(), Status::Created);
     let reimport_body = reimport_response.into_string().expect("reimport body");
     let reimport_json: Value = serde_json::from_str(&reimport_body).expect("valid json");
-    let reimported_id = reimport_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let reimported_id = support::resume_uuid(&reimport_json["body"]["id"]);
     fixture.track_resume_id(reimported_id);
 
     let education_response = fixture
@@ -1512,7 +1506,7 @@ fn test_import_resume_markdown_upserts_existing_by_email() {
     assert_eq!(first_response.status(), Status::Created);
     let first_body = first_response.into_string().expect("first body");
     let first_json: Value = serde_json::from_str(&first_body).expect("valid json");
-    let resume_id = first_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&first_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let updated_markdown = markdown
@@ -1529,7 +1523,7 @@ fn test_import_resume_markdown_upserts_existing_by_email() {
     assert_eq!(second_response.status(), Status::Ok);
     let second_body = second_response.into_string().expect("second body");
     let second_json: Value = serde_json::from_str(&second_body).expect("valid json");
-    assert_eq!(second_json["body"]["id"], resume_id);
+    assert_eq!(second_json["body"]["id"], resume_id.to_string());
     assert_eq!(second_json["body"]["name"], "Jane Updated");
 
     let skills_response = fixture
@@ -1564,7 +1558,7 @@ fn test_video_markdown_round_trip() {
             serde_json::json!({
                 "name": "Jane Doe",
                 "email": unique_email,
-                "is_public": true,
+                "visibility": "public",
                 "video": video_url
             })
             .to_string(),
@@ -1574,7 +1568,7 @@ fn test_video_markdown_round_trip() {
     assert_eq!(create_response.status(), Status::Created);
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
-    let resume_id = create_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let export_response = fixture
@@ -1604,7 +1598,7 @@ fn test_video_markdown_round_trip() {
 
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let imported_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(imported_id);
     assert_eq!(import_json["body"]["video"], video_url);
 }
@@ -1630,7 +1624,7 @@ fn test_video_markdown_link_ignored() {
 
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
     assert!(import_json["body"]["video"].is_null());
 }
@@ -1650,7 +1644,7 @@ fn test_portfolio_video_url_markdown_round_trip() {
             serde_json::json!({
                 "name": "Jane Doe",
                 "email": unique_email,
-                "is_public": true
+                "visibility": "public"
             })
             .to_string(),
         )
@@ -1659,7 +1653,7 @@ fn test_portfolio_video_url_markdown_round_trip() {
     assert_eq!(create_response.status(), Status::Created);
     let create_body = create_response.into_string().expect("create body");
     let create_json: Value = serde_json::from_str(&create_body).expect("valid json");
-    let resume_id = create_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let project_response = fixture
@@ -1712,7 +1706,7 @@ fn test_portfolio_video_url_markdown_round_trip() {
 
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let imported_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let imported_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(imported_id);
 
     let projects_response = fixture
@@ -1750,7 +1744,7 @@ fn test_portfolio_video_url_markdown_link_ignored() {
 
     let import_body = import_response.into_string().expect("import body");
     let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     fixture.track_resume_id(resume_id);
 
     let projects_response = fixture
@@ -1801,7 +1795,7 @@ fn test_portfolio_url_bullets_500_round_trip() {
 
         let import_body = import_response.into_string().expect("import body");
         let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-        let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+        let resume_id = support::resume_uuid(&import_json["body"]["id"]);
         fixture.track_resume_id(resume_id);
 
         let projects_response = fixture
@@ -1865,7 +1859,7 @@ fn test_portfolio_url_bullets_blank_normalized() {
 
         let import_body = import_response.into_string().expect("import body");
         let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-        let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+        let resume_id = support::resume_uuid(&import_json["body"]["id"]);
         fixture.track_resume_id(resume_id);
 
         let projects_response = fixture
@@ -1910,7 +1904,7 @@ fn test_portfolio_url_bullets_markdown_link_flattened() {
 
         let import_body = import_response.into_string().expect("import body");
         let import_json: Value = serde_json::from_str(&import_body).expect("valid json");
-        let resume_id = import_json["body"]["id"].as_i64().expect("resume id") as i32;
+        let resume_id = support::resume_uuid(&import_json["body"]["id"]);
         fixture.track_resume_id(resume_id);
 
         let projects_response = fixture
@@ -2170,7 +2164,7 @@ fn test_import_markdown_active_markers() {
     assert_eq!(import_response.status(), Status::Created);
     let import_json: Value =
         serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
 
     let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
     assert_eq!(education[0]["active"], false);
@@ -2272,7 +2266,7 @@ fn test_import_active_marker_either_order_on_headings() {
     assert_eq!(import_response.status(), Status::Created);
     let import_json: Value =
         serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
 
     let education = get_list(&fixture, format!("/api/resume/{}/education", resume_id));
     assert_eq!(education[0]["active"], false);
@@ -2304,10 +2298,10 @@ fn test_import_stray_active_marker_stripped_on_markerless_lines() {
     assert_eq!(import_response.status(), Status::Created);
     let import_json: Value =
         serde_json::from_str(&import_response.into_string().expect("body")).expect("json");
-    let resume_id = import_json["body"]["id"].as_i64().expect("id") as i32;
+    let resume_id = support::resume_uuid(&import_json["body"]["id"]);
     assert_eq!(import_json["body"]["name"], "Jane");
     assert_eq!(import_json["body"]["email"], unique_email);
-    assert_eq!(import_json["body"]["is_public"], true);
+    assert_eq!(import_json["body"]["visibility"], "public");
 
     let skills = get_list(&fixture, format!("/api/resume/{}/skills", resume_id));
     assert_eq!(skills[0]["skill_name"], "Rust");

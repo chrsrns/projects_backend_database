@@ -30,7 +30,7 @@ pub(crate) mod tests {
 
     pub(crate) fn resume_row() -> domain::models::Resume {
         domain::models::Resume {
-            id: 7,
+            id: uuid::Uuid::from_u128(7),
             name: "Jane Doe".to_string(),
             profile_image_url: None,
             location: None,
@@ -46,7 +46,7 @@ pub(crate) mod tests {
                 .and_hms_opt(0, 0, 0)
                 .unwrap(),
             created_by: Some(1),
-            is_public: true,
+            visibility: "public".to_string(),
             executive_summary: None,
             video: None,
             base_resume_id: None,
@@ -77,17 +77,19 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[test]
     fn test_export_import_round_trip_front_matter() {
         let mut resume = resume_row();
-        resume.id = 21;
-        resume.base_resume_id = Some(7);
+        resume.id = uuid::Uuid::from_u128(21);
+        resume.base_resume_id = Some(uuid::Uuid::from_u128(7));
         resume.company_name = Some("Acme".to_string());
 
         let exported = resume_to_markdown(&full_resume(resume), true);
         let parsed = parse_resume_markdown(&exported).expect("round-trip parse ok");
         let fm = parsed.front_matter.expect("front-matter");
-        assert_eq!(fm.resume_id, Some(serde_json::json!(21)));
+        assert_eq!(
+            fm.resume_id,
+            Some(serde_json::json!("00000000-0000-0000-0000-000000000015"))
+        );
         assert_eq!(fm.company_name, Some(serde_json::json!("Acme")));
         assert_eq!(parsed.resume.name, "Jane Doe");
     }
@@ -95,7 +97,7 @@ pub(crate) mod tests {
     pub(crate) fn education_row(active: bool) -> domain::models::Education {
         domain::models::Education {
             id: 11,
-            resume_id: 7,
+            resume_id: uuid::Uuid::from_u128(7),
             education_stage: "Bachelor's".to_string(),
             institution_name: "University of ABC".to_string(),
             degree: None,
@@ -116,7 +118,7 @@ pub(crate) mod tests {
     pub(crate) fn work_row(active: bool) -> domain::models::WorkExperience {
         domain::models::WorkExperience {
             id: 21,
-            resume_id: 7,
+            resume_id: uuid::Uuid::from_u128(7),
             job_title: "Engineer".to_string(),
             company_name: Some("Tech Corp".to_string()),
             start_date: NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
@@ -136,7 +138,7 @@ pub(crate) mod tests {
     pub(crate) fn project_row(active: bool) -> domain::models::PortfolioProject {
         domain::models::PortfolioProject {
             id: 31,
-            resume_id: 7,
+            resume_id: uuid::Uuid::from_u128(7),
             project_name: "My Project".to_string(),
             image_url: None,
             project_link: None,
@@ -221,7 +223,6 @@ pub(crate) mod tests {
         resume
     }
 
-    #[test]
     #[test]
     fn test_active_marker_export_parse_round_trip() {
         let output = resume_to_markdown(&active_fixture(false), true);

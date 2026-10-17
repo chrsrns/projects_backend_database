@@ -2,13 +2,15 @@ use diesel::prelude::*;
 use domain::models::Language;
 use infrastructure::establish_connection;
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     resume::common::{app_err_from_diesel_err, find_accessible_resume},
 };
 
 pub fn list_languages(
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<Vec<Language>, ApplicationError> {
     use domain::schema::languages::dsl as languages_dsl;

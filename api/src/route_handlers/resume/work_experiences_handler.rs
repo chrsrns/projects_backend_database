@@ -8,6 +8,7 @@ use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
 use shared::response_models::Response;
+use uuid::Uuid;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
@@ -18,7 +19,7 @@ use crate::realtime::Hub;
     path = "/resume/{resume_id}/work_experiences",
     tag = "WorkExperiences",
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     responses(
         (status = 200, description = "OK", body = Response<Vec<WorkExperience>>, content_type = "application/json"),
@@ -29,7 +30,7 @@ use crate::realtime::Hub;
 )]
 #[get("/resume/<resume_id>/work_experiences")]
 pub fn list_work_experiences_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<WorkExperience>> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
@@ -43,7 +44,7 @@ pub fn list_work_experiences_handler(
     tag = "WorkExperiences",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id")
+        ("resume_id" = Uuid, Path, description = "Resume id")
     ),
     request_body(content = NewWorkExperienceRequest, content_type = "application/json"),
     responses(
@@ -61,7 +62,7 @@ pub fn list_work_experiences_handler(
 pub fn create_work_experience_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     payload: Json<NewWorkExperienceRequest>,
 ) -> CustomJsonResult<WorkExperience> {
     let item = work_experiences::create_work_experience(
@@ -142,7 +143,7 @@ pub fn delete_work_experience_handler(
     path = "/resume/{resume_id}/work_experiences/{work_id}/key_points",
     tag = "WorkExperienceKeyPoints",
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("work_id" = i32, Path, description = "Work experience id")
     ),
     responses(
@@ -154,7 +155,7 @@ pub fn delete_work_experience_handler(
 )]
 #[get("/resume/<resume_id>/work_experiences/<work_id>/key_points")]
 pub fn list_work_experience_key_points_handler(
-    resume_id: i32,
+    resume_id: Uuid,
     work_id: i32,
     maybe_auth: MaybeAuthSession,
 ) -> JsonResult<Vec<WorkExperienceKeyPoint>> {
@@ -170,7 +171,7 @@ pub fn list_work_experience_key_points_handler(
     tag = "WorkExperienceKeyPoints",
     security(("bearerAuth" = [])),
     params(
-        ("resume_id" = i32, Path, description = "Resume id"),
+        ("resume_id" = Uuid, Path, description = "Resume id"),
         ("work_id" = i32, Path, description = "Work experience id")
     ),
     request_body(content = NewWorkExperienceKeyPointRequest, content_type = "application/json"),
@@ -189,7 +190,7 @@ pub fn list_work_experience_key_points_handler(
 pub fn create_work_experience_key_point_handler(
     auth: AuthSession,
     hub: &State<Hub>,
-    resume_id: i32,
+    resume_id: Uuid,
     work_id: i32,
     payload: Json<NewWorkExperienceKeyPointRequest>,
 ) -> CustomJsonResult<WorkExperienceKeyPoint> {

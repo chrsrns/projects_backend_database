@@ -1,5 +1,7 @@
 use diesel::prelude::*;
-use domain::models::{NewResume, NewResumeRequest, Resume, ResumeView};
+use uuid::Uuid;
+
+use domain::models::{NewResume, NewResumeRequest, Resume, ResumeView, Visibility};
 use infrastructure::establish_connection;
 
 use crate::{
@@ -16,6 +18,7 @@ pub fn create_resume(
     use domain::schema::resumes;
 
     let new_resume = NewResume {
+        id: Uuid::now_v7(),
         name: resume.name,
         profile_image_url: resume.profile_image_url,
         location: resume.location,
@@ -25,7 +28,10 @@ pub fn create_resume(
         executive_summary: validate_executive_summary(resume.executive_summary)?,
         video: validate_video(resume.video)?,
         created_by: Some(user_id_value),
-        is_public: resume.is_public.unwrap_or(false),
+        visibility: resume
+            .visibility
+            .map(|v| v.as_str().to_string())
+            .unwrap_or_else(|| Visibility::Private.to_string()),
         base_resume_id: None,
         company_name: None,
         role_title: None,

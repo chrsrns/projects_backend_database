@@ -2,8 +2,9 @@ use chrono::NaiveDateTime;
 use rocket::serde::Serialize;
 use std::str::FromStr;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
-use super::{DatePrecision, PartialDate, Resume};
+use super::{DatePrecision, PartialDate, Resume, Visibility};
 
 /// Viewer-aware, flat resume payload.
 ///
@@ -15,7 +16,7 @@ use super::{DatePrecision, PartialDate, Resume};
 #[derive(Serialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct ResumeView {
-    pub id: i32,
+    pub id: Uuid,
     pub name: String,
     pub profile_image_url: Option<String>,
     pub location: Option<String>,
@@ -25,12 +26,12 @@ pub struct ResumeView {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub created_by: Option<i32>,
-    pub is_public: bool,
+    pub visibility: Visibility,
     pub executive_summary: Option<String>,
     #[schema(max_length = 500)]
     pub video: Option<String>,
     pub is_variant: bool,
-    pub base_resume_id: Option<i32>,
+    pub base_resume_id: Option<Uuid>,
     pub show_variant_tag: Option<bool>,
     pub company_name: Option<String>,
     pub role_title: Option<String>,
@@ -42,7 +43,7 @@ pub struct ResumeView {
 }
 
 impl ResumeView {
-    pub fn from_resume(resume: Resume, base_accessible: bool, is_owner: bool) -> Self {
+    pub fn from_resume(resume: Resume, base_linkage_visible: bool, is_owner: bool) -> Self {
         let target_date = resume.target_date.map(|canonical| PartialDate {
             canonical,
             precision: resume
@@ -54,8 +55,8 @@ impl ResumeView {
 
         ResumeView {
             is_variant: resume.base_resume_id.is_some()
-                && (base_accessible || resume.show_variant_tag),
-            base_resume_id: if base_accessible {
+                && (base_linkage_visible || resume.show_variant_tag),
+            base_resume_id: if base_linkage_visible {
                 resume.base_resume_id
             } else {
                 None
@@ -76,7 +77,7 @@ impl ResumeView {
             created_at: resume.created_at,
             updated_at: resume.updated_at,
             created_by: resume.created_by,
-            is_public: resume.is_public,
+            visibility: Visibility::from_str(&resume.visibility).unwrap_or(Visibility::Private),
             executive_summary: resume.executive_summary,
             video: resume.video,
             company_name: resume.company_name,

@@ -2,12 +2,13 @@ use crate::realtime::Hub;
 use rocket::State;
 use rocket::futures::{SinkExt, StreamExt};
 use serde::Deserialize;
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 struct ClientMessage {
     #[serde(rename = "type")]
     kind: String,
-    resume_id: Option<i32>,
+    resume_id: Option<Uuid>,
     token: Option<String>,
 }
 
@@ -150,7 +151,7 @@ pub fn ws_handler(ws: ws::WebSocket, hub: &State<Hub>) -> ws::Channel<'static> {
     })
 }
 
-async fn authorize_subscription(resume_id: i32, token: Option<String>) -> bool {
+async fn authorize_subscription(resume_id: Uuid, token: Option<String>) -> bool {
     rocket::tokio::task::spawn_blocking(move || {
         let user_id = match token {
             Some(t) => {

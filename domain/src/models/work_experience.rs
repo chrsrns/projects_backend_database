@@ -6,6 +6,7 @@ use serde::Serializer;
 use serde::ser::SerializeStruct;
 use std::str::FromStr;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use super::{
     DatePrecision, PartialDate, deserialize_optional_nullable_partial_date,
@@ -15,7 +16,6 @@ use super::{
 #[derive(Queryable, ToSchema, Ord, Eq, PartialEq, PartialOrd, Debug)]
 pub struct WorkExperience {
     pub id: i32,
-    pub resume_id: i32,
     pub job_title: String,
     pub company_name: Option<String>,
     #[schema(value_type = PartialDate)]
@@ -30,6 +30,7 @@ pub struct WorkExperience {
     pub start_date_precision: String,
     #[schema(ignore)]
     pub end_date_precision: Option<String>,
+    pub resume_id: Uuid,
 }
 
 impl Serialize for WorkExperience {
@@ -74,7 +75,7 @@ impl Serialize for WorkExperience {
 #[derive(Insertable, Debug)]
 #[diesel(table_name = work_experiences)]
 pub struct NewWorkExperience {
-    pub resume_id: i32,
+    pub resume_id: Uuid,
     pub job_title: String,
     pub company_name: Option<String>,
     pub start_date: NaiveDate,

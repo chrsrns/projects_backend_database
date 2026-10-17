@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
 use diesel::prelude::*;
+use uuid::Uuid;
+
 use domain::models::{
     Education, EducationKeyPoint, Framework, Language, NewEducation, NewEducationKeyPoint,
     NewFramework, NewLanguage, NewPortfolioKeyPoint, NewPortfolioProject, NewPortfolioTechnology,
     NewResume, NewSkill, NewVariantRequest, NewWorkExperience, NewWorkExperienceKeyPoint,
     PortfolioKeyPoint, PortfolioProject, PortfolioTechnology, Resume, ResumeView, Skill,
-    WorkExperience, WorkExperienceKeyPoint,
+    Visibility, WorkExperience, WorkExperienceKeyPoint,
 };
 use infrastructure::run_in_transaction;
 
@@ -19,7 +21,7 @@ use crate::resume::common::{
 use crate::resume::view;
 
 pub fn list_variants(
-    base_id: i32,
+    base_id: Uuid,
     user_id_value: Option<i32>,
 ) -> Result<Vec<ResumeView>, ApplicationError> {
     use domain::schema::resumes::dsl as resumes_dsl;
@@ -31,7 +33,7 @@ pub fn list_variants(
         .filter(resumes_dsl::base_resume_id.eq(base_id))
         .into_boxed();
     if !is_owner {
-        query = query.filter(resumes_dsl::is_public.eq(true));
+        query = query.filter(resumes_dsl::visibility.eq(Visibility::Public.as_str()));
     }
 
     let variants = query
@@ -42,18 +44,21 @@ pub fn list_variants(
         .load::<Resume>(&mut infrastructure::establish_connection())
         .map_err(app_err_from_diesel_err)?;
 
-    // Reaching this point already proved the caller may read the base, so
-    // every listed variant has a reachable base.
-    Ok(view::views_for_known_accessible_base(
+    // The caller proved by-id access to the base, but linkage reveal is
+    // stricter (V218): the base id is shown only when the base is public
+    // or owned by the viewer — an unlisted base's capability uuid stays
+    // redacted from its public variants.
+    let base_linkage_visible = base.visibility == Visibility::Public.as_str() || is_owner;
+    Ok(view::views_for_accessible_base(
         variants,
         user_id_value,
-        true,
+        base_linkage_visible,
     ))
 }
 
 pub fn create_variant(
     user_id_value: i32,
-    base_id: i32,
+    base_id: Uuid,
     request: NewVariantRequest,
     publisher: &dyn ResumeChangePublisher,
 ) -> Result<ResumeView, ApplicationError> {
@@ -81,6 +86,7 @@ pub fn create_variant(
     };
 
     let new_resume = NewResume {
+        id: Uuid::now_v7(),
         name: base.name.clone(),
         profile_image_url: base.profile_image_url.clone(),
         location: base.location.clone(),
@@ -90,7 +96,10 @@ pub fn create_variant(
         executive_summary: base.executive_summary.clone(),
         video: base.video.clone(),
         created_by: Some(user_id_value),
-        is_public: request.is_public.unwrap_or(base.is_public),
+        visibility: request
+            .visibility
+            .map(|v| v.as_str().to_string())
+            .unwrap_or_else(|| base.visibility.clone()),
         base_resume_id: Some(base_id),
         company_name: metadata.company_name,
         role_title: metadata.role_title,

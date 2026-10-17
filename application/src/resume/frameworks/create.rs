@@ -1,6 +1,8 @@
 use diesel::prelude::*;
 use domain::models::{Framework, Language, NewFramework, NewFrameworkRequest};
 
+use uuid::Uuid;
+
 use crate::{
     error::ApplicationError,
     realtime::{ResumeChangePublisher, ResumeChangedAction, SectionType},
@@ -9,7 +11,7 @@ use crate::{
 
 pub fn create_framework(
     user_id_value: i32,
-    resume_id_value: i32,
+    resume_id_value: Uuid,
     language_id_value: i32,
     payload: NewFrameworkRequest,
     publisher: &dyn ResumeChangePublisher,

@@ -1,4 +1,4 @@
-use super::PartialDate;
+use super::{PartialDate, Visibility};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedResume {
@@ -10,7 +10,7 @@ pub struct ParsedResume {
     pub mobile_number: Option<String>,
     pub executive_summary: Option<String>,
     pub video: Option<String>,
-    pub is_public: bool,
+    pub visibility: Visibility,
     pub education: Vec<ParsedEducation>,
     pub education_key_points: Vec<ParsedEducationKeyPoint>,
     pub skills: Vec<ParsedSkill>,
