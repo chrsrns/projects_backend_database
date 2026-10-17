@@ -168,6 +168,18 @@ pub struct SnapshotFramework {
     pub display_order: Option<i32>,
 }
 
+/// A revision about to be written. `created_at` comes from the column default.
+#[derive(Insertable, Debug)]
+#[diesel(table_name = crate::schema::resume_revisions)]
+pub struct NewResumeRevision {
+    pub resume_id: Uuid,
+    pub revision: i32,
+    pub created_by: i32,
+    pub action: String,
+    pub is_restore: bool,
+    pub snapshot: serde_json::Value,
+}
+
 /// A stored revision row, mapped in table column order.
 #[derive(Queryable, Debug, Clone)]
 pub struct ResumeRevisionRow {

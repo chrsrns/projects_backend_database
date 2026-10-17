@@ -333,6 +333,10 @@ fn write_import_tx(
     };
 
     let resume = if let Some(resume_id) = existing_id {
+        // The import replaces the whole aggregate, so the state it replaces is
+        // recorded as one revision before anything is deleted.
+        crate::resume::revision::capture::capture(conn, resume_id, "personalinfo", false)?;
+
         diesel::delete(skills::table.filter(skills::dsl::resume_id.eq(resume_id))).execute(conn)?;
         diesel::delete(languages::table.filter(languages::dsl::resume_id.eq(resume_id)))
             .execute(conn)?;

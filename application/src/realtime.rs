@@ -13,6 +13,22 @@ pub enum SectionType {
     Experience,
 }
 
+impl SectionType {
+    /// The wire value of the section, which is also what a revision records as
+    /// the action that produced it.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SectionType::PersonalInfo => "personalinfo",
+            SectionType::Education => "education",
+            SectionType::Frameworks => "frameworks",
+            SectionType::Languages => "languages",
+            SectionType::Projects => "projects",
+            SectionType::Skills => "skills",
+            SectionType::Experience => "experience",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ResumeChangedAction {
