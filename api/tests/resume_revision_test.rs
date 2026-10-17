@@ -1,3 +1,4 @@
+use diesel::prelude::*;
 use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 use serde_json::Value;
@@ -282,4 +283,506 @@ fn revision_numbers_are_dense_from_one() {
 
     let (status, _) = fetch_revision(&fixture, resume_id, 5);
     assert_eq!(status, Status::NotFound);
+}
+
+fn post_json(
+    fixture: &support::Fixture,
+    path: String,
+    payload: Value,
+) -> (Status, Value) {
+    let response = fixture
+        .client()
+        .post(path)
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(payload.to_string())
+        .dispatch();
+
+    let status = response.status();
+    let text = response.into_string().unwrap_or_default();
+    (status, serde_json::from_str(&text).unwrap_or(Value::Null))
+}
+
+fn post_child(fixture: &support::Fixture, path: String, payload: Value) -> i64 {
+    let label = path.clone();
+    let (status, body) = post_json(fixture, path, payload);
+    assert_eq!(status, Status::Created, "create child at {}", label);
+    body["body"]["id"].as_i64().expect("child id")
+}
+
+fn create_child_set(fixture: &support::Fixture, resume_id: Uuid) -> ChildIds {
+    let education_id = create_education(fixture, resume_id);
+
+    let education_key_point_id = post_child(
+        fixture,
+        format!("/api/resume/{}/education/{}/key_points", resume_id, education_id),
+        serde_json::json!({ "key_point": "Graduated with honors", "display_order": 1 }),
+    );
+
+    let skill_id = post_child(
+        fixture,
+        format!("/api/resume/{}/skills", resume_id),
+        serde_json::json!({ "skill_name": "Rust", "confidence_percentage": 90, "display_order": 1 }),
+    );
+
+    let work_id = post_child(
+        fixture,
+        format!("/api/resume/{}/work_experiences", resume_id),
+        serde_json::json!({
+            "job_title": "Engineer",
+            "company_name": "Tech Corp",
+            "start_date": "2021-01",
+            "display_order": 1
+        }),
+    );
+
+    let work_key_point_id = post_child(
+        fixture,
+        format!("/api/resume/{}/work_experiences/{}/key_points", resume_id, work_id),
+        serde_json::json!({ "key_point": "Shipped the API", "display_order": 1 }),
+    );
+
+    let project_id = post_child(
+        fixture,
+        format!("/api/resume/{}/portfolio_projects", resume_id),
+        serde_json::json!({ "project_name": "Resume API", "display_order": 1 }),
+    );
+
+    let project_key_point_id = post_child(
+        fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/key_points",
+            resume_id, project_id
+        ),
+        serde_json::json!({ "key_point": "Serves markdown", "display_order": 1 }),
+    );
+
+    let technology_id = post_child(
+        fixture,
+        format!(
+            "/api/resume/{}/portfolio_projects/{}/technologies",
+            resume_id, project_id
+        ),
+        serde_json::json!({ "technology_name": "Diesel", "display_order": 1 }),
+    );
+
+    let language_id = post_child(
+        fixture,
+        format!("/api/resume/{}/languages", resume_id),
+        serde_json::json!({ "language_name": "Rust", "display_order": 1 }),
+    );
+
+    let framework_id = post_child(
+        fixture,
+        format!("/api/resume/{}/languages/{}/frameworks", resume_id, language_id),
+        serde_json::json!({ "framework_name": "Rocket", "display_order": 1 }),
+    );
+
+    ChildIds {
+        education_id,
+        education_key_point_id,
+        skill_id,
+        work_id,
+        work_key_point_id,
+        project_id,
+        project_key_point_id,
+        technology_id,
+        language_id,
+        framework_id,
+    }
+}
+
+struct ChildIds {
+    education_id: i64,
+    education_key_point_id: i64,
+    skill_id: i64,
+    work_id: i64,
+    work_key_point_id: i64,
+    project_id: i64,
+    project_key_point_id: i64,
+    technology_id: i64,
+    language_id: i64,
+    framework_id: i64,
+}
+
+fn keyed(snapshot: &Value, collection: &str, key: i64) -> Value {
+    snapshot[collection][key.to_string()].clone()
+}
+
+fn restore_revision(
+    fixture: &support::Fixture,
+    resume_id: Uuid,
+    revision: i64,
+    expected_revision: i64,
+) -> (Status, Value) {
+    post_json(
+        fixture,
+        format!("/api/resume/{}/revisions/{}/restore", resume_id, revision),
+        serde_json::json!({ "expected_revision": expected_revision }),
+    )
+}
+
+#[test]
+fn snapshot_omits_identity_and_lifecycle_fields() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 5);
+    let resume_id = create_resume(&fixture, "Shape", "Here");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "There" })),
+        Status::Ok
+    );
+
+    let (_, revision) = fetch_revision(&fixture, resume_id, 1);
+    let snapshot = &revision["body"]["snapshot"];
+
+    for field in [
+        "id",
+        "created_at",
+        "updated_at",
+        "created_by",
+        "base_resume_id",
+    ] {
+        assert!(
+            snapshot.get(field).is_none(),
+            "snapshot must not carry {}",
+            field
+        );
+    }
+
+    assert_eq!(snapshot["schema_version"].as_i64(), Some(1));
+    assert_eq!(snapshot["show_variant_tag"].as_bool(), Some(true));
+    assert_eq!(snapshot["visibility"].as_str(), Some("private"));
+    assert!(snapshot["name"].is_string());
+    assert!(snapshot["education"].is_array());
+}
+
+#[test]
+fn snapshot_carries_every_child_collection() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 6);
+    let resume_id = create_resume(&fixture, "All Children", "Here");
+    fixture.track_resume_id(resume_id);
+
+    let ids = create_child_set(&fixture, resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "Moved" })),
+        Status::Ok
+    );
+
+    let (status, revision) = fetch_revision(&fixture, resume_id, 1);
+    assert_eq!(status, Status::Ok);
+    let snapshot = &revision["body"]["snapshot"];
+
+    assert_eq!(snapshot["education"][0]["id"].as_i64(), Some(ids.education_id));
+    assert_eq!(
+        keyed(snapshot, "education_key_points", ids.education_id)[0]["id"].as_i64(),
+        Some(ids.education_key_point_id)
+    );
+    assert_eq!(snapshot["skills"][0]["id"].as_i64(), Some(ids.skill_id));
+    assert_eq!(
+        snapshot["work_experiences"][0]["id"].as_i64(),
+        Some(ids.work_id)
+    );
+    assert_eq!(
+        keyed(snapshot, "work_experience_key_points", ids.work_id)[0]["id"].as_i64(),
+        Some(ids.work_key_point_id)
+    );
+    assert_eq!(
+        snapshot["portfolio_projects"][0]["id"].as_i64(),
+        Some(ids.project_id)
+    );
+    assert_eq!(
+        keyed(snapshot, "portfolio_key_points", ids.project_id)[0]["id"].as_i64(),
+        Some(ids.project_key_point_id)
+    );
+    assert_eq!(
+        keyed(snapshot, "portfolio_technologies", ids.project_id)[0]["id"].as_i64(),
+        Some(ids.technology_id)
+    );
+    assert_eq!(snapshot["languages"][0]["id"].as_i64(), Some(ids.language_id));
+    assert_eq!(
+        keyed(snapshot, "frameworks", ids.language_id)[0]["id"].as_i64(),
+        Some(ids.framework_id)
+    );
+}
+
+#[test]
+fn markdown_import_writes_one_revision() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 7);
+    let resume_id = create_resume(&fixture, "Import Subject", "Original");
+    fixture.track_resume_id(resume_id);
+
+    let (_, created) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}", resume_id),
+        fixture.auth_header(),
+    );
+    let original_email = created["body"]["email"]
+        .as_str()
+        .expect("email")
+        .to_string();
+
+    let markdown = format!(
+        "# Import Subject\n\n- Location: Imported\n- Email: {}\n\n## Skills\n\n- Rust - 90%\n",
+        support::unique_email("revision.import")
+    );
+
+    let response = fixture
+        .client()
+        .post(format!("/api/resume/{}/import/markdown", resume_id))
+        .header(fixture.auth_header())
+        .header(ContentType::Markdown)
+        .body(markdown)
+        .dispatch();
+    assert_eq!(response.status(), Status::Ok, "import into an existing resume");
+
+    let (status, body) = list_revisions(&fixture, resume_id);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        revision_numbers(&body),
+        vec![1],
+        "a whole-aggregate replace is a single revision"
+    );
+
+    let (_, revision) = fetch_revision(&fixture, resume_id, 1);
+    let snapshot = &revision["body"]["snapshot"];
+    assert_eq!(
+        snapshot["email"].as_str(),
+        Some(original_email.as_str()),
+        "the revision holds the state from before the import"
+    );
+    assert_eq!(
+        snapshot["education"]
+            .as_array()
+            .expect("education array")
+            .len(),
+        0
+    );
+}
+
+#[test]
+fn restore_reapplies_content_and_appends_a_revision() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 8);
+    let resume_id = create_resume(&fixture, "Restore Subject", "L0");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "L1" })),
+        Status::Ok
+    );
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "L2" })),
+        Status::Ok
+    );
+
+    let (status, restored) = restore_revision(&fixture, resume_id, 1, 2);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        restored["body"]["location"].as_str(),
+        Some("L0"),
+        "restoring revision 1 applies the state from before the first edit"
+    );
+
+    let (_, body) = list_revisions(&fixture, resume_id);
+    assert_eq!(
+        revision_numbers(&body),
+        vec![3, 2, 1],
+        "a restore appends rather than truncating"
+    );
+
+    let head = &body["body"][0];
+    assert_eq!(head["is_restore"].as_bool(), Some(true));
+    assert_eq!(head["action"].as_str(), Some("personalinfo"));
+
+    let (_, appended) = fetch_revision(&fixture, resume_id, 3);
+    assert_eq!(
+        appended["body"]["snapshot"]["location"].as_str(),
+        Some("L2"),
+        "the appended revision holds the state the restore replaced"
+    );
+
+    let (_, current) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}", resume_id),
+        fixture.auth_header(),
+    );
+    assert_eq!(current["body"]["location"].as_str(), Some("L0"));
+}
+
+#[test]
+fn restore_preserves_display_order_and_active() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 9);
+    let resume_id = create_resume(&fixture, "Ordering", "Here");
+    fixture.track_resume_id(resume_id);
+
+    let education_id = create_education(&fixture, resume_id);
+
+    assert_eq!(
+        put_education(
+            &fixture,
+            education_id,
+            serde_json::json!({ "display_order": 9, "active": false })
+        ),
+        Status::Ok
+    );
+
+    let (status, _) = restore_revision(&fixture, resume_id, 2, 2);
+    assert_eq!(status, Status::Ok);
+
+    let (status, educations) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}/education", resume_id),
+        fixture.auth_header(),
+    );
+    assert_eq!(status, Status::Ok);
+    let restored = &educations["body"][0];
+    assert_eq!(restored["display_order"].as_i64(), Some(1));
+    assert_eq!(restored["active"].as_bool(), Some(true));
+}
+
+#[test]
+fn restore_leaves_identity_and_variant_email_alone() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 10);
+    let base_id = create_resume(&fixture, "Variant Base", "Base Place");
+    fixture.track_resume_id(base_id);
+
+    let (_, base) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}", base_id),
+        fixture.auth_header(),
+    );
+    let base_email = base["body"]["email"]
+        .as_str()
+        .expect("base email")
+        .to_string();
+
+    let (status, variant) = post_json(
+        &fixture,
+        format!("/api/resume/{}/variants", base_id),
+        serde_json::json!({ "variant_label": "Acme" }),
+    );
+    assert_eq!(status, Status::Created);
+    let variant_id = support::resume_uuid(&variant["body"]["id"]);
+    fixture.track_resume_id(variant_id);
+
+    assert_eq!(
+        put_resume(
+            &fixture,
+            variant_id,
+            serde_json::json!({ "location": "Variant Place" })
+        ),
+        Status::Ok
+    );
+
+    let (status, _) = restore_revision(&fixture, variant_id, 1, 1);
+    assert_eq!(status, Status::Ok);
+
+    let (status, current) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}", variant_id),
+        fixture.auth_header(),
+    );
+    assert_eq!(status, Status::Ok);
+    assert_eq!(current["body"]["email"].as_str(), Some(base_email.as_str()));
+    assert_eq!(
+        support::resume_uuid(&current["body"]["id"]),
+        variant_id,
+        "a restore does not rewrite row identity"
+    );
+    assert_eq!(
+        support::resume_uuid(&current["body"]["base_resume_id"]),
+        base_id
+    );
+    assert_eq!(
+        current["body"]["created_by"].as_i64(),
+        Some(fixture.user_id() as i64)
+    );
+}
+
+#[test]
+fn restore_restores_visibility() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 11);
+    let resume_id = create_resume(&fixture, "Visibility", "Here");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "visibility": "public" })
+        ),
+        Status::Ok
+    );
+
+    let (status, restored) = restore_revision(&fixture, resume_id, 1, 1);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        restored["body"]["visibility"].as_str(),
+        Some("private"),
+        "visibility is content, so a restore brings it back"
+    );
+}
+
+#[test]
+fn diff_path_is_a_json_pointer() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 12);
+    let resume_id = create_resume(&fixture, "Diff Subject", "Before");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "After" })),
+        Status::Ok
+    );
+
+    let (status, diff) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}/revisions/1/diff", resume_id),
+        fixture.auth_header(),
+    );
+    assert_eq!(status, Status::Ok);
+
+    let changes = diff["body"]["changes"]
+        .as_array()
+        .expect("changes array");
+    let location = changes
+        .iter()
+        .find(|change| change["path"].as_str() == Some("/location"))
+        .expect("a change for /location");
+
+    assert_eq!(location["kind"].as_str(), Some("changed"));
+    assert_eq!(location["before"].as_str(), Some("Before"));
+    assert_eq!(location["after"].as_str(), Some("After"));
+}
+
+#[test]
+fn older_snapshot_missing_a_field_deserializes() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 13);
+    let resume_id = create_resume(&fixture, "Old Snapshot", "Here");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "Moved" })),
+        Status::Ok
+    );
+
+    let mut connection = infrastructure::establish_connection();
+    diesel::sql_query(
+        "UPDATE resume_revisions SET snapshot = snapshot - 'video' WHERE resume_id = $1 AND revision = 1",
+    )
+    .bind::<diesel::sql_types::Uuid, _>(resume_id)
+    .execute(&mut connection)
+    .expect("strip a field from the stored snapshot");
+
+    let (status, revision) = fetch_revision(&fixture, resume_id, 1);
+    assert_eq!(
+        status,
+        Status::Ok,
+        "a snapshot missing a field still reads"
+    );
+    assert_eq!(
+        revision["body"]["snapshot"]["video"],
+        Value::Null,
+        "the missing field reads as absent"
+    );
 }
