@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use domain::models::{
     ResumeRevision, ResumeRevisionDiff, ResumeRevisionRow, ResumeRevisionSummary, ResumeSnapshot,
 };
-use infrastructure::establish_connection;
+use infrastructure::{DbConnection, establish_connection};
 use uuid::Uuid;
 
 use crate::error::ApplicationError;
@@ -64,7 +64,7 @@ pub fn revision_diff(
     let row = load_revision_row(resume_id, revision, user_id)?;
     let before = read_snapshot(&row)?;
 
-    let head = head_revision(resume_id)?;
+    let head = head_revision(&mut establish_connection(), resume_id).map_err(app_err_from_diesel_err)?;
     let after = if revision < head {
         let next = load_revision_row(resume_id, revision + 1, user_id)?;
         read_snapshot(&next)?
@@ -101,14 +101,18 @@ fn load_revision_row(
     )
 }
 
-fn head_revision(resume_id: Uuid) -> Result<i32, ApplicationError> {
+/// The highest revision a resume has, or zero when it has no revisions.
+/// Takes the caller's connection so a restore can read it under its own lock.
+pub(crate) fn head_revision(
+    conn: &mut DbConnection,
+    resume_id: Uuid,
+) -> Result<i32, diesel::result::Error> {
     use domain::schema::resume_revisions;
 
     let head: Option<i32> = resume_revisions::table
         .filter(resume_revisions::resume_id.eq(resume_id))
         .select(diesel::dsl::max(resume_revisions::revision))
-        .first(&mut establish_connection())
-        .map_err(app_err_from_diesel_err)?;
+        .first(conn)?;
 
     Ok(head.unwrap_or(0))
 }
