@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-diesel = { version = "2.3.2", features = ["postgres", "uuid"] }
+diesel = { version = "2.3.2", features = ["postgres", "serde_json", "uuid"] }
 domain = { path = "../domain" }
 infrastructure = { path = "../infrastructure" }
 rocket = { version = "0.5.1", features = ["json"] }
