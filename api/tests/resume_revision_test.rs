@@ -29,8 +29,8 @@ fn create_resume(fixture: &support::Fixture, name: &str, location: &str) -> Uuid
 
     assert_eq!(response.status(), Status::Created, "create resume");
 
-    let body: Value = serde_json::from_str(&response.into_string().expect("create body"))
-        .expect("valid json");
+    let body: Value =
+        serde_json::from_str(&response.into_string().expect("create body")).expect("valid json");
     support::resume_uuid(&body["body"]["id"])
 }
 
@@ -117,8 +117,8 @@ fn create_education(fixture: &support::Fixture, resume_id: Uuid) -> i64 {
 
     assert_eq!(response.status(), Status::Created, "create education");
 
-    let body: Value = serde_json::from_str(&response.into_string().expect("education body"))
-        .expect("valid json");
+    let body: Value =
+        serde_json::from_str(&response.into_string().expect("education body")).expect("valid json");
     body["body"]["id"].as_i64().expect("education id")
 }
 
@@ -136,7 +136,11 @@ fn scalar_update_writes_one_revision_with_pre_edit_snapshot() {
     );
 
     assert_eq!(
-        put_resume(&fixture, resume_id, serde_json::json!({ "location": "After" })),
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "location": "After" })
+        ),
         Status::Ok
     );
 
@@ -145,7 +149,10 @@ fn scalar_update_writes_one_revision_with_pre_edit_snapshot() {
     assert_eq!(revision_numbers(&body), vec![1]);
 
     let summary = &body["body"][0];
-    assert_eq!(summary["created_by"].as_i64(), Some(fixture.user_id() as i64));
+    assert_eq!(
+        summary["created_by"].as_i64(),
+        Some(fixture.user_id() as i64)
+    );
     assert_eq!(summary["is_restore"].as_bool(), Some(false));
     assert_eq!(summary["action"].as_str(), Some("personalinfo"));
 
@@ -233,7 +240,11 @@ fn resume_create_and_delete_write_no_revision() {
     fixture.track_resume_id(resume_id);
 
     assert_eq!(
-        put_resume(&fixture, resume_id, serde_json::json!({ "location": "Kept" })),
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "location": "Kept" })
+        ),
         Status::Ok
     );
     let (_, body) = list_revisions(&fixture, resume_id);
@@ -285,11 +296,7 @@ fn revision_numbers_are_dense_from_one() {
     assert_eq!(status, Status::NotFound);
 }
 
-fn post_json(
-    fixture: &support::Fixture,
-    path: String,
-    payload: Value,
-) -> (Status, Value) {
+fn post_json(fixture: &support::Fixture, path: String, payload: Value) -> (Status, Value) {
     let response = fixture
         .client()
         .post(path)
@@ -315,7 +322,10 @@ fn create_child_set(fixture: &support::Fixture, resume_id: Uuid) -> ChildIds {
 
     let education_key_point_id = post_child(
         fixture,
-        format!("/api/resume/{}/education/{}/key_points", resume_id, education_id),
+        format!(
+            "/api/resume/{}/education/{}/key_points",
+            resume_id, education_id
+        ),
         serde_json::json!({ "key_point": "Graduated with honors", "display_order": 1 }),
     );
 
@@ -338,7 +348,10 @@ fn create_child_set(fixture: &support::Fixture, resume_id: Uuid) -> ChildIds {
 
     let work_key_point_id = post_child(
         fixture,
-        format!("/api/resume/{}/work_experiences/{}/key_points", resume_id, work_id),
+        format!(
+            "/api/resume/{}/work_experiences/{}/key_points",
+            resume_id, work_id
+        ),
         serde_json::json!({ "key_point": "Shipped the API", "display_order": 1 }),
     );
 
@@ -374,7 +387,10 @@ fn create_child_set(fixture: &support::Fixture, resume_id: Uuid) -> ChildIds {
 
     let framework_id = post_child(
         fixture,
-        format!("/api/resume/{}/languages/{}/frameworks", resume_id, language_id),
+        format!(
+            "/api/resume/{}/languages/{}/frameworks",
+            resume_id, language_id
+        ),
         serde_json::json!({ "framework_name": "Rocket", "display_order": 1 }),
     );
 
@@ -429,7 +445,11 @@ fn snapshot_omits_identity_and_lifecycle_fields() {
     fixture.track_resume_id(resume_id);
 
     assert_eq!(
-        put_resume(&fixture, resume_id, serde_json::json!({ "location": "There" })),
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "location": "There" })
+        ),
         Status::Ok
     );
 
@@ -466,15 +486,28 @@ fn snapshot_carries_every_child_collection() {
     let ids = create_child_set(&fixture, resume_id);
 
     assert_eq!(
-        put_resume(&fixture, resume_id, serde_json::json!({ "location": "Moved" })),
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "location": "Moved" })
+        ),
         Status::Ok
     );
 
-    let (status, revision) = fetch_revision(&fixture, resume_id, 1);
+    let (status, timeline) = list_revisions(&fixture, resume_id);
+    assert_eq!(status, Status::Ok);
+    let head = timeline["body"][0]["revision"]
+        .as_i64()
+        .expect("the edit just captured a revision");
+
+    let (status, revision) = fetch_revision(&fixture, resume_id, head);
     assert_eq!(status, Status::Ok);
     let snapshot = &revision["body"]["snapshot"];
 
-    assert_eq!(snapshot["education"][0]["id"].as_i64(), Some(ids.education_id));
+    assert_eq!(
+        snapshot["education"][0]["id"].as_i64(),
+        Some(ids.education_id)
+    );
     assert_eq!(
         keyed(snapshot, "education_key_points", ids.education_id)[0]["id"].as_i64(),
         Some(ids.education_key_point_id)
@@ -500,7 +533,10 @@ fn snapshot_carries_every_child_collection() {
         keyed(snapshot, "portfolio_technologies", ids.project_id)[0]["id"].as_i64(),
         Some(ids.technology_id)
     );
-    assert_eq!(snapshot["languages"][0]["id"].as_i64(), Some(ids.language_id));
+    assert_eq!(
+        snapshot["languages"][0]["id"].as_i64(),
+        Some(ids.language_id)
+    );
     assert_eq!(
         keyed(snapshot, "frameworks", ids.language_id)[0]["id"].as_i64(),
         Some(ids.framework_id)
@@ -535,7 +571,11 @@ fn markdown_import_writes_one_revision() {
         .header(ContentType::Markdown)
         .body(markdown)
         .dispatch();
-    assert_eq!(response.status(), Status::Ok, "import into an existing resume");
+    assert_eq!(
+        response.status(),
+        Status::Ok,
+        "import into an existing resume"
+    );
 
     let (status, body) = list_revisions(&fixture, resume_id);
     assert_eq!(status, Status::Ok);
@@ -731,7 +771,11 @@ fn diff_path_is_a_json_pointer() {
     fixture.track_resume_id(resume_id);
 
     assert_eq!(
-        put_resume(&fixture, resume_id, serde_json::json!({ "location": "After" })),
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "location": "After" })
+        ),
         Status::Ok
     );
 
@@ -742,9 +786,7 @@ fn diff_path_is_a_json_pointer() {
     );
     assert_eq!(status, Status::Ok);
 
-    let changes = diff["body"]["changes"]
-        .as_array()
-        .expect("changes array");
+    let changes = diff["body"]["changes"].as_array().expect("changes array");
     let location = changes
         .iter()
         .find(|change| change["path"].as_str() == Some("/location"))
@@ -762,7 +804,11 @@ fn older_snapshot_missing_a_field_deserializes() {
     fixture.track_resume_id(resume_id);
 
     assert_eq!(
-        put_resume(&fixture, resume_id, serde_json::json!({ "location": "Moved" })),
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "location": "Moved" })
+        ),
         Status::Ok
     );
 
@@ -775,11 +821,7 @@ fn older_snapshot_missing_a_field_deserializes() {
     .expect("strip a field from the stored snapshot");
 
     let (status, revision) = fetch_revision(&fixture, resume_id, 1);
-    assert_eq!(
-        status,
-        Status::Ok,
-        "a snapshot missing a field still reads"
-    );
+    assert_eq!(status, Status::Ok, "a snapshot missing a field still reads");
     assert_eq!(
         revision["body"]["snapshot"]["video"],
         Value::Null,
@@ -868,7 +910,9 @@ fn capture_publishes_nothing_extra() {
         Status::Ok
     );
 
-    let event = receiver.try_recv().expect("the mutation notifies subscribers");
+    let event = receiver
+        .try_recv()
+        .expect("the mutation notifies subscribers");
     assert_eq!(
         event.action,
         api::realtime::ResumeChangedAction::Updated(api::realtime::SectionType::PersonalInfo)
@@ -905,14 +949,9 @@ fn concurrent_edits_serialize_without_losing_a_revision() {
                     serde_json::from_value(serde_json::json!({ "location": location }))
                         .expect("update dto");
 
-                application::resume::update::update_resume(
-                    user_id,
-                    resume_id,
-                    dto,
-                    &NullPublisher,
-                )
-                .expect("a concurrent edit serializes instead of failing")
-                .location
+                application::resume::update::update_resume(user_id, resume_id, dto, &NullPublisher)
+                    .expect("a concurrent edit serializes instead of failing")
+                    .location
             })
         })
         .collect();
