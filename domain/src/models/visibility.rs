@@ -31,6 +31,12 @@ impl Visibility {
     }
 }
 
+impl Default for Visibility {
+    fn default() -> Self {
+        Visibility::Private
+    }
+}
+
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
