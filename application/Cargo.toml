@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-diesel = { version = "2.3.2", features = ["postgres", "uuid"] }
+diesel = { version = "2.3.2", features = ["postgres", "serde_json", "uuid"] }
 domain = { path = "../domain" }
 infrastructure = { path = "../infrastructure" }
 rocket = { version = "0.5.1", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
+similar = "3.2.0"
 shared = { path = "../shared" }
 argon2 = "0.5.3"
 rand_core = "0.6.4"
