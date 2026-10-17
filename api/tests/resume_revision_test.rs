@@ -267,6 +267,38 @@ fn resume_create_and_delete_write_no_revision() {
 }
 
 #[test]
+fn delete_miss_writes_no_revision() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 18);
+    let resume_id = create_resume(&fixture, "Delete Miss", "Here");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(
+            &fixture,
+            resume_id,
+            serde_json::json!({ "location": "There" })
+        ),
+        Status::Ok
+    );
+    let (_, body) = list_revisions(&fixture, resume_id);
+    assert_eq!(revision_numbers(&body), vec![1]);
+
+    assert_eq!(
+        delete_education(&fixture, 9_999_999),
+        Status::NotFound,
+        "deleting a row that does not exist is a miss"
+    );
+
+    let (status, body) = list_revisions(&fixture, resume_id);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        revision_numbers(&body),
+        vec![1],
+        "a delete that matched no row leaves no revision"
+    );
+}
+
+#[test]
 fn revision_numbers_are_dense_from_one() {
     let mut fixture = support::Fixture::new(LOCK_KEY + 4);
     let resume_id = create_resume(&fixture, "Dense", "L0");

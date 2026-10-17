@@ -1,4 +1,5 @@
 use chrono::NaiveDate;
+use diesel::Connection;
 use diesel::prelude::{BoolExpressionMethods, ExpressionMethods, QueryDsl};
 use diesel::query_dsl::LoadQuery;
 use diesel::query_dsl::methods::LimitDsl;
@@ -74,8 +75,10 @@ pub fn run_published<T>(
 }
 
 /// Runs a delete `op` and its revision capture in one transaction on a pooled
-/// connection, returning the affected row count. Zero rows deleted → 404;
-/// otherwise publishes `resume_changed` with `action` for `resume_id`.
+/// connection. A miss (zero rows deleted) rolls the transaction back — the
+/// capture goes with it — and returns the uniform "{entity} with id {id} not
+/// found" body; otherwise publishes `resume_changed` with `action` for
+/// `resume_id`.
 pub fn run_published_delete(
     entity: &str,
     id: impl std::fmt::Display,
@@ -86,17 +89,35 @@ pub fn run_published_delete(
 ) -> Result<(), ApplicationError> {
     let mut conn = establish_connection();
 
-    match run_in_transaction(&mut conn, |conn| {
+    match conn.transaction::<usize, DeleteMissOr, _>(|conn| {
         capture_for_action(conn, resume_id, &action)?;
-        op(conn)
+        match op(conn)? {
+            0 => Err(DeleteMissOr::Miss),
+            deleted => Ok(deleted),
+        }
     }) {
-        Ok(0) => Err(entity_not_found(entity, id)),
         Ok(_) => {
             publisher.resume_changed(resume_id, action);
             Ok(())
         }
-        Err(diesel::result::Error::NotFound) => Err(entity_not_found(entity, id)),
-        Err(err) => Err(app_err_from_diesel_err(err)),
+        Err(DeleteMissOr::Miss) | Err(DeleteMissOr::Db(diesel::result::Error::NotFound)) => {
+            Err(entity_not_found(entity, id))
+        }
+        Err(DeleteMissOr::Db(err)) => Err(app_err_from_diesel_err(err)),
+    }
+}
+
+/// Transaction error for `run_published_delete`: a zero-row delete is not a
+/// database failure, but returning it as an error is what rolls the capture
+/// back with the rest of the transaction.
+enum DeleteMissOr {
+    Miss,
+    Db(diesel::result::Error),
+}
+
+impl From<diesel::result::Error> for DeleteMissOr {
+    fn from(err: diesel::result::Error) -> Self {
+        DeleteMissOr::Db(err)
     }
 }
 
