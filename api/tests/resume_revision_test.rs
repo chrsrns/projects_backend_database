@@ -786,3 +786,181 @@ fn older_snapshot_missing_a_field_deserializes() {
         "the missing field reads as absent"
     );
 }
+
+#[test]
+fn restore_with_stale_expected_head_is_409() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 14);
+    let resume_id = create_resume(&fixture, "Stale Guard", "L0");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "L1" })),
+        Status::Ok
+    );
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "L2" })),
+        Status::Ok
+    );
+
+    let (status, _) = restore_revision(&fixture, resume_id, 1, 1);
+    assert_eq!(
+        status,
+        Status::Conflict,
+        "a client holding a stale head is refused"
+    );
+
+    let (_, body) = list_revisions(&fixture, resume_id);
+    assert_eq!(
+        revision_numbers(&body),
+        vec![2, 1],
+        "a refused restore writes nothing"
+    );
+
+    let (_, current) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}", resume_id),
+        fixture.auth_header(),
+    );
+    assert_eq!(current["body"]["location"].as_str(), Some("L2"));
+
+    let (status, _) = restore_revision(&fixture, resume_id, 1, 2);
+    assert_eq!(status, Status::Ok, "the current head is accepted");
+}
+
+#[test]
+fn restore_publishes_personalinfo_for_the_target_resume() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 15);
+    let resume_id = create_resume(&fixture, "Publish", "L0");
+    fixture.track_resume_id(resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "L1" })),
+        Status::Ok
+    );
+
+    let mut receiver = fixture.hub.subscribe(resume_id);
+
+    let (status, _) = restore_revision(&fixture, resume_id, 1, 1);
+    assert_eq!(status, Status::Ok);
+
+    let event = receiver.try_recv().expect("a restore notifies subscribers");
+    assert_eq!(event.resume_id, resume_id);
+    assert_eq!(
+        event.action,
+        api::realtime::ResumeChangedAction::Updated(api::realtime::SectionType::PersonalInfo)
+    );
+    assert!(
+        receiver.try_recv().is_err(),
+        "a restore publishes exactly one event"
+    );
+}
+
+#[test]
+fn capture_publishes_nothing_extra() {
+    let mut fixture = support::Fixture::new(LOCK_KEY + 16);
+    let resume_id = create_resume(&fixture, "Quiet Capture", "L0");
+    fixture.track_resume_id(resume_id);
+
+    let mut receiver = fixture.hub.subscribe(resume_id);
+
+    assert_eq!(
+        put_resume(&fixture, resume_id, serde_json::json!({ "location": "L1" })),
+        Status::Ok
+    );
+
+    let event = receiver.try_recv().expect("the mutation notifies subscribers");
+    assert_eq!(
+        event.action,
+        api::realtime::ResumeChangedAction::Updated(api::realtime::SectionType::PersonalInfo)
+    );
+    assert!(
+        receiver.try_recv().is_err(),
+        "capturing the pre-state publishes nothing of its own"
+    );
+}
+
+#[test]
+fn concurrent_edits_serialize_without_losing_a_revision() {
+    struct NullPublisher;
+
+    impl application::realtime::ResumeChangePublisher for NullPublisher {
+        fn resume_changed(
+            &self,
+            _resume_id: Uuid,
+            _action: application::realtime::ResumeChangedAction,
+        ) {
+        }
+    }
+
+    let mut fixture = support::Fixture::new(LOCK_KEY + 17);
+    let resume_id = create_resume(&fixture, "Concurrent", "L0");
+    fixture.track_resume_id(resume_id);
+    let user_id = fixture.user_id();
+
+    let handles: Vec<_> = ["A", "B"]
+        .into_iter()
+        .map(|location| {
+            std::thread::spawn(move || {
+                let dto: domain::models::UpdateResume =
+                    serde_json::from_value(serde_json::json!({ "location": location }))
+                        .expect("update dto");
+
+                application::resume::update::update_resume(
+                    user_id,
+                    resume_id,
+                    dto,
+                    &NullPublisher,
+                )
+                .expect("a concurrent edit serializes instead of failing")
+                .location
+            })
+        })
+        .collect();
+
+    let mut written: Vec<String> = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("thread joins").expect("location"))
+        .collect();
+    written.sort();
+
+    let (status, body) = list_revisions(&fixture, resume_id);
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        revision_numbers(&body),
+        vec![2, 1],
+        "both edits are recorded, with no gap and no lost write"
+    );
+
+    let (_, first) = fetch_revision(&fixture, resume_id, 1);
+    assert_eq!(
+        first["body"]["snapshot"]["location"].as_str(),
+        Some("L0"),
+        "the first revision still holds the original state"
+    );
+
+    let (_, second) = fetch_revision(&fixture, resume_id, 2);
+    let second_pre = second["body"]["snapshot"]["location"]
+        .as_str()
+        .expect("pre-state")
+        .to_string();
+    assert!(
+        second_pre == "A" || second_pre == "B",
+        "the second edit observes the first one's committed write"
+    );
+
+    let (_, current) = get_json(
+        fixture.client(),
+        format!("/api/resume/{}", resume_id),
+        fixture.auth_header(),
+    );
+    let live = current["body"]["location"]
+        .as_str()
+        .expect("live location")
+        .to_string();
+
+    assert_eq!(written, vec!["A".to_string(), "B".to_string()]);
+    assert_ne!(
+        live, second_pre,
+        "the live row is the last writer's state, never a recorded pre-image"
+    );
+}
