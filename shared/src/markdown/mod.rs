@@ -45,7 +45,7 @@ pub(crate) mod tests {
                 .unwrap()
                 .and_hms_opt(0, 0, 0)
                 .unwrap(),
-            created_by: Some(1),
+            created_by: 1,
             visibility: "public".to_string(),
             executive_summary: None,
             video: None,

@@ -412,7 +412,7 @@ fn variant_create_defaults_public_from_base_and_tag_true() {
         "tag defaults to true and is visible to the owner"
     );
     assert_eq!(variant.base_resume_id, Some(base_id));
-    assert_eq!(variant.created_by, Some(fixture.user_id()));
+    assert_eq!(variant.created_by, fixture.user_id());
     assert_eq!(variant.company_name.as_deref(), Some("Acme Corp"));
     assert_eq!(variant.variant_label.as_deref(), Some("Acme 2026"));
 

@@ -95,7 +95,7 @@ pub fn create_variant(
         mobile_number: base.mobile_number.clone(),
         executive_summary: base.executive_summary.clone(),
         video: base.video.clone(),
-        created_by: Some(user_id_value),
+        created_by: user_id_value,
         visibility: request
             .visibility
             .map(|v| v.as_str().to_string())

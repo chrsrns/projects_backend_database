@@ -355,7 +355,7 @@ mod tests {
             mobile_number: None,
             created_at: Utc::now().naive_utc(),
             updated_at: Utc::now().naive_utc(),
-            created_by: Some(1),
+            created_by: 1,
             visibility: "unlisted".to_string(),
             executive_summary: None,
             video: None,

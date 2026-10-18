@@ -148,14 +148,15 @@ pub fn find_accessible_resume(
 }
 
 pub fn require_owner(resume: &Resume, user_id: i32) -> Result<(), ApplicationError> {
-    match resume.created_by {
-        Some(owner) if owner == user_id => Ok(()),
-        _ => Err(ApplicationError::Forbidden),
+    if resume.created_by == user_id {
+        Ok(())
+    } else {
+        Err(ApplicationError::Forbidden)
     }
 }
 
 pub fn viewer_is_owner(resume: &Resume, viewer: Option<i32>) -> bool {
-    resume.created_by == viewer
+    Some(resume.created_by) == viewer
 }
 
 pub fn validate_executive_summary(
@@ -274,7 +275,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
-    fn resume_with_owner(owner: Option<i32>) -> Resume {
+    fn resume_with_owner(owner: i32) -> Resume {
         Resume {
             id: Uuid::nil(),
             name: "n".to_string(),
@@ -310,43 +311,30 @@ mod tests {
 
     #[test]
     fn test_require_owner_accepts_owner() {
-        assert!(require_owner(&resume_with_owner(Some(7)), 7).is_ok());
+        assert!(require_owner(&resume_with_owner(7), 7).is_ok());
     }
 
     #[test]
     fn test_require_owner_rejects_non_owner() {
         assert_eq!(
-            require_owner(&resume_with_owner(Some(7)), 8),
-            Err(ApplicationError::Forbidden)
-        );
-    }
-
-    #[test]
-    fn test_require_owner_rejects_unowned_row() {
-        assert_eq!(
-            require_owner(&resume_with_owner(None), 7),
+            require_owner(&resume_with_owner(7), 8),
             Err(ApplicationError::Forbidden)
         );
     }
 
     #[test]
     fn test_viewer_is_owner_matching() {
-        assert!(viewer_is_owner(&resume_with_owner(Some(7)), Some(7)));
+        assert!(viewer_is_owner(&resume_with_owner(7), Some(7)));
     }
 
     #[test]
     fn test_viewer_is_owner_mismatch() {
-        assert!(!viewer_is_owner(&resume_with_owner(Some(7)), Some(8)));
+        assert!(!viewer_is_owner(&resume_with_owner(7), Some(8)));
     }
 
     #[test]
     fn test_viewer_is_owner_anonymous() {
-        assert!(!viewer_is_owner(&resume_with_owner(Some(7)), None));
-    }
-
-    #[test]
-    fn test_viewer_is_owner_unowned_row() {
-        assert!(!viewer_is_owner(&resume_with_owner(None), Some(7)));
+        assert!(!viewer_is_owner(&resume_with_owner(7), None));
     }
 
     #[test]

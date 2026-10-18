@@ -627,7 +627,7 @@ pub fn import_resume_markdown(
         mobile_number: full_resume.mobile_number.clone(),
         executive_summary: validated.executive_summary.clone(),
         video: validated.video.clone(),
-        created_by: Some(user_id_value),
+        created_by: user_id_value,
         visibility: full_resume.visibility.as_str().to_string(),
         base_resume_id: None,
         company_name: None,

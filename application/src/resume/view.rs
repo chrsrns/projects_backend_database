@@ -23,7 +23,7 @@ fn base_accessibility(
         return Ok(HashMap::new());
     }
 
-    let rows: Vec<(Option<Uuid>, String, Option<i32>)> = joined_resume
+    let rows: Vec<(Option<Uuid>, String, i32)> = joined_resume
         .inner_join(
             base_resume.on(base_resume
                 .field(resumes::id)
@@ -42,8 +42,8 @@ fn base_accessibility(
     let mut accessibility = HashMap::new();
     for (base_id, base_visibility, base_owner) in rows {
         if let Some(base_id) = base_id {
-            let reachable = base_visibility == Visibility::Public.as_str()
-                || (viewer.is_some() && base_owner.is_some() && base_owner == viewer);
+            let reachable =
+                base_visibility == Visibility::Public.as_str() || viewer == Some(base_owner);
             accessibility.insert(base_id, reachable);
         }
     }

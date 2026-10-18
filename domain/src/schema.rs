@@ -129,7 +129,7 @@ diesel::table! {
         mobile_number -> Nullable<Varchar>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        created_by -> Nullable<Int4>,
+        created_by -> Int4,
         executive_summary -> Nullable<Text>,
         #[max_length = 500]
         video -> Nullable<Varchar>,

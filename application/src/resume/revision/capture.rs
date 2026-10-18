@@ -33,10 +33,7 @@ pub fn capture(
     };
 
     // Every mutating use case is owner gated, so the row always has an author.
-    // A missing one is an internal inconsistency, not a client error.
-    let Some(created_by) = resume.created_by else {
-        return Err(diesel::result::Error::RollbackTransaction);
-    };
+    let created_by = resume.created_by;
 
     let full = load_full_resume(conn, resume_id)?.ok_or(diesel::result::Error::NotFound)?;
     let snapshot = snapshot_from_full_resume(&full)
