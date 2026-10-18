@@ -101,6 +101,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    resume_revisions (resume_id, revision) {
+        resume_id -> Uuid,
+        revision -> Int4,
+        created_at -> Timestamp,
+        created_by -> Int4,
+        #[max_length = 32]
+        action -> Varchar,
+        is_restore -> Bool,
+        snapshot -> Jsonb,
+    }
+}
+
+diesel::table! {
     resumes (id) {
         #[max_length = 255]
         name -> Varchar,
@@ -211,6 +224,8 @@ diesel::joinable!(languages -> resumes (resume_id));
 diesel::joinable!(portfolio_key_points -> portfolio_projects (portfolio_project_id));
 diesel::joinable!(portfolio_projects -> resumes (resume_id));
 diesel::joinable!(portfolio_technologies -> portfolio_projects (portfolio_project_id));
+diesel::joinable!(resume_revisions -> resumes (resume_id));
+diesel::joinable!(resume_revisions -> users (created_by));
 diesel::joinable!(resumes -> users (created_by));
 diesel::joinable!(sessions -> users (user_id));
 diesel::joinable!(skills -> resumes (resume_id));
@@ -225,6 +240,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     portfolio_key_points,
     portfolio_projects,
     portfolio_technologies,
+    resume_revisions,
     resumes,
     sessions,
     skills,

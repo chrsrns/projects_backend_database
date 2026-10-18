@@ -56,6 +56,21 @@ A variant is a full deep copy of a base resume, tagged with the company, role, t
 
 Variant targeting metadata round-trips through a `---` front-matter block in the Markdown export/import (see the format document); it stays out of `ResumeDocument`.
 
+### Revision history
+
+Every edit that changes stored state records a revision: the whole resume, children included, exactly as it stood *before* that edit. Revision 1 therefore holds the state that preceded the first edit, and the current resume is the live row rather than a revision. Creating a resume records nothing, because there is no before-image to keep.
+
+History is owner-only, including for a public or unlisted resume: a revision can hold content the current visibility hides, so holding the link is not enough. The trail is kept in full with no pruning, and it cascades away when the resume is deleted.
+
+- **GET** `/api/resume/{id}/revisions` — the timeline, newest first, without snapshot bodies (Bearer auth, owner only)
+- **GET** `/api/resume/{id}/revisions/{n}` — one revision with the state it recorded (Bearer auth, owner only)
+- **GET** `/api/resume/{id}/revisions/{n}/diff` — what the edit changed, as JSON Pointers; add `?unified=true` for a unified text diff (Bearer auth, owner only)
+- **POST** `/api/resume/{id}/revisions/{n}/restore` — put the state before edit `n` back (Bearer auth, owner only)
+
+A restore body carries the revision the client believes is current (`{"expected_revision": 3}`); a stale value answers `409` and writes nothing. A successful restore appends the state it replaced as a new revision, so the trail stays complete and the head is always the newest entry. It rewrites content only: row identity, author and base linkage are untouched, a variant keeps its email, and restoring an address another base resume has since claimed is refused with `409`.
+
+Children are reinserted on restore, so child ids change while content, `display_order` and `active` survive. Diff paths address children by position rather than by id for that reason, and a renumbering with identical content is not reported as a change.
+
 ### Markdown resume endpoints
 
 Markdown bodies are accepted as `text/markdown` up to 1 MiB (larger payloads get a `413`). Every export opens with a front-matter block whose `resume_id` marker routes a re-import back onto that row; `POST /api/resume/import/markdown` resolves marker, then email match, then create. Stripping the marker imports the content as a new resume. The explicit route `POST /api/resume/{id}/import/markdown` targets the URL id (owner only; a disagreeing marker answers `400`). On a variant target the `Email`/`Visibility` bullets are validated but ignored, and the front-matter metadata keys apply with absent = no change and empty/`null` = `NULL`.
