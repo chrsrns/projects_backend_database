@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
 use diesel::alias;
+use diesel::pg::Pg;
 use diesel::prelude::*;
-use domain::models::{Resume, ResumeView, Visibility};
+use diesel::sql_types::{Nullable, Text};
+use domain::models::{
+    Resume, ResumeListOrder, ResumeListQuery, ResumeListSort, ResumePage, ResumeView, Visibility,
+};
 use domain::schema::resumes;
 use infrastructure::establish_connection;
 
@@ -23,7 +27,7 @@ fn base_accessibility(
         return Ok(HashMap::new());
     }
 
-    let rows: Vec<(Option<Uuid>, String, Option<i32>)> = joined_resume
+    let rows: Vec<(Option<Uuid>, String, i32)> = joined_resume
         .inner_join(
             base_resume.on(base_resume
                 .field(resumes::id)
@@ -42,8 +46,8 @@ fn base_accessibility(
     let mut accessibility = HashMap::new();
     for (base_id, base_visibility, base_owner) in rows {
         if let Some(base_id) = base_id {
-            let reachable = base_visibility == Visibility::Public.as_str()
-                || (viewer.is_some() && base_owner.is_some() && base_owner == viewer);
+            let reachable =
+                base_visibility == Visibility::Public.as_str() || viewer == Some(base_owner);
             accessibility.insert(base_id, reachable);
         }
     }
@@ -77,26 +81,94 @@ fn accessible_resume(
         .map_err(app_err_from_diesel_err)
 }
 
-/// Listing access (V211): non-owners see `public` rows only; `unlisted`
-/// is never listed.
-fn listed_resumes(viewer: Option<i32>) -> Result<Vec<Resume>, ApplicationError> {
+/// LIKE metacharacters are literal in a search term (V256).
+fn escape_like(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+/// Listing access (V211) + the search term set (V252): non-owners see
+/// `public` rows only; `unlisted` is never listed.
+fn scoped_resumes(
+    viewer: Option<i32>,
+    query: &ResumeListQuery,
+) -> resumes::BoxedQuery<'static, Pg> {
     use domain::schema::resumes::dsl as resumes_dsl;
 
-    let mut query = resumes_dsl::resumes.into_boxed();
-    query = match viewer {
-        Some(user_id) => query.filter(
+    let mut q = resumes_dsl::resumes.into_boxed();
+    q = match viewer {
+        Some(user_id) => q.filter(
             resumes_dsl::visibility
                 .eq(Visibility::Public.as_str())
                 .or(resumes_dsl::created_by.eq(user_id)),
         ),
-        None => query.filter(resumes_dsl::visibility.eq(Visibility::Public.as_str())),
+        None => q.filter(resumes_dsl::visibility.eq(Visibility::Public.as_str())),
     };
 
-    query
+    for term in &query.search_terms {
+        let pattern = format!("%{}%", escape_like(term));
+        q = q.filter(
+            resumes_dsl::name
+                .ilike(pattern.clone())
+                .or(resumes_dsl::email.ilike(pattern.clone()))
+                .or(resumes_dsl::company_name.ilike(pattern.clone()))
+                .or(resumes_dsl::role_title.ilike(pattern.clone()))
+                .or(resumes_dsl::variant_label.ilike(pattern.clone()))
+                .or(resumes_dsl::job_description.ilike(pattern.clone()))
+                .or(resumes_dsl::target_date
+                    .cast::<Nullable<Text>>()
+                    .ilike(pattern)),
+        );
+    }
+
+    q
+}
+
+fn listed_resumes(
+    viewer: Option<i32>,
+    query: &ResumeListQuery,
+) -> Result<ResumePage, ApplicationError> {
+    use domain::schema::resumes::dsl as resumes_dsl;
+
+    let mut conn = establish_connection();
+
+    let total: i64 = scoped_resumes(viewer, query)
+        .count()
+        .get_result(&mut conn)
+        .map_err(app_err_from_diesel_err)?;
+
+    let mut q = scoped_resumes(viewer, query);
+    q = match (query.sort, query.order) {
+        (ResumeListSort::Id, ResumeListOrder::Asc) => q.order(resumes_dsl::id.asc()),
+        (ResumeListSort::Id, ResumeListOrder::Desc) => q.order(resumes_dsl::id.desc()),
+        (ResumeListSort::Name, ResumeListOrder::Asc) => q
+            .order(resumes_dsl::name.asc())
+            .then_order_by(resumes_dsl::id.asc()),
+        (ResumeListSort::Name, ResumeListOrder::Desc) => q
+            .order(resumes_dsl::name.desc())
+            .then_order_by(resumes_dsl::id.asc()),
+        (ResumeListSort::UpdatedAt, ResumeListOrder::Asc) => q
+            .order(resumes_dsl::updated_at.asc())
+            .then_order_by(resumes_dsl::id.asc()),
+        (ResumeListSort::UpdatedAt, ResumeListOrder::Desc) => q
+            .order(resumes_dsl::updated_at.desc())
+            .then_order_by(resumes_dsl::id.asc()),
+    };
+
+    let rows = q
         .select(resumes::all_columns)
-        .order(resumes_dsl::id.asc())
-        .load::<Resume>(&mut establish_connection())
-        .map_err(app_err_from_diesel_err)
+        .limit(query.limit)
+        .offset(query.offset)
+        .load::<Resume>(&mut conn)
+        .map_err(app_err_from_diesel_err)?;
+
+    Ok(ResumePage {
+        items: build_views(viewer, rows)?,
+        total,
+        limit: query.limit,
+        offset: query.offset,
+    })
 }
 
 fn build_views(
@@ -136,8 +208,11 @@ pub fn load_resume_view(
     }
 }
 
-pub fn load_resume_views(viewer: Option<i32>) -> Result<Vec<ResumeView>, ApplicationError> {
-    build_views(viewer, listed_resumes(viewer)?)
+pub fn load_resume_views(
+    viewer: Option<i32>,
+    query: &ResumeListQuery,
+) -> Result<ResumePage, ApplicationError> {
+    listed_resumes(viewer, query)
 }
 
 /// Builds views for rows the caller has already proven they may read,

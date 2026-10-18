@@ -181,7 +181,7 @@ fn resume_view_shape_flat_across_all_endpoints() {
         .dispatch();
     assert_eq!(listed.status(), Status::Ok);
     let listed_json: Value = serde_json::from_str(&listed.into_string().unwrap()).unwrap();
-    let items = listed_json["body"].as_array().unwrap();
+    let items = listed_json["body"]["items"].as_array().unwrap();
     assert!(!items.is_empty());
     for item in items {
         assert_flat_resume_view(item);
@@ -228,7 +228,7 @@ fn list_resumes_includes_variants_in_id_order() {
         .dispatch();
     assert_eq!(response.status(), Status::Ok);
     let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
-    let items = json["body"].as_array().unwrap();
+    let items = json["body"]["items"].as_array().unwrap();
 
     let ids: Vec<uuid::Uuid> = items
         .iter()

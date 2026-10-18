@@ -791,7 +791,7 @@ fn stale_email_marker_still_targets_variant() {
         .dispatch();
     assert_eq!(list.status(), Status::Ok);
     let resumes: Value = serde_json::from_str(&list.into_string().unwrap()).unwrap();
-    let ids: Vec<uuid::Uuid> = resumes["body"]
+    let ids: Vec<uuid::Uuid> = resumes["body"]["items"]
         .as_array()
         .unwrap()
         .iter()

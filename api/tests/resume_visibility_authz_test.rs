@@ -76,7 +76,7 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     assert_eq!(anon_list_response.status(), Status::Ok);
     let anon_list_body = anon_list_response.into_string().expect("anon list body");
     let anon_list_json: Value = serde_json::from_str(&anon_list_body).expect("valid json");
-    let anon_items = anon_list_json["body"].as_array().expect("array");
+    let anon_items = anon_list_json["body"]["items"].as_array().expect("array");
 
     assert!(
         anon_items
@@ -97,7 +97,7 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     assert_eq!(owner_list_response.status(), Status::Ok);
     let owner_list_body = owner_list_response.into_string().expect("owner list body");
     let owner_list_json: Value = serde_json::from_str(&owner_list_body).expect("valid json");
-    let owner_items = owner_list_json["body"].as_array().expect("array");
+    let owner_items = owner_list_json["body"]["items"].as_array().expect("array");
 
     assert!(
         owner_items
@@ -402,7 +402,7 @@ fn test_unlisted_readable_by_id_but_never_listed() {
         let resp = req.dispatch();
         assert_eq!(resp.status(), Status::Ok);
         let json: Value = serde_json::from_str(&resp.into_string().unwrap()).unwrap();
-        json["body"]
+        json["body"]["items"]
             .as_array()
             .unwrap()
             .iter()
@@ -608,7 +608,7 @@ fn test_unlisted_variant_on_private_base_reachable_by_id() {
     let list = fixture.client().get("/api/resumes").dispatch();
     let list_json: Value = serde_json::from_str(&list.into_string().unwrap()).unwrap();
     assert!(
-        !list_json["body"]
+        !list_json["body"]["items"]
             .as_array()
             .unwrap()
             .iter()

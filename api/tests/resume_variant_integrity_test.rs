@@ -225,17 +225,48 @@ fn self_reference_and_precision_checks_fire() {
 }
 
 #[test]
-fn fk_violation_maps_to_409() {
-    let _fixture = support::Fixture::new(9_241_043);
+fn created_by_rejects_null() {
+    let _fixture = support::Fixture::new(9_241_042);
     let mut connection = infrastructure::establish_connection();
 
     let error = diesel::sql_query(
-        "INSERT INTO resumes (id, name, email, visibility, base_resume_id) VALUES ($4, $1, $2, 'private', $3)",
+        "INSERT INTO resumes (id, name, email, visibility, created_by) VALUES ($1, $2, $3, 'private', NULL)",
+    )
+    .bind::<diesel::sql_types::Uuid, _>(uuid::Uuid::new_v4())
+    .bind::<diesel::sql_types::Text, _>("Orphan Row")
+    .bind::<diesel::sql_types::Text, _>(format!(
+        "null.owner.{}@example.com",
+        unique_suffix()
+    ))
+    .execute(&mut connection)
+    .expect_err("a resume without an owner must be rejected");
+
+    assert!(
+        matches!(
+            error,
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::NotNullViolation,
+                _
+            )
+        ),
+        "expected a not-null violation, got {:?}",
+        error
+    );
+}
+
+#[test]
+fn fk_violation_maps_to_409() {
+    let fixture = support::Fixture::new(9_241_043);
+    let mut connection = infrastructure::establish_connection();
+
+    let error = diesel::sql_query(
+        "INSERT INTO resumes (id, name, email, visibility, base_resume_id, created_by) VALUES ($4, $1, $2, 'private', $3, $5)",
     )
     .bind::<diesel::sql_types::Text, _>("Orphan Variant")
     .bind::<diesel::sql_types::Text, _>(format!("variant.orphan.{}@example.com", unique_suffix()))
     .bind::<diesel::sql_types::Uuid, _>(uuid::Uuid::new_v4())
     .bind::<diesel::sql_types::Uuid, _>(uuid::Uuid::new_v4())
+    .bind::<diesel::sql_types::Integer, _>(fixture.user_id())
     .execute(&mut connection)
     .expect_err("a base reference to a missing resume must be rejected");
 

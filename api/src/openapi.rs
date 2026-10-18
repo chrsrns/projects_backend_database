@@ -6,12 +6,12 @@ use domain::models::{
     NewLanguageRequest, NewPortfolioKeyPointRequest, NewPortfolioProjectRequest,
     NewPortfolioTechnologyRequest, NewResumeRequest, NewSkillRequest, NewVariantRequest,
     NewWorkExperienceKeyPointRequest, NewWorkExperienceRequest, PartialDate, PortfolioKeyPoint,
-    PortfolioProject, PortfolioTechnology, RestoreRequest, ResumeRevision, ResumeRevisionDiff,
-    ResumeRevisionSummary, ResumeSnapshot, ResumeView, RevisionChange, RevisionChangeKind, Skill,
-    UpdateEducationKeyPoint, UpdateEducationRequest, UpdateFramework, UpdateLanguage,
-    UpdatePortfolioKeyPoint, UpdatePortfolioProject, UpdatePortfolioTechnology, UpdateResume,
-    UpdateSkill, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest, User, WorkExperience,
-    WorkExperienceKeyPoint,
+    PortfolioProject, PortfolioTechnology, RestoreRequest, ResumePage, ResumeRevision,
+    ResumeRevisionDiff, ResumeRevisionSummary, ResumeSnapshot, ResumeView, RevisionChange,
+    RevisionChangeKind, Skill, UpdateEducationKeyPoint, UpdateEducationRequest, UpdateFramework,
+    UpdateLanguage, UpdatePortfolioKeyPoint, UpdatePortfolioProject, UpdatePortfolioTechnology,
+    UpdateResume, UpdateSkill, UpdateWorkExperienceKeyPoint, UpdateWorkExperienceRequest, User,
+    WorkExperience, WorkExperienceKeyPoint,
 };
 use shared::response_models::{AuthTokenResponse, Response};
 use shared::resume_document::{
@@ -129,6 +129,8 @@ impl Modify for ServerAddon {
         DatePrecision,
         Response::<User>,
         ResumeView,
+        ResumePage,
+        Response::<ResumePage>,
         Response::<ResumeView>,
         Response::<Vec<ResumeView>>,
         Response::<ResumeRevisionSummary>,

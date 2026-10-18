@@ -7,9 +7,11 @@ use shared::node_config::NodeConfig;
 use utoipa::OpenApi;
 
 pub mod auth;
+pub mod catchers;
 pub mod error;
 pub mod llm;
 pub mod openapi;
+pub mod query_scan;
 pub mod realtime;
 pub mod route_handlers;
 pub mod ws_handler;
@@ -221,6 +223,17 @@ pub fn build_rocket_with_llm_client(
                 portfolio_projects_handler::update_portfolio_technology_handler,
                 portfolio_projects_handler::delete_portfolio_technology_handler,
                 llm::generate_handler,
+            ],
+        )
+        .register(
+            "/api",
+            catchers![
+                catchers::bad_request,
+                catchers::unauthorized,
+                catchers::payload_too_large,
+                catchers::unsupported_media_type,
+                catchers::unprocessable_entity,
+                catchers::internal_error,
             ],
         )
         .mount(

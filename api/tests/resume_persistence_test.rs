@@ -134,7 +134,9 @@ fn test_create_resume_appears_in_list() {
     let list_body = list_response.into_string().expect("Response body");
     let list_json: Value = serde_json::from_str(&list_body).expect("Valid JSON");
 
-    let resumes_array = list_json["body"].as_array().expect("Should be array");
+    let resumes_array = list_json["body"]["items"]
+        .as_array()
+        .expect("Should be array");
 
     println!("Total resumes in list: {}", resumes_array.len());
 
@@ -492,7 +494,9 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     let list_body = list_response.into_string().expect("Response body");
     let list_json: Value = serde_json::from_str(&list_body).expect("Valid JSON");
 
-    let resumes_array = list_json["body"].as_array().expect("Should be array");
+    let resumes_array = list_json["body"]["items"]
+        .as_array()
+        .expect("Should be array");
 
     let our_ids: Vec<uuid::Uuid> = resumes_array
         .iter()
@@ -1679,4 +1683,54 @@ fn test_portfolio_projects_key_points_and_technologies_crud_flow() {
         .header(fixture.auth_header())
         .dispatch();
     assert_eq!(delete_project_response.status(), Status::NoContent);
+}
+
+#[test]
+fn error_responses_carry_the_envelope() {
+    let mut fixture = support::Fixture::new(9_226_030);
+
+    // 404: an unknown resume id answers the same Response<String> shape.
+    let missing = fixture
+        .client()
+        .get(format!("/api/resume/{}", uuid::Uuid::new_v4()))
+        .header(fixture.auth_header())
+        .dispatch();
+    assert_eq!(missing.status(), Status::NotFound);
+    let json: Value = serde_json::from_str(&missing.into_string().unwrap()).unwrap();
+    assert!(json["body"].is_string(), "404 body is Response<String>");
+
+    // 403: a non-owner mutating a reachable resume keeps the envelope.
+    let create = fixture
+        .client()
+        .post("/api/new_resume")
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(
+            serde_json::json!({
+                "name": "Envelope",
+                "email": support::unique_email("envelope"),
+                "visibility": "public",
+            })
+            .to_string(),
+        )
+        .dispatch();
+    assert_eq!(create.status(), Status::Created);
+    let create_json: Value = serde_json::from_str(&create.into_string().unwrap()).unwrap();
+    fixture.track_resume_id(support::resume_uuid(&create_json["body"]["id"]));
+    let resume_id = support::resume_uuid(&create_json["body"]["id"]);
+
+    let intruder = support::register_and_login(fixture.client(), "envelope.intruder");
+    fixture.track_user_id(intruder.user_id);
+    fixture.track_session_id(intruder.token.clone());
+
+    let forbidden = fixture
+        .client()
+        .put(format!("/api/resume/{resume_id}"))
+        .header(support::auth_header(&intruder.token))
+        .header(ContentType::JSON)
+        .body(serde_json::json!({}).to_string())
+        .dispatch();
+    assert_eq!(forbidden.status(), Status::Forbidden);
+    let json: Value = serde_json::from_str(&forbidden.into_string().unwrap()).unwrap();
+    assert!(json["body"].is_string(), "403 body is Response<String>");
 }

@@ -68,9 +68,9 @@ impl<'r> Responder<'r, 'static> for MarkdownResponse {
     ),
     responses(
         (status = 200, description = "Markdown representation", body = String, content_type = "text/markdown"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Not found"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not found", body = Response<String>, content_type = "application/json"),
     )
 )]
 #[get("/resume/<resume_id>/export/markdown")]
@@ -89,10 +89,10 @@ pub fn export_resume_markdown(resume_id: Uuid, maybe_auth: MaybeAuthSession) -> 
     responses(
         (status = 200, description = "Updated resume", body = Response<ResumeView>, content_type = "application/json"),
         (status = 201, description = "Created resume", body = Response<ResumeView>, content_type = "application/json"),
-        (status = 400, description = "Invalid Markdown"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
+        (status = 400, description = "Invalid Markdown", body = Response<String>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit", body = Response<String>, content_type = "application/json"),
     )
 )]
 #[post(
@@ -125,11 +125,11 @@ pub fn import_resume_markdown(
     request_body = String,
     responses(
         (status = 200, description = "Updated resume", body = Response<ResumeView>, content_type = "application/json"),
-        (status = 400, description = "Invalid Markdown or front-matter marker mismatch"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Not found"),
-        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
+        (status = 400, description = "Invalid Markdown or front-matter marker mismatch", body = Response<String>, content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = Response<String>, content_type = "application/json"),
+        (status = 403, description = "Forbidden", body = Response<String>, content_type = "application/json"),
+        (status = 404, description = "Not found", body = Response<String>, content_type = "application/json"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit", body = Response<String>, content_type = "application/json"),
     )
 )]
 #[post(
@@ -159,8 +159,8 @@ pub fn import_resume_markdown_into(
     request_body(content = String, content_type = "text/markdown"),
     responses(
         (status = 200, description = "Markdown validation report", body = Response<MarkdownValidationReport>, content_type = "application/json"),
-        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
-        (status = 500, description = "Internal server error"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit", body = Response<String>, content_type = "application/json"),
+        (status = 500, description = "Internal server error", body = Response<String>, content_type = "application/json"),
     )
 )]
 #[post(
@@ -194,9 +194,9 @@ pub fn validate_resume_markdown(
     request_body(content = String, content_type = "text/markdown"),
     responses(
         (status = 200, description = "Resume document envelope", body = Response<ResumeDocumentEnvelope>, content_type = "application/json"),
-        (status = 400, description = "Invalid Markdown"),
-        (status = 413, description = "Markdown payload exceeds 1 MiB limit"),
-        (status = 500, description = "Internal server error"),
+        (status = 400, description = "Invalid Markdown", body = Response<String>, content_type = "application/json"),
+        (status = 413, description = "Markdown payload exceeds 1 MiB limit", body = Response<String>, content_type = "application/json"),
+        (status = 500, description = "Internal server error", body = Response<String>, content_type = "application/json"),
     )
 )]
 #[post(

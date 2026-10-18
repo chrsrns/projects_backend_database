@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use rocket::serde::Serialize;
+use rocket::serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use super::{DatePrecision, PartialDate, Resume, Visibility};
 /// reachable, and whether the viewer owns the row. Those three values are
 /// computed per request here rather than stored, so the database never
 /// holds a viewer-specific answer.
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct ResumeView {
     pub id: Uuid,
@@ -25,7 +25,7 @@ pub struct ResumeView {
     pub mobile_number: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub created_by: Option<i32>,
+    pub created_by: i32,
     pub visibility: Visibility,
     pub executive_summary: Option<String>,
     #[schema(max_length = 500)]

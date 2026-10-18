@@ -27,7 +27,7 @@ pub fn create_resume(
         mobile_number: resume.mobile_number,
         executive_summary: validate_executive_summary(resume.executive_summary)?,
         video: validate_video(resume.video)?,
-        created_by: Some(user_id_value),
+        created_by: user_id_value,
         visibility: resume
             .visibility
             .map(|v| v.as_str().to_string())
