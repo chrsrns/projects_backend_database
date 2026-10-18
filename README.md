@@ -37,6 +37,12 @@ The API is documented using OpenAPI 3.0 and served via Swagger UI.
 
 Handlers wrap results using `shared::response_models::Response<T>` and serialize the wrapper to JSON.
 
+### Authentication
+
+A session token is an opaque UUID recorded in `sessions` with a 24-hour expiry, sent as `Authorization: Bearer <token>` (a lowercase `bearer` prefix is accepted too).
+
+The read routes that are open to anonymous callers — `GET /api/resumes`, `GET /api/resume/{id}`, the section lists, `GET /api/resume/{id}/variants`, and the Markdown export — treat a bearer they cannot resolve (expired, unknown, or malformed) as absent and answer with the anonymous response. A stale token left in the browser therefore renders public content rather than an error. `GET /api/auth/me`, the write routes, and the Markdown import routes stay strict and answer `401` for any bearer they cannot resolve. A session lookup that fails outright answers `5xx`, never `401`, so a transient database problem cannot make a client discard a session that is still valid.
+
 ### Resume endpoints
 
 Resume bodies are returned as a flat, viewer-aware payload: every stored resume column plus `is_variant`, `base_resume_id`, `show_variant_tag` and the variant targeting fields. Whether a variant advertises itself depends on whether the caller may read its base resume, and `show_variant_tag` is only returned to the owner.

@@ -163,12 +163,12 @@ fn seed_public_resume(fixture: &mut support::Fixture, token: &str) -> Seeded {
 
     let routes = vec![
         ("list resumes", "/api/resumes".to_string()),
-        (
-            "read one resume",
-            format!("/api/resume/{resume_id}"),
-        ),
+        ("read one resume", format!("/api/resume/{resume_id}")),
         ("list skills", format!("/api/resume/{resume_id}/skills")),
-        ("list education", format!("/api/resume/{resume_id}/education")),
+        (
+            "list education",
+            format!("/api/resume/{resume_id}/education"),
+        ),
         (
             "list education key points",
             format!("/api/resume/{resume_id}/education/{education_id}/key_points"),
@@ -201,10 +201,7 @@ fn seed_public_resume(fixture: &mut support::Fixture, token: &str) -> Seeded {
             "list frameworks",
             format!("/api/resume/{resume_id}/languages/{language_id}/frameworks"),
         ),
-        (
-            "list variants",
-            format!("/api/resume/{resume_id}/variants"),
-        ),
+        ("list variants", format!("/api/resume/{resume_id}/variants")),
     ];
 
     Seeded { resume_id, routes }
@@ -212,7 +209,11 @@ fn seed_public_resume(fixture: &mut support::Fixture, token: &str) -> Seeded {
 
 /// Every JSON token-optional read must answer 200 with a body identical to
 /// the anonymous body, for each unresolvable bearer shape.
-fn assert_anonymous_json_surface(fixture: &support::Fixture, routes: &[(&str, String)], expired: &str) {
+fn assert_anonymous_json_surface(
+    fixture: &support::Fixture,
+    routes: &[(&str, String)],
+    expired: &str,
+) {
     for (label, path) in routes {
         let anonymous = fixture.client().get(path).dispatch();
         assert_eq!(
@@ -223,11 +224,7 @@ fn assert_anonymous_json_surface(fixture: &support::Fixture, routes: &[(&str, St
         let anonymous_body = body_json(anonymous);
 
         for (shape, token) in unresolvable_bearers(expired) {
-            let response = fixture
-                .client()
-                .get(path)
-                .header(bearer(&token))
-                .dispatch();
+            let response = fixture.client().get(path).header(bearer(&token)).dispatch();
 
             assert_eq!(
                 response.status(),
@@ -272,7 +269,11 @@ fn unresolvable_bearer_reads_as_anonymous_on_markdown_export() {
     fixture.expire_session(&owner.token);
 
     let anonymous = fixture.client().get(&path).dispatch();
-    assert_eq!(anonymous.status(), Status::Ok, "anonymous export should be 200");
+    assert_eq!(
+        anonymous.status(),
+        Status::Ok,
+        "anonymous export should be 200"
+    );
     let anonymous_body = anonymous.into_string().expect("markdown body");
 
     for (shape, token) in unresolvable_bearers(&owner.token) {
@@ -322,10 +323,7 @@ fn lowercase_bearer_prefix_still_authenticates_as_owner() {
     let private_resume_id = support::resume_uuid(&body_json(create)["body"]["id"]);
     fixture.track_resume_id(private_resume_id);
 
-    let lowercase = Header::new(
-        "Authorization",
-        format!("bearer {}", owner.token),
-    );
+    let lowercase = Header::new("Authorization", format!("bearer {}", owner.token));
 
     let listed = fixture
         .client()
