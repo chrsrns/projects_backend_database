@@ -456,6 +456,14 @@ impl WsHarness {
             .expect("expected a websocket frame")
     }
 
+    /// Asserts the server sends nothing back within `within`.
+    fn expect_no_frame(&self, within: std::time::Duration) {
+        match self.frames.recv_timeout(within) {
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            other => panic!("expected no frame, got {other:?}"),
+        }
+    }
+
     fn close(self) {
         let WsHarness {
             runtime,
@@ -682,6 +690,52 @@ fn ws_denied_resubscribe_leaves_the_previous_subscription_live() {
         "a denied re-subscribe must not disconnect the live subscription: {frame}"
     );
     assert_eq!(json["resume_id"], public_id.to_string());
+
+    harness.close();
+}
+
+/// Re-subscribing to the resume already subscribed to changes nothing.
+///
+/// The observable consequence is that the guard is skipped entirely: a
+/// second subscribe naming the same resume does not re-authorize, so even a
+/// token the guard could not resolve produces no error frame. The live
+/// subscription stays and still delivers exactly one event per change.
+#[test]
+fn ws_resubscribing_to_the_same_resume_is_a_no_op() {
+    let mut fixture = support::Fixture::new(9_242_075);
+
+    let owner = support::register_and_login(fixture.client(), "ws.resubscribe.same");
+    fixture.track_user_id(owner.user_id);
+    fixture.track_session_id(owner.token.clone());
+
+    let resume_id = create_resume_with_visibility(&mut fixture, &owner.token, "private");
+
+    let harness = WsHarness::open(fixture.hub.clone(), 17_008);
+    harness.subscribe(serde_json::json!({
+        "type": "subscribe",
+        "resume_id": resume_id,
+        "token": owner.token
+    }));
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    harness.subscribe(serde_json::json!({
+        "type": "subscribe",
+        "resume_id": resume_id,
+        "token": "not-a-uuid"
+    }));
+
+    harness.expect_no_frame(std::time::Duration::from_millis(500));
+
+    publish_change(&fixture, &owner.token, resume_id);
+
+    let frame = harness.next_frame();
+    let json: Value = serde_json::from_str(&frame).expect("valid frame json");
+    assert_eq!(
+        json["type"], "resume.changed",
+        "the original subscription is still the live one: {frame}"
+    );
+    assert_eq!(json["resume_id"], resume_id.to_string());
 
     harness.close();
 }
