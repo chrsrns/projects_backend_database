@@ -37,6 +37,7 @@ pub fn auth_header(token: &str) -> Header<'static> {
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     pub user_id: i32,
+    pub email: String,
     pub token: String,
 }
 
@@ -63,9 +64,13 @@ pub fn register_and_login(client: &Client, email_prefix: &str) -> AuthContext {
     let register_body = register_response.into_string().expect("register body");
     let register_json: Value = serde_json::from_str(&register_body).expect("valid json");
     let user_id = register_json["body"]["id"].as_i64().expect("user id") as i32;
+    let registered_email = register_json["body"]["email"]
+        .as_str()
+        .expect("email")
+        .to_string();
 
     let login_payload = serde_json::json!({
-        "email": register_json["body"]["email"].as_str().expect("email"),
+        "email": registered_email,
         "password": "test-password"
     });
 
@@ -85,7 +90,41 @@ pub fn register_and_login(client: &Client, email_prefix: &str) -> AuthContext {
         .expect("token")
         .to_string();
 
-    AuthContext { user_id, token }
+    AuthContext {
+        user_id,
+        email: registered_email,
+        token,
+    }
+}
+
+/// Mints an additional session for an already-registered user. Lets a test
+/// keep one usable bearer while another session of the same user is expired
+/// or deleted, which is what the token-optional read cases need.
+pub fn login_session(client: &Client, email: &str) -> String {
+    let login_payload = serde_json::json!({
+        "email": email,
+        "password": "test-password"
+    });
+
+    let login_response = client
+        .post("/api/auth/login")
+        .header(ContentType::JSON)
+        .body(login_payload.to_string())
+        .dispatch();
+
+    assert_eq!(
+        login_response.status(),
+        Status::Ok,
+        "second login should succeed"
+    );
+
+    let login_body = login_response.into_string().expect("login body");
+    let login_json: Value = serde_json::from_str(&login_body).expect("valid json");
+
+    login_json["body"]["token"]
+        .as_str()
+        .expect("token")
+        .to_string()
 }
 
 pub struct Fixture {
@@ -163,6 +202,24 @@ impl Fixture {
 
     pub fn untrack_resume_id(&mut self, id: uuid::Uuid) {
         self.created_resume_ids.retain(|&existing| existing != id);
+    }
+
+    /// Backdates a session's `expires_at` so its bearer stops resolving,
+    /// while leaving the row in place. Deliberately not a logout: logout
+    /// deletes the row and the client treats the two cases differently.
+    pub fn expire_session(&mut self, token: &str) {
+        let session_uuid = token
+            .parse::<uuid::Uuid>()
+            .expect("session token should be a UUID");
+
+        let affected = diesel::sql_query(
+            "UPDATE sessions SET expires_at = now() AT TIME ZONE 'UTC' - interval '1 hour' WHERE id = $1",
+        )
+        .bind::<diesel::sql_types::Uuid, _>(session_uuid)
+        .execute(&mut self.lock_connection)
+        .expect("expire session");
+
+        assert_eq!(affected, 1, "exactly one session row should be expired");
     }
 }
 
