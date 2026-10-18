@@ -162,7 +162,6 @@ fn seed_public_resume(fixture: &mut support::Fixture, token: &str) -> Seeded {
     );
 
     let routes = vec![
-        ("list resumes", "/api/resumes".to_string()),
         ("read one resume", format!("/api/resume/{resume_id}")),
         ("list skills", format!("/api/resume/{resume_id}/skills")),
         (
@@ -240,6 +239,49 @@ fn assert_anonymous_json_surface(
     }
 }
 
+/// The listing route answers with every readable resume, not only this
+/// fixture's, so it is compared entry by entry. Comparing the whole body
+/// twice would race with a sibling test that creates its own public resume
+/// in between.
+fn assert_anonymous_listing(fixture: &support::Fixture, resume_id: uuid::Uuid, expired: &str) {
+    let entry = |body: &Value| -> Value {
+        body["body"]
+            .as_array()
+            .expect("listing body should be an array")
+            .iter()
+            .find(|row| row["id"] == resume_id.to_string())
+            .cloned()
+            .expect("the fixture's own resume should be listed")
+    };
+
+    let anonymous = fixture.client().get("/api/resumes").dispatch();
+    assert_eq!(
+        anonymous.status(),
+        Status::Ok,
+        "anonymous listing should be 200"
+    );
+    let anonymous_entry = entry(&body_json(anonymous));
+
+    for (shape, token) in unresolvable_bearers(expired) {
+        let response = fixture
+            .client()
+            .get("/api/resumes")
+            .header(bearer(&token))
+            .dispatch();
+
+        assert_eq!(
+            response.status(),
+            Status::Ok,
+            "listing with a {shape} should read as anonymous, not 401"
+        );
+        assert_eq!(
+            entry(&body_json(response)),
+            anonymous_entry,
+            "listing with a {shape} should match the anonymous entry exactly"
+        );
+    }
+}
+
 #[test]
 fn unresolvable_bearer_reads_as_anonymous_on_every_token_optional_route() {
     let mut fixture = support::Fixture::new(9_242_001);
@@ -252,6 +294,7 @@ fn unresolvable_bearer_reads_as_anonymous_on_every_token_optional_route() {
 
     fixture.expire_session(&owner.token);
 
+    assert_anonymous_listing(&fixture, seeded.resume_id, &owner.token);
     assert_anonymous_json_surface(&fixture, &seeded.routes, &owner.token);
 }
 
