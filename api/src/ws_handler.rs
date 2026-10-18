@@ -19,7 +19,7 @@ struct ClientMessage {
     responses(
         (status = 101, description = "WebSocket Upgrade Successful"),
         (status = 400, description = "Bad Request - Invalid message format"),
-        (status = 403, description = "Forbidden - Invalid token or unauthorized")
+        (status = 403, description = "Forbidden - the resume is private and the subscriber may not read it")
     )
 )]
 #[rocket::get("/ws")]
@@ -151,22 +151,18 @@ pub fn ws_handler(ws: ws::WebSocket, hub: &State<Hub>) -> ws::Channel<'static> {
     })
 }
 
+/// Decides whether a subscriber may watch `resume_id`.
+///
+/// The token only ever widens access, so one that cannot be resolved (absent,
+/// expired, unknown, or malformed) is treated as no token at all and the
+/// subscription is then decided by the resume's visibility alone. A lookup
+/// that fails outright stays closed instead of being read as absence.
 async fn authorize_subscription(resume_id: Uuid, token: Option<String>) -> bool {
     rocket::tokio::task::spawn_blocking(move || {
-        let user_id = match token {
-            Some(t) => {
-                let session_id = match t.parse::<uuid::Uuid>() {
-                    Ok(v) => v,
-                    Err(_) => return false,
-                };
-
-                match application::auth::me::resolve_session_user_id(session_id) {
-                    Ok(Some(uid)) => Some(uid),
-                    Ok(None) => return false,
-                    Err(_) => return false,
-                }
-            }
-            None => None,
+        let user_id = match crate::auth::resolve_token(token.as_deref()) {
+            crate::auth::SessionResolution::Authenticated(session) => Some(session.user_id),
+            crate::auth::SessionResolution::Anonymous => None,
+            crate::auth::SessionResolution::Failed => return false,
         };
 
         application::resume::read::list_resume(resume_id, user_id).is_ok()

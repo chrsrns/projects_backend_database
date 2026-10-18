@@ -33,6 +33,8 @@ The API is documented using OpenAPI 3.0 and served via Swagger UI.
 
 - **GET** `/api/ws`
 
+Subscribe with `{"type":"subscribe","resume_id":"<uuid>","token":"<session uuid>"}`. The token is optional and only widens access: one that cannot be resolved (absent, expired, unknown, or malformed) is treated as no token at all, and the subscription is decided by the resume's visibility — a `public` or `unlisted` resume subscribes, a `private` one answers `{"type":"error","message":"forbidden"}`. A denied re-subscribe leaves the subscription already live on that connection untouched.
+
 ### Response format
 
 Handlers wrap results using `shared::response_models::Response<T>` and serialize the wrapper to JSON.
