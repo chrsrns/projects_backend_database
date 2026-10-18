@@ -10,6 +10,7 @@ pub mod auth;
 pub mod error;
 pub mod llm;
 pub mod openapi;
+pub mod query_scan;
 pub mod realtime;
 pub mod route_handlers;
 pub mod ws_handler;

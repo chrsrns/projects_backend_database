@@ -134,7 +134,9 @@ fn test_create_resume_appears_in_list() {
     let list_body = list_response.into_string().expect("Response body");
     let list_json: Value = serde_json::from_str(&list_body).expect("Valid JSON");
 
-    let resumes_array = list_json["body"].as_array().expect("Should be array");
+    let resumes_array = list_json["body"]["items"]
+        .as_array()
+        .expect("Should be array");
 
     println!("Total resumes in list: {}", resumes_array.len());
 
@@ -492,7 +494,9 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     let list_body = list_response.into_string().expect("Response body");
     let list_json: Value = serde_json::from_str(&list_body).expect("Valid JSON");
 
-    let resumes_array = list_json["body"].as_array().expect("Should be array");
+    let resumes_array = list_json["body"]["items"]
+        .as_array()
+        .expect("Should be array");
 
     let our_ids: Vec<uuid::Uuid> = resumes_array
         .iter()

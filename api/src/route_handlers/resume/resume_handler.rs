@@ -1,6 +1,7 @@
 use application::resume::{create, delete, read, update};
-use domain::models::{NewResumeRequest, ResumeView, UpdateResume};
+use domain::models::{NewResumeRequest, ResumeListParams, ResumePage, ResumeView, UpdateResume};
 use rocket::State;
+use rocket::http::Status;
 use rocket::response::status::{Custom, NoContent};
 use rocket::serde::json::Json;
 use rocket::{delete as rocket_delete, get, post, put};
@@ -8,6 +9,8 @@ use shared::response_models::Response;
 
 use super::{CustomJsonResult, JsonResult, NoContentResult};
 use crate::auth::{AuthSession, MaybeAuthSession};
+use crate::error::ApiError;
+use crate::query_scan::QueryScan;
 use crate::realtime::Hub;
 use uuid::Uuid;
 
@@ -15,15 +18,39 @@ use uuid::Uuid;
     get,
     path = "/resumes",
     tag = "Resumes",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size (1-100, default 20)"),
+        ("offset" = Option<i64>, Query, description = "Rows to skip (default 0)"),
+        ("sort" = Option<String>, Query, description = "Sort field: id | name | updated_at"),
+        ("order" = Option<String>, Query, description = "Sort order: asc | desc"),
+        ("search" = Option<String>, Query, description = "AND-of-terms substring search")
+    ),
     responses(
-        (status = 200, description = "OK", body = Response<Vec<ResumeView>>, content_type = "application/json")
+        (status = 200, description = "OK", body = Response<ResumePage>, content_type = "application/json"),
+        (status = 400, description = "Bad Request", body = Response<String>, content_type = "application/json")
     )
 )]
-#[get("/resumes")]
-pub fn list_resumes_handler(maybe_auth: MaybeAuthSession) -> JsonResult<Vec<ResumeView>> {
+#[get("/resumes?<params..>")]
+pub fn list_resumes_handler(
+    maybe_auth: MaybeAuthSession,
+    params: Result<ResumeListParams, rocket::form::Errors<'_>>,
+    scan: QueryScan,
+) -> JsonResult<ResumePage> {
     let user_id_value = maybe_auth.0.map(|a| a.user_id);
-    let resumes = read::list_resumes(user_id_value)?;
-    Ok(Json(Response { body: resumes }))
+    let bad_request = || {
+        ApiError(Custom(
+            Status::BadRequest,
+            Json(Response {
+                body: "invalid query parameters".to_string(),
+            }),
+        ))
+    };
+    if !scan.is_clean() {
+        return Err(bad_request());
+    }
+    let params = params.map_err(|_| bad_request())?;
+    let page = read::list_resumes(user_id_value, params)?;
+    Ok(Json(Response { body: page }))
 }
 
 #[utoipa::path(

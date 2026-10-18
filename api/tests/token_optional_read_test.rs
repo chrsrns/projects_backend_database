@@ -245,7 +245,7 @@ fn assert_anonymous_json_surface(
 /// in between.
 fn assert_anonymous_listing(fixture: &support::Fixture, resume_id: uuid::Uuid, expired: &str) {
     let entry = |body: &Value| -> Value {
-        body["body"]
+        body["body"]["items"]
             .as_array()
             .expect("listing body should be an array")
             .iter()
@@ -376,7 +376,7 @@ fn lowercase_bearer_prefix_still_authenticates_as_owner() {
     assert_eq!(listed.status(), Status::Ok);
     let listed_body = body_json(listed);
     assert!(
-        listed_body["body"]
+        listed_body["body"]["items"]
             .as_array()
             .expect("array")
             .iter()
