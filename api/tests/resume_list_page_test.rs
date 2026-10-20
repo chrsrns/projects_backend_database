@@ -49,7 +49,10 @@ fn items(page: &Value) -> &Vec<Value> {
 /// Page-unit accessors for the grouped shape: every item is
 /// `{base: ResumeView, variants: ResumeView[]}`.
 fn unit_id(unit: &Value) -> String {
-    unit["base"]["id"].as_str().expect("unit base id").to_string()
+    unit["base"]["id"]
+        .as_str()
+        .expect("unit base id")
+        .to_string()
 }
 
 fn unit_variants(unit: &Value) -> &Vec<Value> {
@@ -126,7 +129,7 @@ fn defaults_echo_limit_offset_and_id_order() {
 
     let got: Vec<String> = items(&page)
         .iter()
-        .map(|r| r["id"].as_str().unwrap().to_string())
+        .map(|r| r["base"]["id"].as_str().unwrap().to_string())
         .collect();
     let want: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
     assert_eq!(got, want, "default order is id ascending");
@@ -146,8 +149,8 @@ fn limit_offset_window_and_total() {
 
     let items = items(&page);
     assert_eq!(items.len(), 2);
-    assert_eq!(items[0]["id"].as_str().unwrap(), ids[2].to_string());
-    assert_eq!(items[1]["id"].as_str().unwrap(), ids[3].to_string());
+    assert_eq!(items[0]["base"]["id"].as_str().unwrap(), ids[2].to_string());
+    assert_eq!(items[1]["base"]["id"].as_str().unwrap(), ids[3].to_string());
 }
 
 #[test]
@@ -200,15 +203,15 @@ fn sort_name_asc_then_id_tiebreak() {
     assert_eq!(status, Status::Ok);
     let items = items(&page);
     assert_eq!(items.len(), 3);
-    assert_eq!(items[0]["name"].as_str().unwrap(), "AAAA M9250004");
-    assert_eq!(items[1]["name"].as_str().unwrap(), "AAAA M9250004");
-    assert_eq!(items[2]["name"].as_str().unwrap(), "ZZZZ M9250004");
+    assert_eq!(items[0]["base"]["name"].as_str().unwrap(), "AAAA M9250004");
+    assert_eq!(items[1]["base"]["name"].as_str().unwrap(), "AAAA M9250004");
+    assert_eq!(items[2]["base"]["name"].as_str().unwrap(), "ZZZZ M9250004");
 
     let mut tied = [dup_a, dup_b];
     tied.sort();
     let got: Vec<String> = items[0..2]
         .iter()
-        .map(|r| r["id"].as_str().unwrap().to_string())
+        .map(|r| r["base"]["id"].as_str().unwrap().to_string())
         .collect();
     assert_eq!(
         got,
@@ -237,8 +240,8 @@ fn sort_updated_at_desc() {
     assert_eq!(status, Status::Ok);
     let items = items(&page);
     assert_eq!(items.len(), 2);
-    assert_eq!(items[0]["id"].as_str().unwrap(), second.to_string());
-    assert_eq!(items[1]["id"].as_str().unwrap(), first.to_string());
+    assert_eq!(items[0]["base"]["id"].as_str().unwrap(), second.to_string());
+    assert_eq!(items[1]["base"]["id"].as_str().unwrap(), first.to_string());
 }
 
 #[test]
@@ -278,8 +281,8 @@ fn search_and_terms_and_fields() {
     assert_eq!(status, Status::Ok);
     assert_eq!(
         page["body"]["total"].as_i64(),
-        Some(2),
-        "base and variant share the cloned name"
+        Some(1),
+        "base and variant nest into one group"
     );
 
     let (status, page) = list(&fixture, "?search=needlecorp9250006+backend");
@@ -338,7 +341,7 @@ fn search_blank_is_unfiltered() {
     let (_, page) = list(&fixture, "?search=%20%20");
     let found: Vec<String> = items(&page)
         .iter()
-        .filter_map(|r| r["id"].as_str().map(str::to_string))
+        .filter_map(|r| r["base"]["id"].as_str().map(str::to_string))
         .collect();
     assert!(
         ids.iter().any(|id| found.contains(&id.to_string())),
@@ -393,7 +396,10 @@ fn scope_unpierced_for_non_owner() {
     let json: Value = serde_json::from_str(&anon.into_string().unwrap()).unwrap();
     let items = items(&json);
     assert_eq!(items.len(), 1);
-    assert_eq!(items[0]["id"].as_str().unwrap(), public_id.to_string());
+    assert_eq!(
+        items[0]["base"]["id"].as_str().unwrap(),
+        public_id.to_string()
+    );
 }
 
 #[test]
@@ -629,16 +635,29 @@ fn search_terms_split_across_rows_do_not_qualify() {
         "split.a.9250017@example.com",
         "private",
     );
-    let _v1 = create_variant(
+    let v1 = create_variant(
         &mut fixture,
         base,
         serde_json::json!({"company_name": "SPLITCORP9250017"}),
     );
-    let _v2 = create_variant(
+    let v2 = create_variant(
         &mut fixture,
         base,
         serde_json::json!({"role_title": "SPLITROLE9250017"}),
     );
+
+    // Variants clone the base name; rename both so no variant row can
+    // carry the base term, keeping the split-row assertions honest.
+    for (variant, name) in [(v1, "V1NEUTRAL9250017"), (v2, "V2NEUTRAL9250017")] {
+        let resp = fixture
+            .client()
+            .put(format!("/api/resume/{variant}"))
+            .header(fixture.auth_header())
+            .header(ContentType::JSON)
+            .body(serde_json::json!({"name": name}).to_string())
+            .dispatch();
+        assert_eq!(resp.status(), Status::Ok, "rename variant {variant}");
+    }
 
     let (status, page) = list(&fixture, "?search=splitbase+splitcorp9250017");
     assert_eq!(status, Status::Ok);

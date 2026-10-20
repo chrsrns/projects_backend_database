@@ -10,10 +10,20 @@ use crate::models::ResumeView;
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(crate = "rocket::serde")]
 pub struct ResumePage {
-    pub items: Vec<ResumeView>,
+    pub items: Vec<ResumeGroup>,
     pub total: i64,
     pub limit: i64,
     pub offset: i64,
+}
+
+/// One page unit: `base` is the unit's own row — a standalone variant when
+/// its base is caller-invisible — and `variants` holds every caller-visible
+/// variant of that base, ordered `id` ascending.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(crate = "rocket::serde")]
+pub struct ResumeGroup {
+    pub base: ResumeView,
+    pub variants: Vec<ResumeView>,
 }
 
 /// Raw query capture for `GET /resumes`. `Vec<String>` fields collect

@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
 use diesel::alias;
+use diesel::expression::BoxableExpression;
 use diesel::pg::Pg;
 use diesel::prelude::*;
-use diesel::sql_types::{Nullable, Text};
+use diesel::sql_types::{Bool, Nullable, Text};
 use domain::models::{
-    Resume, ResumeListOrder, ResumeListQuery, ResumeListSort, ResumePage, ResumeView, Visibility,
+    Resume, ResumeGroup, ResumeListOrder, ResumeListQuery, ResumeListSort, ResumePage, ResumeView,
+    Visibility,
 };
 use domain::schema::resumes;
 use infrastructure::establish_connection;
@@ -88,37 +90,69 @@ fn escape_like(term: &str) -> String {
         .replace('_', "\\_")
 }
 
-/// Listing access (V211) + the search term set (V252): non-owners see
-/// `public` rows only; `unlisted` is never listed.
-fn scoped_resumes(
+/// The V252 term predicate on the outer (unit) row: every field is an
+/// ILIKE substring match, `target_date` cast to text for the operator.
+fn term_predicate(
+    term: &str,
+) -> Box<dyn BoxableExpression<resumes::table, Pg, SqlType = Nullable<Bool>>> {
+    use domain::schema::resumes::dsl as resumes_dsl;
+
+    let pattern = format!("%{}%", escape_like(term));
+    Box::new(
+        resumes_dsl::name
+            .ilike(pattern.clone())
+            .or(resumes_dsl::email.ilike(pattern.clone()))
+            .or(resumes_dsl::company_name.ilike(pattern.clone()))
+            .or(resumes_dsl::role_title.ilike(pattern.clone()))
+            .or(resumes_dsl::variant_label.ilike(pattern.clone()))
+            .or(resumes_dsl::job_description.ilike(pattern.clone()))
+            .or(resumes_dsl::target_date
+                .cast::<Nullable<Text>>()
+                .ilike(pattern)),
+    )
+}
+
+/// Listing access (V211) + the grouped page-unit set (V257) + the search
+/// term set (V252/V260): non-owners see `public` rows only; `unlisted` is
+/// never listed. A unit is a scoped row that is not a variant of a
+/// caller-visible base — the exclusion predicate lives in the page query
+/// itself. Search qualifies a unit when its own row matches every term OR
+/// a single caller-visible variant matches every term — the variant side
+/// arrives as `matching_base_ids`, the V211-scoped set of bases owning a
+/// variant matching the whole term set (row-local per row of the
+/// pre-query, scope-checked per V260).
+fn scoped_units(
     viewer: Option<i32>,
     query: &ResumeListQuery,
+    visible_base_ids: Vec<Uuid>,
+    matching_base_ids: Vec<Uuid>,
 ) -> resumes::BoxedQuery<'static, Pg> {
     use domain::schema::resumes::dsl as resumes_dsl;
 
     let mut q = resumes_dsl::resumes.into_boxed();
-    q = match viewer {
-        Some(user_id) => q.filter(
-            resumes_dsl::visibility
-                .eq(Visibility::Public.as_str())
-                .or(resumes_dsl::created_by.eq(user_id)),
-        ),
-        None => q.filter(resumes_dsl::visibility.eq(Visibility::Public.as_str())),
-    };
+    q = q.filter(
+        resumes_dsl::visibility
+            .eq(Visibility::Public.as_str())
+            .or(resumes_dsl::created_by.eq_any(viewer)),
+    );
+    q = q.filter(resumes_dsl::base_resume_id.is_null().or(diesel::dsl::not(
+        resumes_dsl::base_resume_id.eq_any(visible_base_ids),
+    )));
 
-    for term in &query.search_terms {
-        let pattern = format!("%{}%", escape_like(term));
+    if !query.search_terms.is_empty() {
+        let mut own: Option<
+            Box<dyn BoxableExpression<resumes::table, Pg, SqlType = Nullable<Bool>>>,
+        > = None;
+        for term in &query.search_terms {
+            let pred = term_predicate(term);
+            own = Some(match own {
+                None => pred,
+                Some(prev) => Box::new(prev.and(pred)),
+            });
+        }
         q = q.filter(
-            resumes_dsl::name
-                .ilike(pattern.clone())
-                .or(resumes_dsl::email.ilike(pattern.clone()))
-                .or(resumes_dsl::company_name.ilike(pattern.clone()))
-                .or(resumes_dsl::role_title.ilike(pattern.clone()))
-                .or(resumes_dsl::variant_label.ilike(pattern.clone()))
-                .or(resumes_dsl::job_description.ilike(pattern.clone()))
-                .or(resumes_dsl::target_date
-                    .cast::<Nullable<Text>>()
-                    .ilike(pattern)),
+            own.expect("non-empty term set")
+                .or(resumes_dsl::id.eq_any(matching_base_ids)),
         );
     }
 
@@ -133,12 +167,52 @@ fn listed_resumes(
 
     let mut conn = establish_connection();
 
-    let total: i64 = scoped_resumes(viewer, query)
-        .count()
-        .get_result(&mut conn)
+    // Bases in the viewer's V211 scope — the set a variant's base must be
+    // in for the variant to attach instead of standing alone.
+    let visible_base_ids: Vec<Uuid> = resumes_dsl::resumes
+        .filter(
+            resumes_dsl::visibility
+                .eq(Visibility::Public.as_str())
+                .or(resumes_dsl::created_by.eq_any(viewer)),
+        )
+        .select(resumes_dsl::id)
+        .load(&mut conn)
         .map_err(app_err_from_diesel_err)?;
 
-    let mut q = scoped_resumes(viewer, query);
+    // V260: bases owning a caller-visible variant that matches every
+    // search term on that one row. Empty unless a search is present.
+    let mut matching_base_ids: Vec<Uuid> = Vec::new();
+    if !query.search_terms.is_empty() {
+        let mut mq = resumes_dsl::resumes.into_boxed();
+        mq = mq.filter(resumes_dsl::base_resume_id.is_not_null()).filter(
+            resumes_dsl::visibility
+                .eq(Visibility::Public.as_str())
+                .or(resumes_dsl::created_by.eq_any(viewer)),
+        );
+        for term in &query.search_terms {
+            mq = mq.filter(term_predicate(term));
+        }
+        matching_base_ids = mq
+            .select(resumes_dsl::base_resume_id)
+            .distinct()
+            .load::<Option<Uuid>>(&mut conn)
+            .map_err(app_err_from_diesel_err)?
+            .into_iter()
+            .flatten()
+            .collect();
+    }
+
+    let total: i64 = scoped_units(
+        viewer,
+        query,
+        visible_base_ids.clone(),
+        matching_base_ids.clone(),
+    )
+    .count()
+    .get_result(&mut conn)
+    .map_err(app_err_from_diesel_err)?;
+
+    let mut q = scoped_units(viewer, query, visible_base_ids, matching_base_ids);
     q = match (query.sort, query.order) {
         (ResumeListSort::Id, ResumeListOrder::Asc) => q.order(resumes_dsl::id.asc()),
         (ResumeListSort::Id, ResumeListOrder::Desc) => q.order(resumes_dsl::id.desc()),
@@ -163,8 +237,40 @@ fn listed_resumes(
         .load::<Resume>(&mut conn)
         .map_err(app_err_from_diesel_err)?;
 
+    // V258: one batched variant fetch for the whole page — every
+    // caller-visible variant of every unit's base, ordered `id` ascending.
+    let base_ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+    let mut variant_query = resumes_dsl::resumes
+        .filter(resumes_dsl::base_resume_id.eq_any(&base_ids))
+        .into_boxed();
+    variant_query = variant_query.filter(
+        resumes_dsl::visibility
+            .eq(Visibility::Public.as_str())
+            .or(resumes_dsl::created_by.eq_any(viewer)),
+    );
+    let variant_rows = variant_query
+        .order(resumes_dsl::id.asc())
+        .select(resumes::all_columns)
+        .load::<Resume>(&mut conn)
+        .map_err(app_err_from_diesel_err)?;
+
+    let mut variants_by_base: HashMap<Uuid, Vec<ResumeView>> = HashMap::new();
+    for variant in build_views(viewer, variant_rows)? {
+        if let Some(base_id) = variant.base_resume_id {
+            variants_by_base.entry(base_id).or_default().push(variant);
+        }
+    }
+
+    let items = build_views(viewer, rows)?
+        .into_iter()
+        .map(|base| {
+            let variants = variants_by_base.remove(&base.id).unwrap_or_default();
+            ResumeGroup { base, variants }
+        })
+        .collect();
+
     Ok(ResumePage {
-        items: build_views(viewer, rows)?,
+        items,
         total,
         limit: query.limit,
         offset: query.offset,

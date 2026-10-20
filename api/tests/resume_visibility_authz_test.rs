@@ -81,12 +81,12 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     assert!(
         anon_items
             .iter()
-            .any(|r| r["id"].as_str() == Some(public_resume_id.to_string().as_str()))
+            .any(|r| r["base"]["id"].as_str() == Some(public_resume_id.to_string().as_str()))
     );
     assert!(
         !anon_items
             .iter()
-            .any(|r| r["id"].as_str() == Some(private_resume_id.to_string().as_str()))
+            .any(|r| r["base"]["id"].as_str() == Some(private_resume_id.to_string().as_str()))
     );
 
     let owner_list_response = fixture
@@ -102,12 +102,12 @@ fn test_public_private_visibility_and_owner_only_enforcement() {
     assert!(
         owner_items
             .iter()
-            .any(|r| r["id"].as_str() == Some(public_resume_id.to_string().as_str()))
+            .any(|r| r["base"]["id"].as_str() == Some(public_resume_id.to_string().as_str()))
     );
     assert!(
         owner_items
             .iter()
-            .any(|r| r["id"].as_str() == Some(private_resume_id.to_string().as_str()))
+            .any(|r| r["base"]["id"].as_str() == Some(private_resume_id.to_string().as_str()))
     );
 
     let anon_get_private = fixture
@@ -406,7 +406,7 @@ fn test_unlisted_readable_by_id_but_never_listed() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|r| r["id"].as_str() == Some(id_str.as_str()))
+            .any(|r| r["base"]["id"].as_str() == Some(id_str.as_str()))
     };
     assert!(!visible_to(None), "anonymous list hides unlisted");
     assert!(
@@ -612,7 +612,13 @@ fn test_unlisted_variant_on_private_base_reachable_by_id() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|r| r["id"].as_str() == Some(variant_id.to_string().as_str())),
+            .any(|u| {
+                u["base"]["id"].as_str() == Some(variant_id.to_string().as_str())
+                    || u["variants"].as_array().is_some_and(|vs| {
+                        vs.iter()
+                            .any(|v| v["id"].as_str() == Some(variant_id.to_string().as_str()))
+                    })
+            }),
         "unlisted variant absent from anon list"
     );
 

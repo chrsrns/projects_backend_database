@@ -143,7 +143,7 @@ fn test_create_resume_appears_in_list() {
     // Verify the specific resume we created is in the list
     let found = resumes_array
         .iter()
-        .any(|r| r["email"] == unique_email && r["id"] == created_id.to_string());
+        .any(|r| r["base"]["email"] == unique_email && r["base"]["id"] == created_id.to_string());
 
     assert!(
         found,
@@ -154,14 +154,14 @@ fn test_create_resume_appears_in_list() {
     // Also verify all fields are correct in the list
     let created_resume_in_list = resumes_array
         .iter()
-        .find(|r| r["id"] == created_id.to_string())
+        .find(|r| r["base"]["id"] == created_id.to_string())
         .expect("Should find the created resume");
 
-    assert_eq!(created_resume_in_list["name"], "Jane Smith");
-    assert_eq!(created_resume_in_list["location"], "New York, NY");
-    assert_eq!(created_resume_in_list["email"], unique_email);
+    assert_eq!(created_resume_in_list["base"]["name"], "Jane Smith");
+    assert_eq!(created_resume_in_list["base"]["location"], "New York, NY");
+    assert_eq!(created_resume_in_list["base"]["email"], unique_email);
     assert_eq!(
-        created_resume_in_list["github_url"],
+        created_resume_in_list["base"]["github_url"],
         "https://github.com/janesmith"
     );
 
@@ -501,7 +501,7 @@ fn test_list_resumes_ordering_is_deterministic_for_created_records() {
     let our_ids: Vec<uuid::Uuid> = resumes_array
         .iter()
         .filter_map(|r| {
-            let id = r["id"].as_str()?.parse::<uuid::Uuid>().ok()?;
+            let id = r["base"]["id"].as_str()?.parse::<uuid::Uuid>().ok()?;
             if id == id_a || id == id_b {
                 Some(id)
             } else {

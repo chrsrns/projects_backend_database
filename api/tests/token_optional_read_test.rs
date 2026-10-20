@@ -249,8 +249,8 @@ fn assert_anonymous_listing(fixture: &support::Fixture, resume_id: uuid::Uuid, e
             .as_array()
             .expect("listing body should be an array")
             .iter()
-            .find(|row| row["id"] == resume_id.to_string())
-            .cloned()
+            .find(|row| row["base"]["id"] == resume_id.to_string())
+            .map(|group| group["base"].clone())
             .expect("the fixture's own resume should be listed")
     };
 
@@ -380,7 +380,7 @@ fn lowercase_bearer_prefix_still_authenticates_as_owner() {
             .as_array()
             .expect("array")
             .iter()
-            .any(|row| row["id"].as_str() == Some(private_resume_id.to_string().as_str())),
+            .any(|row| row["base"]["id"].as_str() == Some(private_resume_id.to_string().as_str())),
         "a lowercase `bearer` prefix must still authenticate as the owner"
     );
 
