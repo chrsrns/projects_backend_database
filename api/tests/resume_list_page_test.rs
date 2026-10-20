@@ -46,6 +46,57 @@ fn items(page: &Value) -> &Vec<Value> {
     page["body"]["items"].as_array().expect("items array")
 }
 
+/// Page-unit accessors for the grouped shape: every item is
+/// `{base: ResumeView, variants: ResumeView[]}`.
+fn unit_id(unit: &Value) -> String {
+    unit["base"]["id"].as_str().expect("unit base id").to_string()
+}
+
+fn unit_variants(unit: &Value) -> &Vec<Value> {
+    unit["variants"].as_array().expect("unit variants array")
+}
+
+/// Every resume id visible inside a group: the unit's own id plus each
+/// nested variant id. Absence checks must descend into both.
+fn group_ids(unit: &Value) -> Vec<String> {
+    let mut ids = vec![unit_id(unit)];
+    ids.extend(
+        unit_variants(unit)
+            .iter()
+            .map(|v| v["id"].as_str().unwrap().to_string()),
+    );
+    ids
+}
+
+fn create_variant(
+    fixture: &mut support::Fixture,
+    base: uuid::Uuid,
+    body: serde_json::Value,
+) -> uuid::Uuid {
+    let response = fixture
+        .client()
+        .post(format!("/api/resume/{base}/variants"))
+        .header(fixture.auth_header())
+        .header(ContentType::JSON)
+        .body(body.to_string())
+        .dispatch();
+    assert_eq!(response.status(), Status::Created, "variant create");
+    let json: Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let id = support::resume_uuid(&json["body"]["id"]);
+    fixture.track_resume_id(id);
+    id
+}
+
+fn list_anon(fixture: &support::Fixture, query: &str) -> (Status, Value) {
+    let response = fixture
+        .client()
+        .get(format!("/api/resumes{query}"))
+        .dispatch();
+    let status = response.status();
+    let json = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    (status, json)
+}
+
 /// Every seeded row carries the fixture seed as a searchable marker so
 /// `?search=<seed>` narrows the shared test database to this fixture's rows.
 fn seed(fixture: &mut support::Fixture, count: usize, marker: u64) -> Vec<uuid::Uuid> {
@@ -343,4 +394,307 @@ fn scope_unpierced_for_non_owner() {
     let items = items(&json);
     assert_eq!(items.len(), 1);
     assert_eq!(items[0]["id"].as_str().unwrap(), public_id.to_string());
+}
+
+#[test]
+fn variant_nests_under_base_in_one_unit() {
+    let mut fixture = support::Fixture::new(9_250_011);
+    let base = create_resume(
+        &mut fixture,
+        "NESTBASE M9250011",
+        "nest.a.9250011@example.com",
+        "private",
+    );
+    let variant = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"company_name": "NESTCORP9250011"}),
+    );
+
+    let (status, page) = list(&fixture, "?search=9250011");
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        page["body"]["total"].as_i64(),
+        Some(1),
+        "base + attached variant = one page unit"
+    );
+
+    let units = items(&page);
+    assert_eq!(units.len(), 1);
+    let unit = &units[0];
+    assert_eq!(unit_id(unit), base.to_string());
+    let variants = unit_variants(unit);
+    assert_eq!(variants.len(), 1);
+    assert_eq!(variants[0]["id"].as_str().unwrap(), variant.to_string());
+    assert_eq!(
+        variants[0]["base_resume_id"].as_str().unwrap(),
+        base.to_string(),
+        "nested variant carries the backlink to its base"
+    );
+
+    let top_level: Vec<String> = items(&page).iter().map(unit_id).collect();
+    assert!(
+        !top_level.contains(&variant.to_string()),
+        "attached variant is absent as a top-level unit"
+    );
+}
+
+#[test]
+fn group_variants_ordered_id_ascending() {
+    let mut fixture = support::Fixture::new(9_250_012);
+    let base = create_resume(
+        &mut fixture,
+        "ORDBASE M9250012",
+        "ord.a.9250012@example.com",
+        "private",
+    );
+    let first = create_variant(&mut fixture, base, serde_json::json!({}));
+    let second = create_variant(&mut fixture, base, serde_json::json!({}));
+    let mut want = vec![first.to_string(), second.to_string()];
+    want.sort();
+
+    let (status, page) = list(&fixture, "?search=9250012");
+    assert_eq!(status, Status::Ok);
+    let variants = unit_variants(&items(&page)[0]);
+    let got: Vec<String> = variants
+        .iter()
+        .map(|v| v["id"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(got, want, "group variants ordered id ascending");
+}
+
+#[test]
+fn standalone_variant_of_invisible_base() {
+    let mut fixture = support::Fixture::new(9_250_013);
+    let base = create_resume(
+        &mut fixture,
+        "HIDDENBASE9250013",
+        "hidden.9250013@example.com",
+        "private",
+    );
+    let tagged = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"visibility": "public", "show_variant_tag": true}),
+    );
+    let untagged = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"visibility": "public", "show_variant_tag": false}),
+    );
+
+    let (status, page) = list_anon(&fixture, "?limit=100");
+    assert_eq!(status, Status::Ok);
+    let items = items(&page);
+
+    let tagged_unit = items
+        .iter()
+        .find(|u| unit_id(u) == tagged.to_string())
+        .expect("tagged standalone variant unit");
+    assert_eq!(tagged_unit["base"]["is_variant"].as_bool(), Some(true));
+    assert!(tagged_unit["base"]["base_resume_id"].is_null());
+    assert!(unit_variants(tagged_unit).is_empty());
+
+    let untagged_unit = items
+        .iter()
+        .find(|u| unit_id(u) == untagged.to_string())
+        .expect("untagged standalone variant unit");
+    assert_eq!(untagged_unit["base"]["is_variant"].as_bool(), Some(false));
+    assert!(untagged_unit["base"]["base_resume_id"].is_null());
+    assert!(unit_variants(untagged_unit).is_empty());
+}
+
+#[test]
+fn invisible_variants_absent_from_group() {
+    let mut fixture = support::Fixture::new(9_250_014);
+    let base = create_resume(
+        &mut fixture,
+        "PUBBASE M9250014",
+        "pub.a.9250014@example.com",
+        "public",
+    );
+    let private_variant = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"visibility": "private", "company_name": "PRIVCO9250014"}),
+    );
+    let unlisted_variant = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"visibility": "unlisted", "company_name": "UNLCO9250014"}),
+    );
+    let public_variant = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"visibility": "public", "company_name": "PUBCO9250014"}),
+    );
+
+    let (status, page) = list_anon(&fixture, "?search=9250014");
+    assert_eq!(status, Status::Ok);
+    let items = items(&page);
+    assert_eq!(items.len(), 1);
+    let unit = &items[0];
+    assert_eq!(unit_id(unit), base.to_string());
+
+    let visible: Vec<String> = unit_variants(unit)
+        .iter()
+        .map(|v| v["id"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        visible,
+        vec![public_variant.to_string()],
+        "only caller-visible variants nest; private/unlisted appear nowhere"
+    );
+    assert!(!visible.contains(&private_variant.to_string()));
+    assert!(!visible.contains(&unlisted_variant.to_string()));
+
+    let top_level: Vec<String> = items.iter().map(unit_id).collect();
+    assert!(!top_level.contains(&private_variant.to_string()));
+    assert!(!top_level.contains(&unlisted_variant.to_string()));
+}
+
+#[test]
+fn search_variant_hit_pulls_group_with_all_variants() {
+    let mut fixture = support::Fixture::new(9_250_015);
+    let base = create_resume(
+        &mut fixture,
+        "GROUPBASE M9250015",
+        "grp.a.9250015@example.com",
+        "private",
+    );
+    let _hit = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"company_name": "HITCORP9250015"}),
+    );
+    let _miss = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"company_name": "OTHERCO9250015"}),
+    );
+
+    let (status, page) = list(&fixture, "?search=hitcorp9250015");
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        page["body"]["total"].as_i64(),
+        Some(1),
+        "variant-only hit qualifies the group as one unit"
+    );
+    let unit = &items(&page)[0];
+    assert_eq!(unit_id(unit), base.to_string());
+    assert_eq!(
+        unit_variants(unit).len(),
+        2,
+        "a qualifying group carries all caller-visible variants"
+    );
+}
+
+#[test]
+fn search_two_matching_variants_one_unit() {
+    let mut fixture = support::Fixture::new(9_250_016);
+    let base = create_resume(
+        &mut fixture,
+        "DEDUPBASE M9250016",
+        "dup.a.9250016@example.com",
+        "private",
+    );
+    let _v1 = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"company_name": "SHAREDCO9250016"}),
+    );
+    let _v2 = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"company_name": "SHAREDCO9250016"}),
+    );
+
+    let (status, page) = list(&fixture, "?search=sharedco9250016");
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        page["body"]["total"].as_i64(),
+        Some(1),
+        "two matching variants of one base dedup to one unit"
+    );
+    assert_eq!(items(&page).len(), 1);
+    assert_eq!(unit_variants(&items(&page)[0]).len(), 2);
+}
+
+#[test]
+fn search_terms_split_across_rows_do_not_qualify() {
+    let mut fixture = support::Fixture::new(9_250_017);
+    let base = create_resume(
+        &mut fixture,
+        "SPLITBASE M9250017",
+        "split.a.9250017@example.com",
+        "private",
+    );
+    let _v1 = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"company_name": "SPLITCORP9250017"}),
+    );
+    let _v2 = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"role_title": "SPLITROLE9250017"}),
+    );
+
+    let (status, page) = list(&fixture, "?search=splitbase+splitcorp9250017");
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        page["body"]["total"].as_i64(),
+        Some(0),
+        "terms split across base and variant rows do not qualify"
+    );
+
+    let (status, page) = list(&fixture, "?search=splitcorp9250017+splitrole9250017");
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        page["body"]["total"].as_i64(),
+        Some(0),
+        "terms split across two variant rows do not qualify"
+    );
+}
+
+#[test]
+fn search_invisible_variant_term_qualifies_nothing() {
+    let mut fixture = support::Fixture::new(9_250_018);
+    let base = create_resume(
+        &mut fixture,
+        "GHOSTBASE M9250018",
+        "ghost.a.9250018@example.com",
+        "public",
+    );
+    let _ghost = create_variant(
+        &mut fixture,
+        base,
+        serde_json::json!({"visibility": "private", "company_name": "GHOSTCO9250018"}),
+    );
+
+    let (status, page) = list_anon(&fixture, "?search=ghostco9250018");
+    assert_eq!(status, Status::Ok);
+    assert_eq!(
+        page["body"]["total"].as_i64(),
+        Some(0),
+        "a term matching only a caller-invisible variant qualifies no unit"
+    );
+}
+
+#[test]
+fn group_ids_covers_nested_absence_checks() {
+    let mut fixture = support::Fixture::new(9_250_019);
+    let base = create_resume(
+        &mut fixture,
+        "HELPERBASE M9250019",
+        "hlp.a.9250019@example.com",
+        "private",
+    );
+    let variant = create_variant(&mut fixture, base, serde_json::json!({}));
+
+    let (status, page) = list(&fixture, "?search=9250019");
+    assert_eq!(status, Status::Ok);
+    let all: Vec<String> = items(&page).iter().flat_map(group_ids).collect();
+    assert!(all.contains(&base.to_string()));
+    assert!(all.contains(&variant.to_string()));
 }
