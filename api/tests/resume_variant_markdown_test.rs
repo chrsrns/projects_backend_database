@@ -795,6 +795,13 @@ fn stale_email_marker_still_targets_variant() {
         .as_array()
         .unwrap()
         .iter()
+        .flat_map(|u| {
+            u["variants"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .chain(std::iter::once(&u["base"]))
+        })
         .filter_map(|r| r["id"].as_str().and_then(|s| s.parse::<uuid::Uuid>().ok()))
         .filter(|id| *id == base_id || *id == variant_id)
         .collect();

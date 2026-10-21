@@ -184,7 +184,10 @@ fn resume_view_shape_flat_across_all_endpoints() {
     let items = listed_json["body"]["items"].as_array().unwrap();
     assert!(!items.is_empty());
     for item in items {
-        assert_flat_resume_view(item);
+        assert_flat_resume_view(&item["base"]);
+        for variant in item["variants"].as_array().unwrap() {
+            assert_flat_resume_view(variant);
+        }
     }
 
     let variants = fixture
@@ -232,39 +235,46 @@ fn list_resumes_includes_variants_in_id_order() {
 
     let ids: Vec<uuid::Uuid> = items
         .iter()
-        .map(|item| support::resume_uuid(&item["id"]))
+        .map(|item| support::resume_uuid(&item["base"]["id"]))
         .collect::<Vec<uuid::Uuid>>();
     let mut sorted = ids.clone();
     sorted.sort_unstable();
     assert_eq!(ids, sorted, "the list keeps its ascending id order");
 
-    for id in std::iter::once(base_id).chain(variant_ids.iter().copied()) {
-        assert!(
-            ids.contains(&id),
-            "GET /resumes should include resume {}",
-            id
-        );
-    }
-
+    assert!(
+        ids.contains(&base_id),
+        "GET /resumes should include the base resume"
+    );
     for variant_id in &variant_ids {
-        let item = items
-            .iter()
-            .find(|item| item["id"].as_str() == Some(variant_id.to_string().as_str()))
-            .expect("variant present in the list");
-        assert_eq!(item["is_variant"], Value::Bool(true));
-        assert_eq!(
-            item["base_resume_id"],
-            base_id.to_string(),
-            "the owner sees the parent link"
+        assert!(
+            !ids.contains(variant_id),
+            "attached variant must not be a top-level unit"
         );
     }
 
     let base_item = items
         .iter()
-        .find(|item| item["id"].as_str() == Some(base_id.to_string().as_str()))
+        .find(|item| item["base"]["id"].as_str() == Some(base_id.to_string().as_str()))
         .expect("base present in the list");
-    assert_eq!(base_item["is_variant"], Value::Bool(false));
-    assert!(base_item["base_resume_id"].is_null());
+    assert_eq!(base_item["base"]["is_variant"], Value::Bool(false));
+    assert!(base_item["base"]["base_resume_id"].is_null());
+
+    let variants = base_item["variants"].as_array().unwrap();
+    let got: Vec<uuid::Uuid> = variants
+        .iter()
+        .map(|v| support::resume_uuid(&v["id"]))
+        .collect();
+    let mut want = variant_ids.clone();
+    want.sort_unstable();
+    assert_eq!(got, want, "group carries every variant in id order");
+    for variant in variants {
+        assert_eq!(variant["is_variant"], Value::Bool(true));
+        assert_eq!(
+            variant["base_resume_id"],
+            base_id.to_string(),
+            "the owner sees the parent link"
+        );
+    }
 }
 
 #[test]

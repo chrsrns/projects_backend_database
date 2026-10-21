@@ -49,7 +49,7 @@ The read routes that are open to anonymous callers — `GET /api/resumes`, `GET 
 
 Resume bodies are returned as a flat, viewer-aware payload: every stored resume column plus `is_variant`, `base_resume_id`, `show_variant_tag` and the variant targeting fields. Whether a variant advertises itself depends on whether the caller may read its base resume, and `show_variant_tag` is only returned to the owner.
 
-- **GET** `/api/resumes` — public resumes plus the caller's own private ones, variants included
+- **GET** `/api/resumes` — public resumes plus the caller's own private ones, as a grouped page `{items, total, limit, offset}`. Each item is a `ResumeGroup` `{base, variants[]}`: a variant whose base the caller can read nests under its base and never counts as its own row. Supports `limit`/`offset` (max 100, default 20), `sort` (`id`/`name`/`updated_at`), `order` (`asc`/`desc`), and whitespace-AND `search` that qualifies a group on the base row or any caller-visible variant
 - **GET** `/api/resume/{id}` — a single resume
 - **POST** `/api/new_resume` — create a base resume (Bearer auth)
 - **PUT** `/api/resume/{id}` — update a resume; variant targeting fields are only accepted on variants (Bearer auth)
@@ -165,4 +165,3 @@ docker buildx build \
 - [x] Add request/response examples for each endpoint (curl + JSON payloads)
 - [ ] Add automated integration tests for full CRUD via HTTP
 - [ ] Improve error handling: avoid `unwrap()` in handlers and standardize error payloads
-- [ ] Add pagination/filtering/sorting for `GET /resumes`
